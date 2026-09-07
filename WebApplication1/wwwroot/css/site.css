@@ -1,0 +1,111 @@
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+}
+
+.brand-image.fas {
+    font-size: 1.4rem;
+    line-height: 2.5rem;
+}
+
+.small-box .icon {
+    opacity: 0.4;
+}
+
+.table-responsive-card {
+    overflow-x: auto;
+}
+
+.required-asterisk::after {
+    content: " *";
+    color: #dc3545;
+}
+
+/* Dashboard interactivity & animation --------------------------------- */
+
+@keyframes dash-fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dash-pulse-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+}
+
+@keyframes dash-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+}
+
+.dashboard-page .dash-in {
+    opacity: 0;
+    animation: dash-fade-up 0.5s ease-out forwards;
+    animation-delay: calc(var(--dash-delay, 0) * 60ms);
+}
+
+.dashboard-page .dash-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-page .dash-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-page .small-box,
+.dashboard-page .info-box {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-page .small-box:hover,
+.dashboard-page .info-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-page .dash-pulse {
+    display: inline-block;
+    animation: dash-pulse-scale 2.4s ease-in-out infinite;
+}
+
+.dashboard-page .dash-pulse-dot {
+    font-size: 0.55rem;
+    animation: dash-blink 1.6s ease-in-out infinite;
+}
+
+.dashboard-page .progress-bar.dash-bar {
+    transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboard-page .dash-table tbody tr {
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.dashboard-page .dash-table tbody tr:hover {
+    transform: translateX(2px);
+}
+
+.dashboard-page [data-days] {
+    transition: all 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-page .dash-in {
+        opacity: 1;
+        animation: none;
+    }
+
+    .dashboard-page .dash-pulse,
+    .dashboard-page .dash-pulse-dot {
+        animation: none;
+    }
+
+    .dashboard-page .dash-hover:hover,
+    .dashboard-page .small-box:hover,
+    .dashboard-page .info-box:hover,
+    .dashboard-page .dash-table tbody tr:hover {
+        transform: none;
+    }
+}

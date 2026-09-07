@@ -1,0 +1,35 @@
+@model List<JournalEntry>
+@{
+    ViewData["Title"] = "Journal Entries";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant))
+    {
+        <a asp-action="CreateJournalEntry" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Journal Entry</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Entry #</th><th>Date</th><th>Description</th><th>Source</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+            @foreach (var j in Model)
+            {
+                <tr>
+                    <td><a asp-action="JournalEntryDetails" asp-route-id="@j.Id">@j.EntryNumber</a></td>
+                    <td>@j.Date.ToString("MMM dd, yyyy")</td>
+                    <td>@j.Description</td>
+                    <td><span class="badge text-bg-light border">@j.Source</span></td>
+                    <td class="text-end">@j.TotalDebit.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted py-3">No journal entries yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

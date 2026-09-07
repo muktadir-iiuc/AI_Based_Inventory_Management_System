@@ -1,0 +1,31 @@
+@model List<TrialBalanceRow>
+@{
+    ViewData["Title"] = "Trial Balance";
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@row.AccountCode</td>
+                    <td>@row.AccountName</td>
+                    <td>@row.Type</td>
+                    <td class="text-end">@(row.Debit > 0 ? row.Debit.ToString("C") : "")</td>
+                    <td class="text-end">@(row.Credit > 0 ? row.Credit.ToString("C") : "")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="3" class="text-end">Total</td>
+                    <td class="text-end">@Model.Sum(r => r.Debit).ToString("C")</td>
+                    <td class="text-end">@Model.Sum(r => r.Credit).ToString("C")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>

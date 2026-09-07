@@ -1,0 +1,65 @@
+@model StockValuationViewModel
+@{
+    ViewData["Title"] = "Stock Valuation";
+    var totalCostValue = Model.Rows.Sum(r => r.ValueAtCost);
+    var totalSaleValue = Model.Rows.Sum(r => r.ValueAtSalePrice);
+}
+
+@if (Model.WarehouseScoped)
+{
+    <div class="alert alert-info py-2">
+        <i class="fas fa-warehouse me-1"></i>
+        Showing stock valuation for your assigned warehouse only.
+    </div>
+}
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Inventory Value (at cost)</span>
+                <h4>@totalCostValue.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Inventory Value (at sale price)</span>
+                <h4>@totalSaleValue.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>SKU</th><th>Product</th><th>Category</th>
+                    <th class="text-end">Stock</th><th class="text-end">Cost</th>
+                    <th class="text-end">Value at Cost</th><th class="text-end">Value at Sale Price</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td>@r.Sku</td>
+                    <td>@r.ProductName</td>
+                    <td>@r.CategoryName</td>
+                    <td class="text-end">@r.Stock.ToString("0.##")</td>
+                    <td class="text-end">@r.CostPrice.ToString("C")</td>
+                    <td class="text-end">@r.ValueAtCost.ToString("C")</td>
+                    <td class="text-end">@r.ValueAtSalePrice.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Rows.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted py-3">No stock found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

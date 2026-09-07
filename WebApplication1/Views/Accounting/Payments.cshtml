@@ -1,0 +1,50 @@
+@model List<Payment>
+@{
+    ViewData["Title"] = "Payments & Receipts";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant))
+    {
+        <a asp-action="CreatePayment" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Payment / Receipt</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Payment #</th><th>Date</th><th>Direction</th><th>Against</th><th>Notes</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td>@p.PaymentNumber</td>
+                    <td>@p.Date.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        @if (p.Direction == PaymentDirection.Out) { <span class="badge text-bg-danger">Paid to supplier</span> }
+                        else { <span class="badge text-bg-success">Received from customer</span> }
+                    </td>
+                    <td>
+                        @if (p.PurchaseInvoice is not null)
+                        {
+                            <a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@p.PurchaseInvoiceId">@p.PurchaseInvoice.InvoiceNumber</a>
+                            <span class="text-muted">(@p.PurchaseInvoice.Supplier?.Name)</span>
+                        }
+                        @if (p.SalesInvoice is not null)
+                        {
+                            <a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@p.SalesInvoiceId">@p.SalesInvoice.InvoiceNumber</a>
+                            <span class="text-muted">(@p.SalesInvoice.Customer?.Name)</span>
+                        }
+                    </td>
+                    <td>@p.Notes</td>
+                    <td class="text-end">@p.Amount.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

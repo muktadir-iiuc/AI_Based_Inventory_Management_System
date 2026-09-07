@@ -1,0 +1,53 @@
+@model List<Customer>
+@{
+    ViewData["Title"] = "Customers";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Customer</a>
+    }
+}
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="search" value="@ViewData["Search"]" class="form-control form-control-sm" placeholder="Search customers..." />
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+        </form>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@c.Id">@c.Name</a></td>
+                    <td>@c.ContactPerson</td>
+                    <td>@c.Phone</td>
+                    <td>@c.Email</td>
+                    <td>
+                        @if (c.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer))
+                        {
+                            <a asp-action="Edit" asp-route-id="@c.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this customer?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No customers found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,46 @@
+@model Account
+@{
+    ViewData["Title"] = "Edit Account";
+}
+
+<div class="card col-md-6">
+    <div class="card-body">
+        <form asp-action="EditAccount" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="IsSystemAccount" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="Code" class="form-label required-asterisk"></label>
+                <input asp-for="Code" class="form-control" readonly="@Model.IsSystemAccount" />
+                @if (Model.IsSystemAccount)
+                {
+                    <div class="form-text">System account codes cannot be changed.</div>
+                }
+            </div>
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label required-asterisk"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Type" class="form-label required-asterisk"></label>
+                @if (Model.IsSystemAccount)
+                {
+                    <input class="form-control" value="@Model.Type" readonly />
+                }
+                else
+                {
+                    <select asp-for="Type" asp-items="Html.GetEnumSelectList<AccountType>()" class="form-select"></select>
+                }
+            </div>
+            <div class="form-check mb-3">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-action="ChartOfAccounts" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

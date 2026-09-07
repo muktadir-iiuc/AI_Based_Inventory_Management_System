@@ -1,0 +1,43 @@
+@model List<Warehouse>
+@{
+    ViewData["Title"] = "Warehouses";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Warehouse</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var w in Model)
+            {
+                <tr>
+                    <td>@w.Code</td>
+                    <td>@w.Name</td>
+                    <td>@w.Location</td>
+                    <td>
+                        @if (w.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager))
+                        {
+                            <a asp-action="Edit" asp-route-id="@w.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted py-3">No warehouses found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

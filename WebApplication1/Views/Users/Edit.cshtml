@@ -1,0 +1,61 @@
+@model UserEditViewModel
+@{
+    ViewData["Title"] = "Edit User";
+    var roleList = (SelectList)ViewData["Roles"]!;
+    var warehouseList = (SelectList)ViewData["Warehouses"]!;
+    var unrestrictedRoles = (string[])ViewData["UnrestrictedRoles"]!;
+}
+
+<div class="card col-md-6">
+    <div class="card-body">
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="FullName" class="form-label required-asterisk"></label>
+                <input asp-for="FullName" class="form-control" />
+                <span asp-validation-for="FullName" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label required-asterisk"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Roles" class="form-label required-asterisk">Roles</label>
+                <select asp-for="Roles" asp-items="roleList" id="roleSelect" class="form-select" multiple></select>
+                <div class="form-text">A user can hold more than one role at once (e.g. Sales Officer and Accountant together).</div>
+            </div>
+            <div class="mb-3" id="warehouseGroup">
+                <label asp-for="WarehouseId" class="form-label required-asterisk">Warehouse</label>
+                <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select">
+                    <option value="">-- select warehouse --</option>
+                </select>
+                <span asp-validation-for="WarehouseId" class="text-danger small"></span>
+                <div class="form-text">This user's activity (invoices, stock) will be limited to this warehouse.</div>
+            </div>
+            <div class="form-check mb-3">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const unrestrictedRoles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(unrestrictedRoles));
+        const roleSelect = document.getElementById('roleSelect');
+        const warehouseGroup = document.getElementById('warehouseGroup');
+
+        function toggleWarehouse() {
+            const selected = Array.from(roleSelect.selectedOptions).map(o => o.value);
+            warehouseGroup.classList.toggle('d-none', selected.some(r => unrestrictedRoles.includes(r)));
+        }
+        roleSelect.addEventListener('change', toggleWarehouse);
+        toggleWarehouse();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

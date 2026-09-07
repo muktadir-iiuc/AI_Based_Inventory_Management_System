@@ -1,0 +1,39 @@
+@model List<Account>
+@{
+    ViewData["Title"] = "Chart of Accounts";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant))
+    {
+        <a asp-action="CreateAccount" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Account</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var a in Model)
+            {
+                <tr>
+                    <td>@a.Code</td>
+                    <td><a asp-action="Ledger" asp-route-accountId="@a.Id">@a.Name</a></td>
+                    <td>@a.Type</td>
+                    <td>
+                        @if (a.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant))
+                        {
+                            <a asp-action="EditAccount" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

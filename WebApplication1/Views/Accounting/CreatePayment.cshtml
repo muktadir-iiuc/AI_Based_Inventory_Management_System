@@ -1,0 +1,88 @@
+@model PaymentCreateViewModel
+@{
+    ViewData["Title"] = "New Payment / Receipt";
+    var purchaseList = (SelectList)ViewData["PurchaseInvoices"]!;
+    var salesList = (SelectList)ViewData["SalesInvoices"]!;
+}
+
+<div class="card col-md-6">
+    <div class="card-body">
+        <form asp-action="CreatePayment" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label class="form-label required-asterisk">Direction</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="Direction" id="dirIn" value="@((int)PaymentDirection.In)" checked>
+                    <label class="btn btn-outline-success" for="dirIn"><i class="fas fa-arrow-down"></i> Receive from Customer</label>
+
+                    <input type="radio" class="btn-check" name="Direction" id="dirOut" value="@((int)PaymentDirection.Out)">
+                    <label class="btn btn-outline-danger" for="dirOut"><i class="fas fa-arrow-up"></i> Pay to Supplier</label>
+                </div>
+            </div>
+
+            <div class="mb-3" id="salesInvoiceGroup">
+                <label asp-for="SalesInvoiceId" class="form-label">Sales Invoice</label>
+                <select asp-for="SalesInvoiceId" asp-items="salesList" class="form-select">
+                    <option value="">-- select sales invoice --</option>
+                </select>
+            </div>
+
+            <div class="mb-3 d-none" id="purchaseInvoiceGroup">
+                <label asp-for="PurchaseInvoiceId" class="form-label">Purchase Invoice</label>
+                <select asp-for="PurchaseInvoiceId" asp-items="purchaseList" class="form-select">
+                    <option value="">-- select purchase invoice --</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Date" class="form-label required-asterisk"></label>
+                    <input asp-for="Date" class="form-control" type="date" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Amount" class="form-label required-asterisk"></label>
+                    <input asp-for="Amount" class="form-control" type="number" step="0.01" />
+                    <span asp-validation-for="Amount" class="text-danger small"></span>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Notes" class="form-label"></label>
+                <input asp-for="Notes" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-action="Payments" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const dirIn = document.getElementById('dirIn');
+        const dirOut = document.getElementById('dirOut');
+        const salesGroup = document.getElementById('salesInvoiceGroup');
+        const purchaseGroup = document.getElementById('purchaseInvoiceGroup');
+
+        function toggle() {
+            if (dirIn.checked) {
+                salesGroup.classList.remove('d-none');
+                purchaseGroup.classList.add('d-none');
+            } else {
+                salesGroup.classList.add('d-none');
+                purchaseGroup.classList.remove('d-none');
+            }
+
+            // Select2 computes its width from the element's visible container, so a widget
+            // initialized while hidden behind d-none ends up 0px wide; rebuild it once shown.
+            document.querySelectorAll('.select2-hidden-accessible').forEach(el => {
+                jQuery(el).select2('destroy');
+            });
+            initSelect2(document);
+        }
+        dirIn.addEventListener('change', toggle);
+        dirOut.addEventListener('change', toggle);
+        toggle();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

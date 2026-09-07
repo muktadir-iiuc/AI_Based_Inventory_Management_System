@@ -1,0 +1,38 @@
+@model LedgerViewModel
+@{
+    ViewData["Title"] = $"Ledger: {Model.Account.Name}";
+    var normalDebit = Model.Account.Type is AccountType.Asset or AccountType.Expense;
+    decimal running = 0;
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">@Model.Account.Code &mdash; @Model.Account.Name</h3>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Date</th><th>Entry #</th><th>Memo</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th></tr></thead>
+            <tbody>
+            @foreach (var line in Model.Lines)
+            {
+                running += normalDebit ? (line.Debit - line.Credit) : (line.Credit - line.Debit);
+                <tr>
+                    <td>@line.JournalEntry?.Date.ToString("MMM dd, yyyy")</td>
+                    <td><a asp-action="JournalEntryDetails" asp-route-id="@line.JournalEntryId">@line.JournalEntry?.EntryNumber</a></td>
+                    <td>@line.Memo</td>
+                    <td class="text-end">@(line.Debit > 0 ? line.Debit.ToString("C") : "")</td>
+                    <td class="text-end">@(line.Credit > 0 ? line.Credit.ToString("C") : "")</td>
+                    <td class="text-end">@running.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Lines.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No activity on this account yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <a asp-action="ChartOfAccounts" class="btn btn-secondary btn-sm">Back to chart of accounts</a>
+    </div>
+</div>

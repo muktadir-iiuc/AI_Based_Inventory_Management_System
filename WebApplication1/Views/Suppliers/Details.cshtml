@@ -1,0 +1,53 @@
+@model Supplier
+@{
+    ViewData["Title"] = $"Supplier: {Model.Name}";
+}
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Details</h3></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-4">Name</dt><dd class="col-8">@Model.Name</dd>
+                    <dt class="col-4">Contact</dt><dd class="col-8">@Model.ContactPerson</dd>
+                    <dt class="col-4">Phone</dt><dd class="col-8">@Model.Phone</dd>
+                    <dt class="col-4">Email</dt><dd class="col-8">@Model.Email</dd>
+                    <dt class="col-4">Address</dt><dd class="col-8">@Model.Address</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+                @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+                {
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Purchase Invoices</h3></div>
+            <div class="card-body p-0 table-responsive-card">
+                <table class="table table-striped mb-0">
+                    <thead><tr><th>Invoice #</th><th>Date</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var inv in Model.PurchaseInvoices.OrderByDescending(i => i.Date))
+                    {
+                        <tr>
+                            <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@inv.Id">@inv.InvoiceNumber</a></td>
+                            <td>@inv.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@inv.Status</td>
+                            <td class="text-end">@inv.TotalAmount.ToString("C")</td>
+                        </tr>
+                    }
+                    @if (!Model.PurchaseInvoices.Any())
+                    {
+                        <tr><td colspan="4" class="text-center text-muted py-3">No purchase invoices yet.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

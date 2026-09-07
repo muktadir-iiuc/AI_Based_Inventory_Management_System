@@ -1,0 +1,64 @@
+@model LoginViewModel
+@inject ICompanySettingsService CompanySettings
+@{
+    ViewData["Title"] = "Sign In";
+    Layout = "_LoginLayout";
+    var company = await CompanySettings.GetAsync();
+}
+
+<div class="login-logo">
+    @if (company.LogoImage is not null)
+    {
+        <div class="mb-2"><img src="@Url.Action("Logo", "CompanySettings")" alt="@company.CompanyName" style="max-height:80px; max-width:200px;" /></div>
+    }
+    <a href="#"><b>@company.CompanyName</b></a>
+</div>
+<div class="card">
+    <div class="card-body login-card-body">
+        <p class="login-box-msg">Sign in to manage purchase, sales, accounting and inventory</p>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form asp-action="Login" method="post">
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="input-group mb-3">
+                <input asp-for="Email" class="form-control" placeholder="Email" autocomplete="username" />
+                <div class="input-group-text"><span class="fas fa-envelope"></span></div>
+            </div>
+            <span asp-validation-for="Email" class="text-danger small"></span>
+
+            <div class="input-group mb-3">
+                <input asp-for="Password" class="form-control" placeholder="Password" autocomplete="current-password" />
+                <div class="input-group-text"><span class="fas fa-lock"></span></div>
+            </div>
+            <span asp-validation-for="Password" class="text-danger small"></span>
+
+            <div class="row">
+                <div class="col-7">
+                    <div class="form-check">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label">Remember me</label>
+                    </div>
+                </div>
+                <div class="col-5">
+                    <button type="submit" class="btn btn-primary w-100">Sign In</button>
+                </div>
+            </div>
+        </form>
+
+        <p class="mb-1 mt-3 text-muted small">
+            Demo accounts (password shown after the @@): <br />
+            admin@inventory.local / Admin@123 (Admin)<br />
+            manager@inventory.local / Manager@123 (Manager)<br />
+            purchase@inventory.local / Purchase@123 (Purchase Officer)<br />
+            sales@inventory.local / Sales@123 (Sales Officer)<br />
+            accounts@inventory.local / Accounts@123 (Accountant)<br />
+            viewer@inventory.local / Viewer@123 (Viewer)
+        </p>
+    </div>
+</div>

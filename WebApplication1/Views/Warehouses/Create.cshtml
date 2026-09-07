@@ -1,0 +1,30 @@
+@model Warehouse
+@{
+    ViewData["Title"] = "New Warehouse";
+}
+
+<div class="card col-md-6">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="Code" class="form-label required-asterisk"></label>
+                <input asp-for="Code" class="form-control" />
+                <span asp-validation-for="Code" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label required-asterisk"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Location" class="form-label"></label>
+                <textarea asp-for="Location" class="form-control" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

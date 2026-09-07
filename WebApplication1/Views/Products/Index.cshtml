@@ -1,0 +1,74 @@
+@model List<Product>
+@{
+    ViewData["Title"] = "Products";
+    var categoryList = (SelectList)ViewData["CategoryId"]!;
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Product</a>
+    }
+}
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2">
+            <div class="col-auto">
+                <input type="text" name="search" value="@ViewData["Search"]" class="form-control form-control-sm" placeholder="Search by name or SKU..." />
+            </div>
+            <div class="col-auto">
+                <select name="categoryId" asp-items="categoryList" class="form-select form-select-sm">
+                    <option value="">All categories</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fas fa-search"></i> Filter</button>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>SKU</th><th>Name</th><th>Category</th><th>Unit</th>
+                    <th class="text-end">Cost</th><th class="text-end">Price</th>
+                    <th class="text-end">Stock</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr class="@(p.CurrentStock <= p.ReorderLevel ? "table-warning" : "")">
+                    <td>@p.Sku</td>
+                    <td><a asp-action="Details" asp-route-id="@p.Id">@p.Name</a></td>
+                    <td>@p.Category?.Name</td>
+                    <td>@p.UnitOfMeasure?.Symbol</td>
+                    <td class="text-end">@p.CostPrice.ToString("C")</td>
+                    <td class="text-end">@p.SalePrice.ToString("C")</td>
+                    <td class="text-end">
+                        @p.CurrentStock.ToString("0.##")
+                        @if (p.CurrentStock <= p.ReorderLevel)
+                        {
+                            <i class="fas fa-triangle-exclamation text-warning ms-1" title="At or below reorder level"></i>
+                        }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+                        {
+                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this product?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="8" class="text-center text-muted py-3">No products found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

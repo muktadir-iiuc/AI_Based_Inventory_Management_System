@@ -1,0 +1,53 @@
+@model List<Supplier>
+@{
+    ViewData["Title"] = "Suppliers";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Supplier</a>
+    }
+}
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="search" value="@ViewData["Search"]" class="form-control form-control-sm" placeholder="Search suppliers..." />
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+        </form>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var s in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@s.Id">@s.Name</a></td>
+                    <td>@s.ContactPerson</td>
+                    <td>@s.Phone</td>
+                    <td>@s.Email</td>
+                    <td>
+                        @if (s.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+                        {
+                            <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this supplier?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No suppliers found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

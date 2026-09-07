@@ -1,0 +1,56 @@
+@model List<PurchaseInvoice>
+@{
+    ViewData["Title"] = "Purchase Invoices";
+    var supplierList = (SelectList)ViewData["SupplierId"]!;
+    var warehouseList = (SelectList)ViewData["WarehouseId"]!;
+    var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Purchase Invoice</a>
+    }
+}
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="d-flex gap-2">
+            <select name="supplierId" asp-items="supplierList" class="form-select form-select-sm" style="max-width: 260px;">
+                <option value="">All suppliers</option>
+            </select>
+            @if (!warehouseScoped)
+            {
+                <select name="warehouseId" asp-items="warehouseList" class="form-select form-select-sm" style="max-width: 260px;">
+                    <option value="">All warehouses</option>
+                </select>
+            }
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+        </form>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Invoice #</th><th>Supplier</th><th>Warehouse</th><th>Date</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+            <tbody>
+            @foreach (var inv in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@inv.Id">@inv.InvoiceNumber</a></td>
+                    <td>@inv.Supplier?.Name</td>
+                    <td>@inv.Warehouse?.Name</td>
+                    <td>@inv.Date.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        @if (inv.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
+                        else { <span class="badge text-bg-secondary">Cancelled</span> }
+                    </td>
+                    <td class="text-end">@inv.TotalAmount.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No purchase invoices found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

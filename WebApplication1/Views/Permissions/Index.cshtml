@@ -1,0 +1,48 @@
+@model HashSet<string>
+@{
+    ViewData["Title"] = "Role Permissions";
+    var roles = (string[])ViewData["Roles"]!;
+    var permissions = ((string Key, string Label, string Description)[])ViewData["Permissions"]!;
+}
+
+<div class="alert alert-info">
+    <i class="fas fa-shield-halved me-1"></i>
+    Admin and Manager always have full access. Use this page to grant extra, specific capabilities to the other roles
+    without making them a Manager.
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Save" method="post">
+            <div class="table-responsive-card">
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            @foreach (var p in permissions)
+                            {
+                                <th class="text-center" title="@p.Description">@p.Label</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var role in roles)
+                    {
+                        <tr>
+                            <td class="fw-bold">@role</td>
+                            @foreach (var p in permissions)
+                            {
+                                var key = $"{role}|{p.Key}";
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input" name="grants" value="@key" checked="@Model.Contains(key)" />
+                                </td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Permissions</button>
+        </form>
+    </div>
+</div>

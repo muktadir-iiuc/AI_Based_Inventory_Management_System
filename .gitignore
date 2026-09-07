@@ -1,0 +1,28 @@
+## .NET
+bin/
+obj/
+*.user
+.vs/
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## Rider/VS Code
+.idea/
+.vscode/
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Logs
+*.log
+
+## Secrets
+WebApplication1/appsettings.json

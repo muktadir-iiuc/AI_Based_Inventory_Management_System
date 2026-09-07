@@ -1,0 +1,58 @@
+@model CompanySettingsViewModel
+@{
+    ViewData["Title"] = "Company Settings";
+}
+
+<div class="card col-md-7">
+    <div class="card-body">
+        <form asp-action="Index" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="mb-3">
+                <label asp-for="CompanyName" class="form-label required-asterisk"></label>
+                <input asp-for="CompanyName" class="form-control" />
+                <span asp-validation-for="CompanyName" class="text-danger small"></span>
+                <div class="form-text">Printed as the header of invoice PDFs and shown in page titles and the footer.</div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="ShortName" class="form-label required-asterisk"></label>
+                <input asp-for="ShortName" class="form-control" />
+                <span asp-validation-for="ShortName" class="text-danger small"></span>
+                <div class="form-text">Used where space is tight: the sidebar brand and the sign-in screen.</div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Address" class="form-label"></label>
+                <textarea asp-for="Address" class="form-control" rows="2"></textarea>
+                <span asp-validation-for="Address" class="text-danger small"></span>
+                <div class="form-text">Printed under the company name on invoice PDFs.</div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Phone" class="form-label"></label>
+                <input asp-for="Phone" class="form-control" />
+                <span asp-validation-for="Phone" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="LogoFile" class="form-label"></label>
+                @if (Model.HasLogo)
+                {
+                    <div class="mb-2">
+                        <img src="@Url.Action("Logo")" alt="Company logo" class="border rounded bg-white p-1" style="max-height: 70px; max-width: 200px;" />
+                    </div>
+                }
+                <input asp-for="LogoFile" type="file" class="form-control" accept="image/png,image/jpeg,image/gif,image/bmp" />
+                <span asp-validation-for="LogoFile" class="text-danger small"></span>
+                <div class="form-text">PNG, JPEG, GIF or BMP up to 1 MB. Printed at the top-left of invoice PDFs. Leave empty to keep the current logo.</div>
+                @if (Model.HasLogo)
+                {
+                    <div class="form-check mt-2">
+                        <input asp-for="RemoveLogo" class="form-check-input" />
+                        <label asp-for="RemoveLogo" class="form-check-label"></label>
+                    </div>
+                }
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-controller="Home" asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -1,0 +1,56 @@
+@model List<ReorderSuggestion>
+@{
+    ViewData["Title"] = "AI Reorder Suggestions";
+    var toReorder = Model.Count(r => r.ShouldReorder);
+}
+
+<div class="alert alert-info">
+    <i class="fas fa-robot me-1"></i>
+    Demand is forecast per product from up to 90 days of sales history using an ML.NET SSA (Singular Spectrum Analysis) time-series
+    model, falling back to a 14-day moving average when a product doesn't yet have enough history.
+    <strong>@toReorder</strong> product(s) currently need reordering.
+    @if (User.GetWarehouseId().HasValue)
+    {
+        <span>Figures are scoped to your assigned warehouse.</span>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>SKU</th><th>Product</th>
+                    <th class="text-end">Current Stock</th><th class="text-end">Reorder Level</th>
+                    <th class="text-end">Forecasted 30-day Demand</th>
+                    <th class="text-end">Suggested Reorder Qty</th>
+                    <th>Method</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model)
+            {
+                <tr class="@(r.ShouldReorder ? "table-warning" : "")">
+                    <td>@r.Sku</td>
+                    <td><a asp-controller="Products" asp-action="Details" asp-route-id="@r.ProductId">@r.ProductName</a></td>
+                    <td class="text-end">@r.CurrentStock.ToString("0.##")</td>
+                    <td class="text-end">@r.ReorderLevel.ToString("0.##")</td>
+                    <td class="text-end">@r.Forecasted30DayDemand.ToString("0.#")</td>
+                    <td class="text-end">@(r.SuggestedReorderQty > 0 ? r.SuggestedReorderQty.ToString("0.##") : "-")</td>
+                    <td><span class="badge text-bg-light border">@r.Method</span></td>
+                    <td>
+                        @if (r.ShouldReorder)
+                        {
+                            <span class="badge text-bg-warning"><i class="fas fa-triangle-exclamation"></i> Reorder now</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">OK</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

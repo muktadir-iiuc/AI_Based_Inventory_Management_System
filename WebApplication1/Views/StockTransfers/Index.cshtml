@@ -1,0 +1,41 @@
+@model List<StockTransfer>
+@inject IAuthorizationService AuthorizationService
+@{
+    ViewData["Title"] = "Stock Transfers";
+    var canTransfer = (await AuthorizationService.AuthorizeAsync(User, Permissions.StockTransfer)).Succeeded;
+}
+
+@section Toolbar {
+    @if (canTransfer)
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Transfer</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Transfer #</th><th>From</th><th>To</th><th>Date</th><th>Status</th><th class="text-end">Lines</th></tr></thead>
+            <tbody>
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@t.Id">@t.TransferNumber</a></td>
+                    <td>@t.FromWarehouse?.Name</td>
+                    <td>@t.ToWarehouse?.Name</td>
+                    <td>@t.Date.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        @if (t.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
+                        else { <span class="badge text-bg-secondary">Cancelled</span> }
+                    </td>
+                    <td class="text-end">@t.Items.Count</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">No stock transfers found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

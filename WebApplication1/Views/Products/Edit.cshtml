@@ -1,0 +1,63 @@
+@model Product
+@{
+    ViewData["Title"] = "Edit Product";
+    var categoryList = (SelectList)ViewData["Categories"]!;
+    var unitList = (SelectList)ViewData["Units"]!;
+}
+
+<div class="card col-md-8">
+    <div class="card-body">
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Sku" class="form-label required-asterisk"></label>
+                    <input asp-for="Sku" class="form-control" />
+                    <span asp-validation-for="Sku" class="text-danger small"></span>
+                </div>
+                <div class="col-md-8 mb-3">
+                    <label asp-for="Name" class="form-label required-asterisk"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="CategoryId" class="form-label required-asterisk"></label>
+                    <select asp-for="CategoryId" asp-items="categoryList" class="form-select"></select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="UnitOfMeasureId" class="form-label required-asterisk"></label>
+                    <select asp-for="UnitOfMeasureId" asp-items="unitList" class="form-select"></select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="CostPrice" class="form-label required-asterisk"></label>
+                    <input asp-for="CostPrice" class="form-control" type="number" step="0.01" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label asp-for="SalePrice" class="form-label required-asterisk"></label>
+                    <input asp-for="SalePrice" class="form-control" type="number" step="0.01" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label asp-for="ReorderLevel" class="form-label required-asterisk"></label>
+                    <input asp-for="ReorderLevel" class="form-control" type="number" step="0.01" />
+                </div>
+            </div>
+            <div class="form-check mb-3">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

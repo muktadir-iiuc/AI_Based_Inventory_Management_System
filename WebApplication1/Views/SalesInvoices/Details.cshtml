@@ -1,0 +1,67 @@
+@model SalesInvoice
+@{
+    ViewData["Title"] = $"Sales Invoice {Model.InvoiceNumber}";
+}
+
+@section Toolbar {
+    <a asp-action="PrintPdf" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm" target="_blank">
+        <i class="fas fa-file-pdf"></i> Print PDF
+    </a>
+    <a asp-action="PrintThermal" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="fas fa-receipt"></i> Print Receipt
+    </a>
+    @if (Model.Status == DocumentStatus.Posted && (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer)))
+    {
+        <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Cancel this sales invoice? This will reverse stock and accounting entries.">
+            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-ban"></i> Cancel Invoice</button>
+        </form>
+    }
+}
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Summary</h3></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Invoice #</dt><dd class="col-7">@Model.InvoiceNumber</dd>
+                    <dt class="col-5">Customer</dt><dd class="col-7">@Model.Customer?.Name</dd>
+                    <dt class="col-5">Warehouse</dt><dd class="col-7">@Model.Warehouse?.Name</dd>
+                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
+                    <dt class="col-5">Status</dt>
+                    <dd class="col-7">
+                        @if (Model.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
+                        else { <span class="badge text-bg-secondary">Cancelled</span> }
+                    </dd>
+                    <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
+                    <dt class="col-5">Total</dt><dd class="col-7 fw-bold">@Model.TotalAmount.ToString("C")</dd>
+                    <dt class="col-5">Received</dt><dd class="col-7">@Model.Payments.Sum(p => p.Amount).ToString("C")</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Line Items</h3></div>
+            <div class="card-body p-0 table-responsive-card">
+                <table class="table table-striped mb-0">
+                    <thead><tr><th>Product</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Line Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>@item.Product?.Name <small class="text-muted">(@item.Product?.Sku)</small></td>
+                            <td class="text-end">@item.Quantity.ToString("0.##")</td>
+                            <td class="text-end">@item.UnitPrice.ToString("C")</td>
+                            <td class="text-end">@item.LineTotal.ToString("C")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

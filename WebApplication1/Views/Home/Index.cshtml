@@ -1,0 +1,483 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var currencySymbol = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
+    var yesterdaySales = Model.SalesTrend.Count >= 2 ? Model.SalesTrend[^2] : 0;
+    var yesterdayPurchases = Model.PurchaseTrend.Count >= 2 ? Model.PurchaseTrend[^2] : 0;
+    decimal? DayChange(decimal today, decimal yesterday) => yesterday == 0 ? null : Math.Round((today - yesterday) / yesterday * 100, 1);
+    var todaySalesChange = DayChange(Model.TodaySalesTotal, yesterdaySales);
+    var todayPurchasesChange = DayChange(Model.TodayPurchasesTotal, yesterdayPurchases);
+    var maxTopCustomer = Model.TopCustomers.Count > 0 ? Model.TopCustomers.Max(c => c.Value) : 0;
+}
+
+<div class="dashboard-page">
+
+@if (Model.WarehouseScoped)
+{
+    <div class="alert alert-info py-2 dash-in">
+        <i class="fas fa-warehouse me-1"></i>
+        Showing sales, purchases and stock activity for your assigned warehouse only. Financial balances below remain company-wide.
+    </div>
+}
+
+<div class="d-flex justify-content-end mb-2 dash-in">
+    <span class="text-muted small"><i class="fas fa-circle text-success me-1 dash-pulse-dot"></i>Live &mdash; as of <span id="dashClock"></span></span>
+</div>
+
+<div class="row">
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 0">
+        <div class="small-box text-bg-primary">
+            <div class="inner">
+                <h3 data-countup="@Model.TotalProducts">0</h3>
+                <p>Active Products</p>
+            </div>
+            <i class="icon fas fa-box"></i>
+            <a asp-controller="Products" asp-action="Index" class="small-box-footer">View products <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 1">
+        <div class="small-box text-bg-warning">
+            <div class="inner">
+                <h3 data-countup="@Model.LowStockCount">0</h3>
+                <p>Low Stock Items</p>
+            </div>
+            <i class="icon fas fa-triangle-exclamation"></i>
+            <a asp-controller="Reports" asp-action="ReorderSuggestions" class="small-box-footer">Reorder suggestions <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 2">
+        <div class="small-box text-bg-success">
+            <div class="inner">
+                <h3 data-countup-money="@Model.TodaySalesTotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</h3>
+                <p>
+                    Today's Sales
+                    @if (todaySalesChange.HasValue)
+                    {
+                        <span class="badge @(todaySalesChange >= 0 ? "text-bg-light" : "text-bg-danger") ms-1">
+                            <i class="fas @(todaySalesChange >= 0 ? "fa-arrow-up" : "fa-arrow-down")"></i> @Math.Abs(todaySalesChange.Value)%
+                        </span>
+                    }
+                </p>
+            </div>
+            <i class="icon fas fa-cash-register"></i>
+            <a asp-controller="SalesInvoices" asp-action="Index" class="small-box-footer">View sales <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 3">
+        <div class="small-box text-bg-info">
+            <div class="inner">
+                <h3 data-countup-money="@Model.TodayPurchasesTotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</h3>
+                <p>
+                    Today's Purchases
+                    @if (todayPurchasesChange.HasValue)
+                    {
+                        <span class="badge @(todayPurchasesChange >= 0 ? "text-bg-light" : "text-bg-danger") ms-1">
+                            <i class="fas @(todayPurchasesChange >= 0 ? "fa-arrow-up" : "fa-arrow-down")"></i> @Math.Abs(todayPurchasesChange.Value)%
+                        </span>
+                    }
+                </p>
+            </div>
+            <i class="icon fas fa-truck-loading"></i>
+            <a asp-controller="PurchaseInvoices" asp-action="Index" class="small-box-footer">View purchases <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 4">
+        <div class="info-box shadow-sm">
+            <span class="info-box-icon text-bg-secondary"><i class="fas fa-warehouse"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Stock Value</span>
+                <span class="info-box-number" data-countup-money="@Model.StockValue.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 5">
+        <div class="info-box shadow-sm">
+            <span class="info-box-icon text-bg-danger"><i class="fas fa-ban"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Out of Stock</span>
+                <span class="info-box-number" data-countup="@Model.OutOfStockCount">0</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 6">
+        <div class="info-box shadow-sm">
+            <span class="info-box-icon text-bg-primary"><i class="fas fa-people-group"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Active Customers</span>
+                <span class="info-box-number" data-countup="@Model.ActiveCustomerCount">0</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 7">
+        <div class="info-box shadow-sm">
+            <span class="info-box-icon text-bg-info"><i class="fas fa-industry"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Active Suppliers</span>
+                <span class="info-box-number" data-countup="@Model.ActiveSupplierCount">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 dash-in" style="--dash-delay: 8">
+        <div class="card dash-hover">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Cash &amp; Bank</span>
+                    <i class="fas fa-wallet text-success dash-pulse"></i>
+                </div>
+                <h4 class="mb-0" data-countup-money="@Model.CashBalance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 dash-in" style="--dash-delay: 9">
+        <div class="card dash-hover">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Accounts Receivable</span>
+                    <i class="fas fa-hand-holding-dollar text-info dash-pulse"></i>
+                </div>
+                <h4 class="mb-0" data-countup-money="@Model.AccountsReceivableBalance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 dash-in" style="--dash-delay: 10">
+        <div class="card dash-hover">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Accounts Payable</span>
+                    <i class="fas fa-file-invoice-dollar text-danger dash-pulse"></i>
+                </div>
+                <h4 class="mb-0" data-countup-money="@Model.AccountsPayableBalance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 dash-in" style="--dash-delay: 11">
+        <div class="card dash-hover">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h3 class="card-title mb-0">Sales vs Purchases</h3>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Trend period">
+                    <button type="button" class="btn btn-outline-primary" data-days="7">7D</button>
+                    <button type="button" class="btn btn-outline-primary" data-days="14">14D</button>
+                    <button type="button" class="btn btn-outline-primary active" data-days="30">30D</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="position: relative; height: 260px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 dash-in" style="--dash-delay: 12">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Top Products <small class="text-muted">(30 days)</small></h3>
+            </div>
+            <div class="card-body">
+                @if (!Model.TopProducts.Any())
+                {
+                    <p class="text-muted mb-0">No sales in the last 30 days.</p>
+                }
+                else
+                {
+                    <div class="chart-container" style="position: relative; height: 180px;">
+                        <canvas id="topProductsChart"></canvas>
+                    </div>
+                    <ul class="list-unstyled mt-3 mb-0 small">
+                        @foreach (var p in Model.TopProducts)
+                        {
+                            <li class="d-flex justify-content-between py-1">
+                                <span>@p.Name</span>
+                                <span class="fw-bold">@p.Revenue.ToString("C")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 dash-in" style="--dash-delay: 13">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Low Stock</h3>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    @if (!Model.LowStockProducts.Any())
+                    {
+                        <li class="list-group-item text-muted">Nothing is low on stock right now.</li>
+                    }
+                    @foreach (var p in Model.LowStockProducts)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@p.Name <small class="text-muted">(@p.Sku)</small></span>
+                            <span class="badge text-bg-warning">@p.CurrentStock.ToString("0.##")</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 dash-in" style="--dash-delay: 14">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Top Customers <small class="text-muted">(30 days)</small></h3>
+            </div>
+            <div class="card-body">
+                @if (!Model.TopCustomers.Any())
+                {
+                    <p class="text-muted mb-0">No sales in the last 30 days.</p>
+                }
+                else
+                {
+                    @foreach (var c in Model.TopCustomers)
+                    {
+                        var pct = maxTopCustomer == 0 ? 0 : Math.Round(c.Value / maxTopCustomer * 100, 1);
+                        <div class="progress-group">
+                            @c.Name
+                            <span class="float-end fw-bold">@c.Value.ToString("C")</span>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar bg-success dash-bar" role="progressbar" data-target-width="@(pct.ToString(System.Globalization.CultureInfo.InvariantCulture))" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 dash-in" style="--dash-delay: 15">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Stock Value by Category</h3>
+            </div>
+            <div class="card-body">
+                @if (!Model.CategoryBreakdown.Any())
+                {
+                    <p class="text-muted mb-0">No stock value to break down yet.</p>
+                }
+                else
+                {
+                    <div class="chart-container" style="position: relative; height: 200px;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 dash-in" style="--dash-delay: 16">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Recent Sales Invoices</h3>
+            </div>
+            <div class="card-body p-0 table-responsive-card">
+                <table class="table table-striped mb-0 dash-table">
+                    <thead><tr><th>Invoice #</th><th>Customer</th><th>Date</th><th class="text-end">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.RecentSalesInvoices)
+                    {
+                        <tr>
+                            <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@s.Id">@s.InvoiceNumber</a></td>
+                            <td>@s.Customer?.Name</td>
+                            <td>@s.Date.ToString("MMM dd, yyyy")</td>
+                            <td class="text-end">@s.TotalAmount.ToString("C")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 dash-in" style="--dash-delay: 17">
+        <div class="card dash-hover">
+            <div class="card-header">
+                <h3 class="card-title">Recent Purchase Invoices</h3>
+            </div>
+            <div class="card-body p-0 table-responsive-card">
+                <table class="table table-striped mb-0 dash-table">
+                    <thead><tr><th>Invoice #</th><th>Supplier</th><th>Date</th><th class="text-end">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in Model.RecentPurchaseInvoices)
+                    {
+                        <tr>
+                            <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@p.Id">@p.InvoiceNumber</a></td>
+                            <td>@p.Supplier?.Name</td>
+                            <td>@p.Date.ToString("MMM dd, yyyy")</td>
+                            <td class="text-end">@p.TotalAmount.ToString("C")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            // Live clock
+            const clockEl = document.getElementById('dashClock');
+            function tickClock() {
+                clockEl.textContent = new Date().toLocaleTimeString();
+            }
+            tickClock();
+            setInterval(tickClock, 1000);
+
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            // Count-up animation for integer stats
+            function animateCount(el, target, duration) {
+                if (reduceMotion) { el.textContent = target.toLocaleString(); return; }
+                const start = performance.now();
+                function frame(now) {
+                    const p = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - p, 3);
+                    el.textContent = Math.round(target * eased).toLocaleString();
+                    if (p < 1) requestAnimationFrame(frame);
+                }
+                requestAnimationFrame(frame);
+            }
+            document.querySelectorAll('[data-countup]').forEach(function (el) {
+                animateCount(el, parseInt(el.dataset.countup, 10) || 0, 900);
+            });
+
+            // Count-up animation for currency stats (keeps the currency prefix + thousands separators)
+            function animateMoney(el, target, prefix, duration) {
+                if (reduceMotion) {
+                    el.textContent = prefix + target.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return;
+                }
+                const start = performance.now();
+                function frame(now) {
+                    const p = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - p, 3);
+                    el.textContent = prefix + (target * eased).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    if (p < 1) requestAnimationFrame(frame);
+                }
+                requestAnimationFrame(frame);
+            }
+            document.querySelectorAll('[data-countup-money]').forEach(function (el) {
+                animateMoney(el, parseFloat(el.dataset.countupMoney) || 0, el.dataset.prefix || '', 1100);
+            });
+
+            // Animated progress bars (Top Customers)
+            document.querySelectorAll('.dash-bar').forEach(function (el, i) {
+                setTimeout(function () {
+                    el.style.width = (el.dataset.targetWidth || 0) + '%';
+                }, reduceMotion ? 0 : 150 + i * 120);
+            });
+        })();
+
+        // Sales vs Purchases trend chart, with a client-side 7/14/30-day slice toggle (no server round-trip)
+        const allLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
+        const allSales = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SalesTrend));
+        const allPurchases = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PurchaseTrend));
+
+        const trendCtx = document.getElementById('trendChart');
+        const trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: allLabels.slice(-30),
+                datasets: [
+                    {
+                        label: 'Sales',
+                        data: allSales.slice(-30),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.12)',
+                        tension: 0.35,
+                        fill: true,
+                        pointRadius: 2,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Purchases',
+                        data: allPurchases.slice(-30),
+                        borderColor: '#17a2b8',
+                        backgroundColor: 'rgba(23, 162, 184, 0.12)',
+                        tension: 0.35,
+                        fill: true,
+                        pointRadius: 2,
+                        pointHoverRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 900, easing: 'easeOutQuart' },
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        document.querySelectorAll('[data-days]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('[data-days]').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                const n = parseInt(btn.dataset.days, 10);
+                trendChart.data.labels = allLabels.slice(-n);
+                trendChart.data.datasets[0].data = allSales.slice(-n);
+                trendChart.data.datasets[1].data = allPurchases.slice(-n);
+                trendChart.update();
+            });
+        });
+
+        const palette = ['#0d3b66', '#28a745', '#ffc107', '#17a2b8', '#dc3545', '#6f42c1', '#fd7e14', '#20c997'];
+
+        const topProductsLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopProducts.Select(p => p.Name)));
+        const topProductsData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopProducts.Select(p => p.Revenue)));
+        const topProductsCtx = document.getElementById('topProductsChart');
+        if (topProductsCtx) {
+            new Chart(topProductsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: topProductsLabels,
+                    datasets: [{ data: topProductsData, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { animateRotate: true, animateScale: true, duration: 1000, easing: 'easeOutQuart' },
+                    plugins: { legend: { display: false } },
+                    cutout: '62%'
+                }
+            });
+        }
+
+        const categoryLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryBreakdown.Select(c => c.Name)));
+        const categoryData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryBreakdown.Select(c => c.Value)));
+        const categoryCtx = document.getElementById('categoryChart');
+        if (categoryCtx) {
+            new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryLabels,
+                    datasets: [{ data: categoryData, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { animateRotate: true, animateScale: true, duration: 1000, easing: 'easeOutQuart' },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                    cutout: '55%'
+                }
+            });
+        }
+    </script>
+}

@@ -1,0 +1,45 @@
+@model List<UnitOfMeasure>
+@{
+    ViewData["Title"] = "Units of Measure";
+}
+
+@section Toolbar {
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Unit</a>
+    }
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Name</th><th>Symbol</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td>@u.Name</td>
+                    <td>@u.Symbol</td>
+                    <td>
+                        @if (u.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+                        {
+                            <a asp-action="Edit" asp-route-id="@u.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <form asp-action="Delete" asp-route-id="@u.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this unit?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="4" class="text-center text-muted py-3">No units found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

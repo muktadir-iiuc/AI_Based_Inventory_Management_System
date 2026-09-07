@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <DataSources>
+    <DataSource Name="DataSource1">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString></ConnectString>
+      </ConnectionProperties>
+      <rd:DataSourceID>b7f6b5c0-0000-0000-0000-000000000001</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="InvoiceHeader">
+      <Fields>
+        <Field Name="CompanyName"><DataField>CompanyName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyAddress"><DataField>CompanyAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyPhone"><DataField>CompanyPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyLogo"><DataField>CompanyLogo</DataField><rd:TypeName>System.Byte[]</rd:TypeName></Field>
+        <Field Name="CompanyLogoMimeType"><DataField>CompanyLogoMimeType</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="InvoiceNumber"><DataField>InvoiceNumber</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="InvoiceDate"><DataField>InvoiceDate</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Status"><DataField>Status</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CustomerName"><DataField>CustomerName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CustomerAddress"><DataField>CustomerAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CustomerPhone"><DataField>CustomerPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="WarehouseName"><DataField>WarehouseName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Notes"><DataField>Notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="TotalAmount"><DataField>TotalAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PaidAmount"><DataField>PaidAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="DueAmount"><DataField>DueAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>InvoiceHeader</CommandText>
+      </Query>
+    </DataSet>
+    <DataSet Name="InvoiceItems">
+      <Fields>
+        <Field Name="SL"><DataField>SL</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ProductName"><DataField>ProductName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Sku"><DataField>Sku</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Quantity"><DataField>Quantity</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="UnitPrice"><DataField>UnitPrice</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="LineTotal"><DataField>LineTotal</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>InvoiceItems</CommandText>
+      </Query>
+    </DataSet>
+  </DataSets>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+
+          <Tablix Name="TablixLogo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>1in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.7in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Image Name="CompanyLogo">
+                        <Source>Database</Source>
+                        <Value>=Fields!CompanyLogo.Value</Value>
+                        <MIMEType>=Fields!CompanyLogoMimeType.Value</MIMEType>
+                        <Sizing>FitProportional</Sizing>
+                        <Height>0.68in</Height>
+                        <Width>0.96in</Width>
+                        <Style><Border><Style>None</Style></Border></Style>
+                      </Image>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="LogoGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>0in</Top>
+            <Left>0in</Left>
+            <Height>0.7in</Height>
+            <Width>1in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompany">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompany"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyName.Value</Value><Style><FontSize>16pt</FontSize><FontWeight>Bold</FontWeight><Color>#0d3b66</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>0in</Top>
+            <Left>1.1in</Left>
+            <Height>0.3in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompanyAddress">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.2in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompanyAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyAddress.Value</Value><Style><FontSize>9pt</FontSize><Color>#555555</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyAddressGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>0.3in</Top>
+            <Left>1.1in</Left>
+            <Height>0.2in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompanyPhone">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.2in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompanyPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyPhone.Value</Value><Style><FontSize>9pt</FontSize><Color>#555555</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyPhoneGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>0.5in</Top>
+            <Left>1.1in</Left>
+            <Height>0.2in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Textbox Name="TxtTitle">
+            <CanGrow>true</CanGrow>
+            <Top>0.88in</Top>
+            <Left>0in</Left>
+            <Height>0.26in</Height>
+            <Width>7.7in</Width>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>SALES INVOICE</Value>
+                    <Style><FontSize>12pt</FontSize><FontWeight>Bold</FontWeight><Color>#555555</Color></Style>
+                  </TextRun>
+                </TextRuns>
+                <Style><TextAlign>Center</TextAlign></Style>
+              </Paragraph>
+            </Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+
+          <Line Name="LineTop1">
+            <Top>1.22in</Top>
+            <Left>0in</Left>
+            <Height>0in</Height>
+            <Width>7.7in</Width>
+            <Style><Border><Color>#0d3b66</Color><Style>Solid</Style><Width>1.5pt</Width></Border></Style>
+          </Line>
+
+          <Tablix Name="TablixInvoiceInfo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>3.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellInvoiceNumber"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Invoice #: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!InvoiceNumber.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellInvoiceDate"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Date: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!InvoiceDate.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellStatus"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Status: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!Status.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellWarehouseName"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Warehouse: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!WarehouseName.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="InvoiceInfoGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>1.36in</Top>
+            <Left>0in</Left>
+            <Height>0.88in</Height>
+            <Width>3.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCustomerInfo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>3.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellCustomerName"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Bill To: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!CustomerName.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellCustomerAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Address: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!CustomerAddress.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellCustomerPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Phone: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!CustomerPhone.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="CustomerInfoGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>1.36in</Top>
+            <Left>4.1in</Left>
+            <Height>0.66in</Height>
+            <Width>3.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixItems">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>0.5in</Width></TablixColumn>
+                <TablixColumn><Width>2.6in</Width></TablixColumn>
+                <TablixColumn><Width>1.0in</Width></TablixColumn>
+                <TablixColumn><Width>0.9in</Width></TablixColumn>
+                <TablixColumn><Width>1.3in</Width></TablixColumn>
+                <TablixColumn><Width>1.4in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrSL"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>SL</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrProduct"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Product</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrSku"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>SKU</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrQty"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Qty</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrUnitPrice"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Unit Price</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrLineTotal"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Line Total</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.25in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellSL"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!SL.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellProduct"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ProductName.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellSku"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Sku.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellQty"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Quantity.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellUnitPrice"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!UnitPrice.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellLineTotal"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!LineTotal.Value</Value><Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <TablixMember>
+                  <Group Name="Details" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>InvoiceItems</DataSetName>
+            <Top>2.46in</Top>
+            <Left>0in</Left>
+            <Height>0.55in</Height>
+            <Width>7.7in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Line Name="LineAboveTotals">
+            <Top>3.16in</Top>
+            <Left>4.6in</Left>
+            <Height>0in</Height>
+            <Width>3.1in</Width>
+            <Style><Border><Color>#cccccc</Color><Style>Solid</Style><Width>1pt</Width></Border></Style>
+          </Line>
+
+          <Tablix Name="TablixTotals">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>1.7in</Width></TablixColumn>
+                <TablixColumn><Width>1.4in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellTotalCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Amount</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellTotalValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!TotalAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellPaidCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Amount Paid</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellPaidValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!PaidAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.26in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance Due</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DueAmount.Value</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#b02a37</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="TotalsGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>3.21in</Top>
+            <Left>4.6in</Left>
+            <Height>0.7in</Height>
+            <Width>3.1in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Textbox Name="LblNotesCaption">
+            <Top>3.21in</Top>
+            <Left>0in</Left>
+            <Height>0.2in</Height>
+            <Width>4.2in</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Notes</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+
+          <Tablix Name="TablixNotes">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>4.2in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.5in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellNotesValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Notes.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="NotesGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
+            <Top>3.43in</Top>
+            <Left>0in</Left>
+            <Height>0.5in</Height>
+            <Width>4.2in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Line Name="LineSignature">
+            <Top>4.66in</Top>
+            <Left>4.9in</Left>
+            <Height>0in</Height>
+            <Width>2.8in</Width>
+            <Style><Border><Color>#333333</Color><Style>Solid</Style><Width>0.75pt</Width></Border></Style>
+          </Line>
+          <Textbox Name="LblSignature">
+            <Top>4.71in</Top>
+            <Left>4.9in</Left>
+            <Height>0.2in</Height>
+            <Width>2.8in</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Authorized Signature</Value><Style><FontSize>8pt</FontSize><Color>#666666</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+
+        </ReportItems>
+        <Height>5in</Height>
+        <Style />
+      </Body>
+      <Width>7.7in</Width>
+      <Page>
+        <PageHeight>11in</PageHeight>
+        <PageWidth>8.5in</PageWidth>
+        <LeftMargin>0.4in</LeftMargin>
+        <RightMargin>0.4in</RightMargin>
+        <TopMargin>0.4in</TopMargin>
+        <BottomMargin>0.4in</BottomMargin>
+        <ColumnSpacing>0in</ColumnSpacing>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>c1a3c6a0-0000-0000-0000-000000000002</rd:ReportID>
+</Report>

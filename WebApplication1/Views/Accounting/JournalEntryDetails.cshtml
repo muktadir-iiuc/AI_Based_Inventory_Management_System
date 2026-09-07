@@ -1,0 +1,42 @@
+@model JournalEntry
+@{
+    ViewData["Title"] = $"Journal Entry {Model.EntryNumber}";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">@Model.Description</h3>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-2">Entry #</dt><dd class="col-sm-4">@Model.EntryNumber</dd>
+            <dt class="col-sm-2">Date</dt><dd class="col-sm-4">@Model.Date.ToString("MMM dd, yyyy")</dd>
+            <dt class="col-sm-2">Source</dt><dd class="col-sm-4">@Model.Source</dd>
+            <dt class="col-sm-2">Reference</dt><dd class="col-sm-4">@Model.SourceReference</dd>
+        </dl>
+        <table class="table table-bordered mb-0">
+            <thead><tr><th>Account</th><th>Memo</th><th class="text-end">Debit</th><th class="text-end">Credit</th></tr></thead>
+            <tbody>
+            @foreach (var line in Model.Lines)
+            {
+                <tr>
+                    <td>@line.Account?.Code &mdash; @line.Account?.Name</td>
+                    <td>@line.Memo</td>
+                    <td class="text-end">@(line.Debit > 0 ? line.Debit.ToString("C") : "")</td>
+                    <td class="text-end">@(line.Credit > 0 ? line.Credit.ToString("C") : "")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="2" class="text-end">Total</td>
+                    <td class="text-end">@Model.TotalDebit.ToString("C")</td>
+                    <td class="text-end">@Model.TotalCredit.ToString("C")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <div class="card-footer">
+        <a asp-action="JournalEntries" class="btn btn-secondary btn-sm">Back to list</a>
+    </div>
+</div>

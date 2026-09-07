@@ -1,0 +1,39 @@
+@model List<UserListItem>
+@{
+    ViewData["Title"] = "Users & Roles";
+}
+
+@section Toolbar {
+    <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New User</a>
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Full Name</th><th>Email</th><th>Role</th><th>Warehouse</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td>@u.FullName</td>
+                    <td>@u.Email</td>
+                    <td>
+                        @foreach (var r in u.Roles)
+                        {
+                            <span class="badge text-bg-info">@r</span>
+                        }
+                    </td>
+                    <td>@(u.WarehouseName ?? "All warehouses")</td>
+                    <td>
+                        @if (u.IsActive) { <span class="badge text-bg-success">Active</span> }
+                        else { <span class="badge text-bg-secondary">Inactive</span> }
+                    </td>
+                    <td class="text-end">
+                        <a asp-action="Edit" asp-route-id="@u.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

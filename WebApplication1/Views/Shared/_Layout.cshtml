@@ -1,0 +1,427 @@
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ICompanySettingsService CompanySettings
+@{ var company = await CompanySettings.GetAsync(); }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - @company.CompanyName</title>
+    @if (company.LogoImage is not null)
+    {
+        <link rel="icon" href="@Url.Action("Logo", "CompanySettings")" />
+    }
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/fontawesome-free/css/all.min.css" />
+    <link rel="stylesheet" href="~/lib/admin-lte/css/adminlte.min.css" />
+    <link rel="stylesheet" href="~/lib/select2/css/select2.min.css" />
+    <link rel="stylesheet" href="~/lib/admin-lte/css/adminlte-select2.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+<div class="app-wrapper">
+
+    <nav class="app-header navbar navbar-expand bg-body">
+        <div class="container-fluid">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button">
+                        <i class="fas fa-bars"></i>
+                    </a>
+                </li>
+                <li class="nav-item d-none d-md-block">
+                    <a asp-controller="Home" asp-action="Index" class="nav-link">Dashboard</a>
+                </li>
+                @{ var warehouseName = User.FindFirst("WarehouseName")?.Value; }
+                @if (!string.IsNullOrEmpty(warehouseName))
+                {
+                    <li class="nav-item d-none d-md-block">
+                        <span class="nav-link"><i class="fas fa-warehouse me-1"></i>@warehouseName</span>
+                    </li>
+                }
+            </ul>
+
+            <ul class="navbar-nav ms-auto">
+                @if (SignInManager.IsSignedIn(User))
+                {
+                    <li class="nav-item dropdown">
+                        <a class="nav-link" data-bs-toggle="dropdown" href="#" id="notifBell">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge text-bg-danger navbar-badge d-none" id="notifBadge">0</span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-lg p-0" id="notifList" style="min-width: 340px; max-height: 420px; overflow-y: auto;">
+                            <span class="dropdown-item-text text-muted small text-center d-block py-3" id="notifEmpty">No activity yet this session.</span>
+                        </div>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#">
+                            <i class="fas fa-user-circle me-1"></i>
+                            @(User.FindFirst("FullName")?.Value ?? User.Identity!.Name)
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><span class="dropdown-item-text text-muted small">Roles: @string.Join(", ", User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))</span></li>
+                            <li><span class="dropdown-item-text text-muted small">Warehouse: @(warehouseName ?? "All warehouses")</span></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form asp-controller="Account" asp-action="Logout" method="post">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                }
+            </ul>
+        </div>
+    </nav>
+
+    <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+        <div class="sidebar-brand">
+            <a asp-controller="Home" asp-action="Index" class="brand-link">
+                @if (company.LogoImage is not null)
+                {
+                    <img src="@Url.Action("Logo", "CompanySettings")" alt="@company.CompanyName" class="brand-image opacity-75" style="margin-inline-start:0.3rem; max-height:33px;" />
+                }
+                else
+                {
+                    <i class="fas fa-boxes-stacked brand-image opacity-75" style="margin-inline-start:0.3rem;"></i>
+                }
+                <span class="brand-text fw-light">@company.ShortName</span>
+            </a>
+        </div>
+
+        <div class="sidebar-wrapper">
+            <nav class="mt-2">
+                <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+
+                    <li class="nav-item">
+                        <a asp-controller="Home" asp-action="Index" class="nav-link">
+                            <i class="nav-icon fas fa-gauge"></i>
+                            <p>Dashboard</p>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-warehouse"></i>
+                            <p>Inventory<i class="nav-arrow fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a asp-controller="Products" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-box"></i><p>Products</p></a></li>
+                            <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
+                            <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
+                            <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>
+                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers</p></a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-truck-loading"></i>
+                            <p>Purchase<i class="nav-arrow fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
+                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-cash-register"></i>
+                            <p>Sales<i class="nav-arrow fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
+                            <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-book"></i>
+                            <p>Accounting<i class="nav-arrow fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="ChartOfAccounts" class="nav-link"><i class="nav-icon fas fa-sitemap"></i><p>Chart of Accounts</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="JournalEntries" class="nav-link"><i class="nav-icon fas fa-book-open"></i><p>Journal Entries</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="Payments" class="nav-link"><i class="nav-icon fas fa-money-bill-wave"></i><p>Payments &amp; Receipts</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="TrialBalance" class="nav-link"><i class="nav-icon fas fa-balance-scale"></i><p>Trial Balance</p></a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-chart-line"></i>
+                            <p>Reports<i class="nav-arrow fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a asp-controller="Reports" asp-action="StockValuation" class="nav-link"><i class="nav-icon fas fa-warehouse"></i><p>Stock Valuation</p></a></li>
+                            <li class="nav-item"><a asp-controller="Reports" asp-action="ReorderSuggestions" class="nav-link"><i class="nav-icon fas fa-robot"></i><p>AI Reorder Suggestions</p></a></li>
+                        </ul>
+                    </li>
+
+                    @if (User.IsInRole(Roles.Admin))
+                    {
+                        <li class="nav-header">ADMINISTRATION</li>
+                        <li class="nav-item">
+                            <a asp-controller="Users" asp-action="Index" class="nav-link">
+                                <i class="nav-icon fas fa-user-shield"></i>
+                                <p>Users &amp; Roles</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-controller="Permissions" asp-action="Index" class="nav-link">
+                                <i class="nav-icon fas fa-shield-halved"></i>
+                                <p>Role Permissions</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-controller="CompanySettings" asp-action="Index" class="nav-link">
+                                <i class="nav-icon fas fa-building"></i>
+                                <p>Company Settings</p>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        </div>
+    </aside>
+
+    <main class="app-main">
+        <div class="app-content-header">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <h3 class="mb-0">@ViewData["Title"]</h3>
+                    </div>
+                    <div class="col-sm-6">
+                        @if (IsSectionDefined("Toolbar"))
+                        {
+                            <div class="float-sm-end">@await RenderSectionAsync("Toolbar", required: false)</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="app-content">
+            <div class="container-fluid">
+                @if (TempData["Success"] is not null)
+                {
+                    <div class="alert alert-success alert-dismissible">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        @TempData["Success"]
+                    </div>
+                }
+                @if (TempData["Error"] is not null)
+                {
+                    <div class="alert alert-danger alert-dismissible">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        @TempData["Error"]
+                    </div>
+                }
+                @RenderBody()
+            </div>
+        </div>
+    </main>
+
+    <footer class="app-footer">
+        <div class="float-end d-none d-sm-inline">@company.CompanyName</div>
+        <strong>&copy; @DateTime.Now.Year</strong> All rights reserved.
+    </footer>
+</div>
+
+@if (SignInManager.IsSignedIn(User))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;" id="toastContainer"></div>
+
+    <div id="chatbotPanel" class="card shadow d-none position-fixed" style="bottom: 90px; right: 20px; width: 360px; max-width: calc(100vw - 40px); z-index: 1085;">
+        <div class="card-header d-flex align-items-center bg-primary text-white py-2">
+            <span class="pe-4"><i class="fas fa-robot me-2"></i>AI Chatbot</span>
+            <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" id="chatbotClose" aria-label="Close"></button>
+        </div>
+        <div class="card-body p-0">
+            <div id="chatbotWindow" class="d-flex flex-column p-3" style="height: 360px; overflow-y: auto;"></div>
+        </div>
+        <div class="card-footer p-2">
+            <form id="chatbotForm" class="d-flex gap-2" autocomplete="off">
+                @Html.AntiForgeryToken()
+                <input type="text" id="chatbotInput" class="form-control form-control-sm" placeholder="Ask about stock, sales, purchases..." maxlength="300" />
+                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <button type="button" id="chatbotToggle" class="btn btn-primary rounded-circle shadow position-fixed d-flex align-items-center justify-content-center" style="bottom: 20px; right: 20px; width: 56px; height: 56px; z-index: 1086;" title="AI Chatbot">
+        <i class="fas fa-comment-dots fs-4"></i>
+    </button>
+}
+
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/lib/admin-lte/js/adminlte.min.js"></script>
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/select2/js/select2.min.js"></script>
+<script src="~/lib/chart.js/dist/chart.umd.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@if (SignInManager.IsSignedIn(User))
+{
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script>
+        (function () {
+            const notifList = document.getElementById('notifList');
+            const notifEmpty = document.getElementById('notifEmpty');
+            const notifBadge = document.getElementById('notifBadge');
+            const notifBell = document.getElementById('notifBell');
+            const toastContainer = document.getElementById('toastContainer');
+            let unseenCount = 0;
+
+            function timeLabel() {
+                return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function addToDropdown(data) {
+                if (notifEmpty) { notifEmpty.remove(); }
+                const item = document.createElement('div');
+                item.className = 'dropdown-item border-bottom py-2 text-wrap';
+                item.innerHTML = `<i class="${data.icon} me-2"></i><strong>${data.title}</strong>` +
+                    `<div class="small text-muted">${data.message}</div>` +
+                    `<div class="small text-muted">${timeLabel()}</div>`;
+                notifList.prepend(item);
+                while (notifList.children.length > 15) {
+                    notifList.removeChild(notifList.lastChild);
+                }
+            }
+
+            function showToast(data) {
+                const toastEl = document.createElement('div');
+                toastEl.className = 'toast align-items-center border-0 text-bg-dark';
+                toastEl.setAttribute('role', 'alert');
+                toastEl.innerHTML = `
+                    <div class="d-flex">
+                        <div class="toast-body"><i class="${data.icon} me-2"></i><strong>${data.title}</strong><br>${data.message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>`;
+                toastContainer.appendChild(toastEl);
+                const toast = new bootstrap.Toast(toastEl, { delay: 6000 });
+                toast.show();
+                toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            }
+
+            function handleNotification(data) {
+                addToDropdown(data);
+                showToast(data);
+                unseenCount++;
+                notifBadge.textContent = unseenCount;
+                notifBadge.classList.remove('d-none');
+            }
+
+            notifBell.addEventListener('click', () => {
+                unseenCount = 0;
+                notifBadge.classList.add('d-none');
+            });
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/notifications')
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on('ReceiveNotification', handleNotification);
+            connection.start().catch(err => console.error('SignalR connection failed:', err));
+        })();
+    </script>
+    <script>
+        (function () {
+            const toggle = document.getElementById('chatbotToggle');
+            const panel = document.getElementById('chatbotPanel');
+            const closeBtn = document.getElementById('chatbotClose');
+            const chatWindow = document.getElementById('chatbotWindow');
+            const form = document.getElementById('chatbotForm');
+            const input = document.getElementById('chatbotInput');
+            const token = form.querySelector('input[name="__RequestVerificationToken"]').value;
+            let greeted = false;
+
+            function addBubble(text, lines, isUser) {
+                const wrap = document.createElement('div');
+                wrap.className = 'd-flex mb-2 ' + (isUser ? 'justify-content-end' : 'justify-content-start');
+
+                const bubble = document.createElement('div');
+                bubble.className = 'p-2 px-3 rounded small ' + (isUser ? 'bg-primary text-white' : 'bg-body-secondary');
+                bubble.style.maxWidth = '85%';
+
+                const p = document.createElement('div');
+                p.textContent = text;
+                bubble.appendChild(p);
+
+                if (lines && lines.length) {
+                    const ul = document.createElement('ul');
+                    ul.className = 'mb-0 mt-1 ps-3';
+                    lines.forEach(function (line) {
+                        const li = document.createElement('li');
+                        li.textContent = line;
+                        ul.appendChild(li);
+                    });
+                    bubble.appendChild(ul);
+                }
+
+                wrap.appendChild(bubble);
+                chatWindow.appendChild(wrap);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+
+            async function ask(question) {
+                addBubble(question, null, true);
+                input.value = '';
+
+                try {
+                    const res = await fetch('@Url.Action("Ask", "Chatbot")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': token
+                        },
+                        body: JSON.stringify({ question: question })
+                    });
+
+                    if (!res.ok) {
+                        addBubble('Sorry, something went wrong answering that.', null, false);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    addBubble(data.text, data.lines, false);
+                } catch (e) {
+                    addBubble('Sorry, something went wrong answering that.', null, false);
+                }
+            }
+
+            toggle.addEventListener('click', function () {
+                panel.classList.toggle('d-none');
+                if (!panel.classList.contains('d-none')) {
+                    if (!greeted) {
+                        greeted = true;
+                        addBubble("Hi, I'm your inventory data assistant. I answer only from real data in this system - ask me about stock, sales, purchases, customers, suppliers or balances. Type \"help\" for examples.", null, false);
+                    }
+                    input.focus();
+                }
+            });
+
+            closeBtn.addEventListener('click', function () {
+                panel.classList.add('d-none');
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const question = input.value.trim();
+                if (question) {
+                    ask(question);
+                }
+            });
+        })();
+    </script>
+}
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
