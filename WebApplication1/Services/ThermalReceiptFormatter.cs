@@ -2,68 +2,48 @@ using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Services;
 
-// Renders a sales invoice as fixed-width monospaced lines for an 80mm thermal
-// receipt printer. 42 characters is the standard column count for 80mm paper
-// at the default ("Font A") size on most ESC/POS-compatible printers.
+// Builds the variable-length middle section of an 80mm thermal receipt (optional
+// customer details/notes, then the item list) as fixed-width monospaced lines.
+// The header, invoice meta, totals, and footer are native RDLC fields with real
+// fonts/weights (see SalesInvoiceThermalReceipt.rdlc) — only this middle section,
+// whose row count depends on the invoice, needs to stay plain text.
 public static class ThermalReceiptFormatter
 {
     public const int LineWidth = 42;
 
-    public static List<SalesInvoiceThermalLine> BuildReceipt(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items)
+    public static List<SalesInvoiceThermalLine> BuildDetailLines(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items)
     {
-        var lines = new List<string>
-        {
-            Center(header.CompanyName.ToUpperInvariant()),
-            Center("Sales Invoice Receipt"),
-            Separator('=')
-        };
+        var lines = new List<string>();
 
-        lines.Add(KeyValue("Invoice #", header.InvoiceNumber));
-        lines.Add(KeyValue("Customer", header.CustomerName));
-        if (!string.IsNullOrWhiteSpace(header.WarehouseName))
+        if (!string.IsNullOrWhiteSpace(header.CustomerAddress))
         {
-            lines.Add(KeyValue("Warehouse", header.WarehouseName));
+            lines.Add(KeyValue("Address", header.CustomerAddress));
         }
-        lines.Add(KeyValue("Date", header.InvoiceDate));
-        lines.Add(KeyValue("Status", header.Status));
-        lines.Add(string.Empty);
-        lines.Add(Separator('-'));
+        if (!string.IsNullOrWhiteSpace(header.CustomerPhone))
+        {
+            lines.Add(KeyValue("Phone", header.CustomerPhone));
+        }
+        if (lines.Count > 0)
+        {
+            lines.Add(Separator('-'));
+        }
 
         foreach (var item in items)
         {
             lines.Add(TwoColumn(item.ProductName, item.LineTotal));
-            lines.Add($"  {item.Quantity} x {item.UnitPrice}");
+            lines.Add($"  {item.Sku}  {item.Quantity} x {item.UnitPrice}".TrimEnd());
         }
-
-        lines.Add(Separator('-'));
-        lines.Add(TwoColumn("TOTAL", header.TotalAmount));
-        lines.Add(TwoColumn("PAID", header.PaidAmount));
-        lines.Add(TwoColumn("DUE", header.DueAmount));
 
         if (!string.IsNullOrWhiteSpace(header.Notes))
         {
-            lines.Add(string.Empty);
-            lines.Add(Wrap(header.Notes));
+            lines.Add(Separator('-'));
+            lines.AddRange(WrapNote(header.Notes));
         }
-
-        lines.Add(string.Empty);
-        lines.Add(Center("Thank You!"));
-        lines.Add(Separator('='));
 
         return lines.Select(text => new SalesInvoiceThermalLine { Text = text }).ToList();
     }
 
     private static string Separator(char c) => new(c, LineWidth);
-
-    private static string Center(string text)
-    {
-        text ??= string.Empty;
-        if (text.Length >= LineWidth) return text[..LineWidth];
-        var totalPad = LineWidth - text.Length;
-        var left = totalPad / 2;
-        var right = totalPad - left;
-        return new string(' ', left) + text + new string(' ', right);
-    }
 
     private static string KeyValue(string label, string value)
     {
@@ -90,5 +70,27 @@ public static class ThermalReceiptFormatter
         return left + new string(' ', padding) + right;
     }
 
-    private static string Wrap(string text) => text.Length > LineWidth ? text[..LineWidth] : text;
+    private static List<string> WrapNote(string text)
+    {
+        const string prefix = "Note: ";
+        var lines = new List<string>();
+        var current = prefix;
+        var atLineStart = true;
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = atLineStart ? current + word : current + " " + word;
+            if (candidate.Length > LineWidth && !atLineStart)
+            {
+                lines.Add(current);
+                current = word;
+            }
+            else
+            {
+                current = candidate;
+            }
+            atLineStart = false;
+        }
+        lines.Add(current);
+        return lines.Select(l => l.Length > LineWidth ? l[..LineWidth] : l).ToList();
+    }
 }

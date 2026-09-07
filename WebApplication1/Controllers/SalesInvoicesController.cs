@@ -254,40 +254,65 @@ public class SalesInvoicesController(
         var header = new SalesInvoiceReportHeader
         {
             CompanyName = company.CompanyName,
+            CompanyAddress = company.Address ?? string.Empty,
+            CompanyPhone = string.IsNullOrWhiteSpace(company.Phone) ? string.Empty : $"Phone: {company.Phone}",
             InvoiceNumber = invoice.InvoiceNumber,
             InvoiceDate = invoice.Date.ToString("MMM dd, yyyy"),
-            Status = invoice.Status.ToString(),
             CustomerName = invoice.Customer?.Name ?? string.Empty,
+            CustomerAddress = invoice.Customer?.Address ?? string.Empty,
+            CustomerPhone = invoice.Customer?.Phone ?? string.Empty,
             WarehouseName = invoice.Warehouse?.Name ?? string.Empty,
+            ServedBy = string.IsNullOrWhiteSpace(invoice.CreatedBy) ? "N/A" : invoice.CreatedBy,
             Notes = invoice.Notes ?? string.Empty,
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
             DueAmount = dueAmount.ToString("N2")
         };
 
-        var receiptLines = ThermalReceiptFormatter.BuildReceipt(header, itemLines);
+        var detailLines = ThermalReceiptFormatter.BuildDetailLines(header, itemLines);
 
-        // The RDLC has a fixed page height, but a receipt's length depends on
-        // how many items it has, so the template's page/body/tablix heights
-        // are placeholders filled in here to size the page to this invoice's
-        // content — otherwise a long receipt would spill onto a second page.
-        const double rowHeightIn = 0.16;
-        // AspNetCore.Reporting needs roughly double a row's declared <Height> to actually
-        // fit one line of 8pt text (measured empirically: ~0.31in/row was the break-even
-        // point before a near-empty second page appeared) — 0.34in/row plus a flat buffer
-        // keeps a comfortable margin above that for any invoice length.
-        const double pageRowAllowanceIn = 0.34;
-        const double marginsIn = 0.16;
-        const double bufferIn = 0.3;
+        // The RDLC's fixed-position sections (company header, invoice meta, totals,
+        // footer) have known heights, but the receipt/detail-lines block in between
+        // grows with the invoice, so every section after it is positioned here via
+        // template placeholders rather than fixed coordinates in the .rdlc.
+        const double dynamicSectionTop = 1.78;
+        const double dynamicRowHeightDesign = 0.16; // cosmetic only, for the Tablix's own declared <Height>
+        const double dynamicRowAllowance = 0.34; // visual layout only — see pageHeight comment for the real per-row cost
+        const double totalsHeight = 0.66; // Total + Paid + Balance Due rows, fixed count
+        const double bottomMargin = 0.08;
         const double maxPageHeightIn = 60;
-        var tablixHeight = receiptLines.Count * rowHeightIn;
-        var pageHeight = Math.Min(marginsIn + receiptLines.Count * pageRowAllowanceIn + bufferIn, maxPageHeightIn);
+
+        var dynamicHeight = detailLines.Count * dynamicRowHeightDesign;
+        var dynamicEnd = dynamicSectionTop + detailLines.Count * dynamicRowAllowance;
+        var divider3Top = dynamicEnd + 0.04;
+        var totalsTop = dynamicEnd + 0.10;
+        var totalsEnd = totalsTop + totalsHeight;
+        var divider4Top = totalsEnd + 0.04;
+        var footerTop = divider4Top + 0.08;
+        var footerNoteTop = footerTop + 0.22;
+        var footerEnd = footerNoteTop + 0.16;
+        var bodyHeight = footerEnd;
+
+        // AspNetCore.Reporting's PDF pagination doesn't honor each item's declared
+        // <Top>/<Height> for page-break decisions — it appears to walk the body's
+        // report items in document order, accumulating each one's *actual* required
+        // height (consistently more than its declared height), and once that running
+        // total exceeds the page's printable height everything remaining spills to a
+        // second page. Empirically fit against two calibration points (4 detail lines
+        // -> ~5.2in required, 30 detail lines -> ~17.95in required): required(n) =
+        // 3.24in + 0.49in/line. The constants below add a ~15% safety margin on top.
+        var pageHeight = Math.Min(3.6 + detailLines.Count * 0.55 + bottomMargin + 0.2, maxPageHeightIn);
 
         var templatePath = Path.Combine(env.ContentRootPath, "Reports", "SalesInvoiceThermalReceipt.rdlc");
         var rdlc = await System.IO.File.ReadAllTextAsync(templatePath);
         rdlc = rdlc
-            .Replace("__TABLIXHEIGHT__", tablixHeight.ToString("0.00"))
-            .Replace("__BODYHEIGHT__", tablixHeight.ToString("0.00"))
+            .Replace("__DYNAMICHEIGHT__", dynamicHeight.ToString("0.00"))
+            .Replace("__DIVIDER3_TOP__", divider3Top.ToString("0.00"))
+            .Replace("__TOTALS_TOP__", totalsTop.ToString("0.00"))
+            .Replace("__FOOTER_NOTE_TOP__", footerNoteTop.ToString("0.00"))
+            .Replace("__FOOTER_TOP__", footerTop.ToString("0.00"))
+            .Replace("__DIVIDER4_TOP__", divider4Top.ToString("0.00"))
+            .Replace("__BODYHEIGHT__", bodyHeight.ToString("0.00"))
             .Replace("__PAGEHEIGHT__", pageHeight.ToString("0.00"));
 
         var tempPath = Path.Combine(Path.GetTempPath(), $"thermal-receipt-{Guid.NewGuid():N}.rdlc");
@@ -296,7 +321,8 @@ public class SalesInvoicesController(
             await System.IO.File.WriteAllTextAsync(tempPath, rdlc);
 
             var report = new LocalReport(tempPath);
-            report.AddDataSource("ReceiptLines", receiptLines);
+            report.AddDataSource("InvoiceHeader", new List<SalesInvoiceReportHeader> { header });
+            report.AddDataSource("ReceiptLines", detailLines);
 
             var result = report.Execute(RenderType.Pdf, 1, null, string.Empty);
             return File(result.MainStream, "application/pdf", $"{invoice.InvoiceNumber}-receipt.pdf");

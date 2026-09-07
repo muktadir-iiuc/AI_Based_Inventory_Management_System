@@ -24,6 +24,7 @@ public class SalesInvoiceReportHeader
     public string CustomerAddress { get; set; } = string.Empty;
     public string CustomerPhone { get; set; } = string.Empty;
     public string WarehouseName { get; set; } = string.Empty;
+    public string ServedBy { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
     public string TotalAmount { get; set; } = string.Empty;
     public string PaidAmount { get; set; } = string.Empty;
