@@ -10,7 +10,7 @@
     <div asp-validation-summary="All" class="text-danger"></div>
 
     <div class="row g-3">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card mb-3">
                 <div class="card-header">
                     <h3 class="card-title">Invoice Details</h3>
@@ -59,9 +59,10 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 3%">#</th>
-                                <th style="width: 37%">Product</th>
-                                <th style="width: 13%">Quantity</th>
-                                <th style="width: 15%" class="text-end">Unit Price</th>
+                                <th style="width: 28%">Product</th>
+                                <th style="width: 14%">Category</th>
+                                <th style="width: 12%">Quantity</th>
+                                <th style="width: 14%" class="text-end">Unit Price</th>
                                 <th style="width: 17%" class="text-end">Line Total</th>
                                 <th style="width: 5%"></th>
                             </tr>
@@ -75,8 +76,8 @@
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <div class="card position-sticky" style="top: 1rem;">
+        <div class="col-lg-3">
+            <div class="card position-sticky">
                 <div class="card-header">
                     <h3 class="card-title">Summary</h3>
                 </div>
@@ -93,7 +94,7 @@
                         <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
                     </div>
                     <div class="form-text mt-1">
-                        Price is determined automatically per batch (FIFO) once you pick a product and quantity.
+                        Unit price is suggested automatically from the FIFO batch once you pick a product and quantity — edit it if this sale is priced differently.
                     </div>
                 </div>
                 <div class="card-footer d-grid gap-2">
@@ -119,7 +120,7 @@
         function productOptions() {
             let html = '<option value="">-- select product --</option>';
             products.forEach(p => {
-                html += `<option value="${p.Id}" data-stock="${p.CurrentStock}" data-symbol="${p.Symbol}">${p.Sku} - ${p.Name} (stock: ${p.CurrentStock})</option>`;
+                html += `<option value="${p.Id}" data-stock="${p.CurrentStock}" data-symbol="${p.Symbol}" data-category="${p.Category || ''}">${p.Sku} - ${p.Name} (stock: ${p.CurrentStock})</option>`;
             });
             return html;
         }
@@ -145,8 +146,9 @@
                 <td>
                     <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions()}</select>
                 </td>
-                <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="1" /></td>
-                <td class="text-end unit-price-cell text-muted">&mdash;</td>
+                <td class="category-cell text-muted">&mdash;</td>
+                <td><input name="Items[${rowIndex}].Quantity" type="number" step="1" min="1" inputmode="numeric" class="form-control qty-input" value="1" /></td>
+                <td><input name="Items[${rowIndex}].UnitPrice" type="number" step="0.01" min="0" class="form-control form-control-sm text-end unit-price-input" placeholder="&mdash;" /></td>
                 <td class="text-end line-total fw-semibold">0.00</td>
                 <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
             `;
@@ -156,7 +158,7 @@
             const allocationTr = document.createElement('tr');
             allocationTr.className = 'allocation-row d-none';
             allocationTr.innerHTML = `
-                <td colspan="6" class="bg-body-tertiary p-2">
+                <td colspan="7" class="bg-body-tertiary p-2">
                     <div class="small text-muted mb-1">FIFO batch allocation</div>
                     <table class="table table-sm mb-0 allocation-table">
                         <thead><tr><th>Batch</th><th class="text-end">Available</th><th class="text-end">Allocated</th><th class="text-end">Purchase Price</th><th class="text-end">Sale Price</th></tr></thead>
@@ -175,16 +177,43 @@
         function wireRow(tr, allocationTr) {
             const select = tr.querySelector('.product-select');
             const qty = tr.querySelector('.qty-input');
-            const priceCell = tr.querySelector('.unit-price-cell');
+            const priceInput = tr.querySelector('.unit-price-input');
             const totalCell = tr.querySelector('.line-total');
+            const categoryCell = tr.querySelector('.category-cell');
             const allocationBody = allocationTr.querySelector('tbody');
 
             let debounceHandle = null;
+            let priceManuallyEdited = false;
+
+            function updateLineTotal() {
+                const quantity = parseInt(qty.value, 10) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                totalCell.textContent = (quantity * price).toFixed(2);
+                recalc();
+            }
+
+            // Quantity is whole units only — strip anything typed that isn't a digit (covers
+            // pasting/typing a decimal point too, not just the number spinner).
+            function enforceIntegerQuantity() {
+                const digitsOnly = qty.value.replace(/[^\d]/g, '');
+                if (digitsOnly !== qty.value) {
+                    qty.value = digitsOnly;
+                }
+            }
+
+            // Purely a client-side display — the selected <option>'s own data-category
+            // attribute already has this, so no server round-trip is needed to show it.
+            function updateCategory() {
+                const category = select.selectedOptions[0]?.dataset.category;
+                categoryCell.textContent = category || '—';
+                categoryCell.classList.toggle('text-muted', !category);
+            }
 
             function clearAllocation(message, isError) {
-                priceCell.innerHTML = message || '&mdash;';
-                priceCell.classList.toggle('text-danger', !!isError);
-                priceCell.classList.toggle('text-muted', !isError);
+                priceInput.value = '';
+                priceInput.disabled = !!isError;
+                priceInput.classList.toggle('is-invalid', !!isError);
+                priceInput.title = isError ? (message || '') : '';
                 totalCell.textContent = '0.00';
                 allocationTr.classList.add('d-none');
                 allocationBody.innerHTML = '';
@@ -192,14 +221,14 @@
             }
 
             function showLoading() {
-                priceCell.classList.remove('text-danger');
-                priceCell.classList.add('text-muted');
-                priceCell.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                priceInput.classList.remove('is-invalid');
+                priceInput.disabled = true;
+                priceInput.placeholder = '…';
             }
 
             async function refreshAllocation() {
                 const productId = parseInt(select.value, 10) || 0;
-                const quantity = parseFloat(qty.value) || 0;
+                const quantity = parseInt(qty.value, 10) || 0;
                 const warehouseId = currentWarehouseId();
 
                 if (!productId || !quantity || !warehouseId) {
@@ -224,11 +253,15 @@
                     return;
                 }
 
-                priceCell.classList.remove('text-muted');
-                priceCell.textContent = data.lines.length === 1
-                    ? data.unitPrice.toFixed(2)
-                    : `avg ${(data.lineTotal / quantity).toFixed(2)}`;
-                totalCell.textContent = data.lineTotal.toFixed(2);
+                priceInput.disabled = false;
+                priceInput.placeholder = '0.00';
+                // Suggest the FIFO batch price as a starting point, but never overwrite a price
+                // the user already typed in for this line — only re-suggest on a fresh product
+                // pick (see the product-select 'change' handler below, which resets the flag).
+                if (!priceManuallyEdited) {
+                    priceInput.value = data.unitPrice.toFixed(2);
+                }
+                updateLineTotal();
 
                 allocationBody.innerHTML = data.lines.map(l => `
                     <tr>
@@ -240,8 +273,6 @@
                     </tr>
                 `).join('');
                 allocationTr.classList.toggle('d-none', data.lines.length <= 1);
-
-                recalc();
             }
 
             function debouncedRefresh() {
@@ -249,8 +280,19 @@
                 debounceHandle = setTimeout(refreshAllocation, 300);
             }
 
-            select.addEventListener('change', debouncedRefresh);
-            qty.addEventListener('input', debouncedRefresh);
+            select.addEventListener('change', () => {
+                priceManuallyEdited = false;
+                updateCategory();
+                debouncedRefresh();
+            });
+            qty.addEventListener('input', () => {
+                enforceIntegerQuantity();
+                debouncedRefresh();
+            });
+            priceInput.addEventListener('input', () => {
+                priceManuallyEdited = true;
+                updateLineTotal();
+            });
             tr.querySelector('.remove-row').addEventListener('click', () => {
                 tr.remove();
                 allocationTr.remove();
@@ -264,7 +306,11 @@
             // Select2 replaces the native dropdown UI; its own selection events fire more
             // reliably across browsers than the plain 'change' event once it's active.
             if (typeof jQuery !== 'undefined') {
-                jQuery(select).on('select2:select select2:clear', debouncedRefresh);
+                jQuery(select).on('select2:select select2:clear', () => {
+                    priceManuallyEdited = false;
+                    updateCategory();
+                    debouncedRefresh();
+                });
             }
 
             tr.refreshAllocation = refreshAllocation;
@@ -276,11 +322,11 @@
             const rows = document.querySelectorAll('#itemsBody tr.item-row');
             rows.forEach(tr => {
                 grand += parseFloat(tr.querySelector('.line-total').textContent) || 0;
-                totalQty += parseFloat(tr.querySelector('.qty-input').value) || 0;
+                totalQty += parseInt(tr.querySelector('.qty-input').value, 10) || 0;
             });
             document.getElementById('grandTotal').textContent = grand.toFixed(2);
             document.getElementById('summaryLineCount').textContent = rows.length;
-            document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
+            document.getElementById('summaryQty').textContent = totalQty;
         }
 
         function refreshAllRows() {

@@ -197,19 +197,24 @@ public class SalesInvoicesController(
                     continue;
                 }
 
+                // A manually-entered price on the line applies to every batch this line draws
+                // from (the salesperson sets one price for the quantity they're selling); with
+                // no override, each allocation keeps falling back to its own batch's SalePrice.
                 foreach (var allocation in allocations)
                 {
+                    var unitPrice = item.UnitPrice is > 0 ? item.UnitPrice.Value : allocation.Batch.SalePrice;
+
                     invoice.Items.Add(new SalesInvoiceItem
                     {
                         ProductId = item.ProductId,
                         Quantity = allocation.Quantity,
-                        UnitPrice = allocation.Batch.SalePrice,
+                        UnitPrice = unitPrice,
                         UnitCost = allocation.Batch.PurchasePrice,
                         Batch = allocation.Batch
                     });
 
                     await stockService.IssueStockAsync(item.ProductId, model.WarehouseId, allocation.Quantity, invoice.InvoiceNumber,
-                        batch: allocation.Batch, unitCost: allocation.Batch.PurchasePrice, unitSalePrice: allocation.Batch.SalePrice);
+                        batch: allocation.Batch, unitCost: allocation.Batch.PurchasePrice, unitSalePrice: unitPrice);
                 }
             }
 
@@ -388,14 +393,31 @@ public class SalesInvoicesController(
         // grows with the invoice, so every section after it is positioned here via
         // template placeholders rather than fixed coordinates in the .rdlc.
         const double dynamicSectionTop = 1.78;
-        const double dynamicRowHeightDesign = 0.16; // cosmetic only, for the Tablix's own declared <Height>
-        const double dynamicRowAllowance = 0.34; // visual layout only — see pageHeight comment for the real per-row cost
+        // The detail Tablix's row Textbox has CanGrow=false (see the .rdlc), so each row
+        // visually renders at exactly this declared height — verified by extracting each
+        // line's actual PDF coordinates from generated receipts, which showed a rock-steady
+        // 0.16in between every consecutive row. This constant is the Tablix's own declared
+        // <Height> (__DYNAMICHEIGHT__).
+        const double dynamicRowHeightDesign = 0.16;
         const double totalsHeight = 0.9; // Total + Paid + Balance Due + Customer Outstanding rows, fixed count
-        const double bottomMargin = 0.08;
         const double maxPageHeightIn = 60;
 
         var dynamicHeight = detailLines.Count * dynamicRowHeightDesign;
-        var dynamicEnd = dynamicSectionTop + detailLines.Count * dynamicRowAllowance;
+        // Everything after the Tablix (divider/totals/footer) is placed at an absolute <Top>,
+        // but AspNetCore.Reporting's actual rendered position for it does NOT move smoothly or
+        // 1:1 with that declared value — confirmed by generating real receipts (10- and 16-line
+        // invoices) at several different per-line multipliers and reading each line's true PDF
+        // coordinates back out: small changes here produced wildly inconsistent swings (a value
+        // that closed the gap at one multiplier flipped into several inches of text/totals
+        // *overlap* at a nearby one), so this isn't a stable line someone can just solve for.
+        // 0.044 is the largest value found, of the ones tried, that reliably leaves a small
+        // *positive* gap (not overlap) for both invoices tested — biased deliberately toward
+        // "a bit of leftover blank space" over any risk of overlapping text, since the latter is
+        // a worse defect. If this still prints with a noticeable gap, nudge this down slightly
+        // and reprint — do not extrapolate/interpolate a "precise" value from only 1-2 points,
+        // per the instability described above; change it in small steps and reprint each time.
+        const double dynamicRowPositioningCost = 0.044;
+        var dynamicEnd = dynamicSectionTop + detailLines.Count * dynamicRowPositioningCost;
         var divider3Top = dynamicEnd + 0.04;
         var totalsTop = dynamicEnd + 0.10;
         var customerDueDividerTop = totalsTop + 0.66; // Total + Paid + Balance Due rows end here
@@ -404,7 +426,10 @@ public class SalesInvoicesController(
         var footerTop = divider4Top + 0.08;
         var footerNoteTop = footerTop + 0.22;
         var footerEnd = footerNoteTop + 0.16;
-        var bodyHeight = footerEnd;
+        // The Body's own declared height should still reflect the Tablix's true (visual) size
+        // rather than the deliberately-not-advanced dynamicEnd above, so it's never declared
+        // smaller than the content actually rendered inside it.
+        var bodyHeight = Math.Max(footerEnd, dynamicSectionTop + dynamicHeight + (footerEnd - dynamicEnd));
 
         // AspNetCore.Reporting's PDF pagination doesn't honor each item's declared
         // <Top>/<Height> for page-break decisions — it appears to walk the body's
@@ -413,9 +438,12 @@ public class SalesInvoicesController(
         // total exceeds the page's printable height everything remaining spills to a
         // second page. Empirically fit against two calibration points (4 detail lines
         // -> ~5.2in required, 30 detail lines -> ~17.95in required): required(n) =
-        // 3.24in + 0.49in/line. The constants below add a ~15% safety margin on top,
-        // plus extra headroom for the added Customer Outstanding totals row.
-        var pageHeight = Math.Min(4.0 + detailLines.Count * 0.55 + bottomMargin + 0.2, maxPageHeightIn);
+        // 3.24in + 0.49in/line. On thermal (continuous-roll) printers the PDF's page
+        // height is the paper length that gets fed and cut, so any slack here prints
+        // as a literal blank gap below the receipt — a flat, modest safety margin on
+        // top of the calibrated minimum keeps that gap small and constant instead of
+        // growing with the number of line items.
+        var pageHeight = Math.Min(3.24 + detailLines.Count * 0.49 + 0.5, maxPageHeightIn);
 
         var templatePath = Path.Combine(env.ContentRootPath, "Reports", "SalesInvoiceThermalReceipt.rdlc");
         var rdlc = await System.IO.File.ReadAllTextAsync(templatePath);
@@ -529,13 +557,14 @@ public class SalesInvoicesController(
                     p.Sku,
                     p.Name,
                     CurrentStock = p.WarehouseStocks.Where(s => s.WarehouseId == singleWarehouseId).Select(s => s.Quantity).FirstOrDefault(),
-                    p.UnitOfMeasure!.Symbol
+                    p.UnitOfMeasure!.Symbol,
+                    Category = p.Category!.Name
                 }).ToListAsync();
         }
         else
         {
             ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol }).ToListAsync();
+                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol, Category = p.Category!.Name }).ToListAsync();
         }
     }
 }

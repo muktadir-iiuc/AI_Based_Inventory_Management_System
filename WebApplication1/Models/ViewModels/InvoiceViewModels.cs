@@ -58,8 +58,13 @@ public class SalesLineInput
     [Required]
     public int ProductId { get; set; }
 
-    [Range(0.01, double.MaxValue, ErrorMessage = "Quantity must be greater than zero.")]
-    public decimal Quantity { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Quantity must be a whole number greater than zero.")]
+    public int Quantity { get; set; }
+
+    // Optional override of the FIFO batch's sale price for this line — null/0 falls back to
+    // each allocated batch's own SalePrice, same as before this was editable.
+    [Range(0, double.MaxValue)]
+    public decimal? UnitPrice { get; set; }
 }
 
 public class StockTransferCreateViewModel
