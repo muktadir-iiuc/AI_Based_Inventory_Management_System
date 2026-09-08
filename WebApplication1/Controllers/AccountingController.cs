@@ -194,6 +194,34 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             ModelState.AddModelError(nameof(model.SalesInvoiceId), "Select the sales invoice being received.");
         }
 
+        // A payment can't exceed what's actually still owed on the invoice — re-checked here
+        // against a fresh load rather than trusting the client, since the due amount can have
+        // changed (another payment posted) since the page was rendered.
+        if (model.Direction == PaymentDirection.Out && model.PurchaseInvoiceId is not null)
+        {
+            var invoice = await db.PurchaseInvoices
+                .Include(p => p.Items)
+                .Include(p => p.Payments)
+                .FirstOrDefaultAsync(p => p.Id == model.PurchaseInvoiceId);
+            var due = invoice is null ? 0 : invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount);
+            if (model.Amount > due)
+            {
+                ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed this invoice's due of {due:N2}.");
+            }
+        }
+        else if (model.Direction == PaymentDirection.In && model.SalesInvoiceId is not null)
+        {
+            var invoice = await db.SalesInvoices
+                .Include(s => s.Items)
+                .Include(s => s.Payments)
+                .FirstOrDefaultAsync(s => s.Id == model.SalesInvoiceId);
+            var due = invoice is null ? 0 : invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount);
+            if (model.Amount > due)
+            {
+                ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed this invoice's due of {due:N2}.");
+            }
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateInvoicesAsync();

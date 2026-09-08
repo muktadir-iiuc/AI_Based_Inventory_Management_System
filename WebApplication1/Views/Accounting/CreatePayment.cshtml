@@ -69,7 +69,8 @@
                             <label asp-for="Amount" class="form-label required-asterisk"></label>
                             <input asp-for="Amount" class="form-control" type="number" step="0.01" min="0.01" id="amountInput" />
                             <span asp-validation-for="Amount" class="text-danger small"></span>
-                            <div class="form-text">Pre-filled with the selected invoice's due amount — adjust for a partial payment.</div>
+                            <div class="text-danger small d-none" id="amountExceedsWarning"></div>
+                            <div class="form-text">Pre-filled with the selected invoice's due amount — adjust for a partial payment, but it can't exceed what's still due.</div>
                         </div>
                     </div>
                     <div class="mb-0">
@@ -148,26 +149,57 @@
 
         const salesInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["SalesInvoiceMeta"]));
         const purchaseInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["PurchaseInvoiceMeta"]));
+        const amountWarning = document.getElementById('amountExceedsWarning');
+        const submitButton = document.querySelector('#paymentForm button[type="submit"]');
+        let amountManuallyEdited = false;
 
         function money(n) {
             return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function updateSummary() {
+        function currentInvoiceRow() {
             const inSales = dirIn.checked;
             const select = document.getElementById(inSales ? 'salesInvoiceSelect' : 'purchaseInvoiceSelect');
             const meta = inSales ? salesInvoiceMeta : purchaseInvoiceMeta;
             const id = parseInt(select.value, 10);
-            const row = meta.find(m => m.Id === id);
+            return meta.find(m => m.Id === id);
+        }
+
+        // Re-checked against the same due figure shown in the info panel — the server always
+        // re-validates against a fresh read too, since due can change between page load and submit.
+        function validateAmount() {
+            const row = currentInvoiceRow();
+            const amount = parseFloat(amountInput.value) || 0;
+            const exceeds = !!row && amount > row.InvoiceDue;
+
+            amountInput.classList.toggle('is-invalid', exceeds);
+            amountWarning.classList.toggle('d-none', !exceeds);
+            if (exceeds) {
+                amountWarning.textContent = `Amount cannot exceed this invoice's due of ${money(row.InvoiceDue)}.`;
+            }
+            if (submitButton) {
+                submitButton.disabled = exceeds;
+            }
+            return !exceeds;
+        }
+
+        function updateSummary() {
+            const row = currentInvoiceRow();
+            const select = document.getElementById(dirIn.checked ? 'salesInvoiceSelect' : 'purchaseInvoiceSelect');
             summaryInvoice.textContent = select.selectedOptions[0]?.value ? select.selectedOptions[0].text.split(' - ')[0] : '—';
             summaryParty.textContent = row ? (row.CustomerName || row.SupplierName) : '—';
             summaryAmount.textContent = money(amountInput.value);
+            validateAmount();
         }
+
+        amountInput.addEventListener('input', () => {
+            amountManuallyEdited = true;
+            updateSummary();
+        });
 
         function wireInvoiceInfo(selectId, meta, infoId, amountId, dueId, partyOutstandingId) {
             const select = document.getElementById(selectId);
             const info = document.getElementById(infoId);
-            let amountManuallyEdited = false;
 
             function update() {
                 const id = parseInt(select.value, 10);
@@ -188,14 +220,10 @@
                 updateSummary();
             }
 
-            select.addEventListener('change', update);
+            select.addEventListener('change', () => { amountManuallyEdited = false; update(); });
             if (typeof jQuery !== 'undefined') {
-                jQuery(select).on('select2:select select2:clear', update);
+                jQuery(select).on('select2:select select2:clear', () => { amountManuallyEdited = false; update(); });
             }
-            amountInput.addEventListener('input', () => {
-                amountManuallyEdited = true;
-                updateSummary();
-            });
             select.wireUpdate = update;
         }
 
