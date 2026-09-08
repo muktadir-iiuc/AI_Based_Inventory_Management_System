@@ -6,71 +6,104 @@
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
 }
 
-<div class="card">
-    <div class="card-body">
-        <form asp-action="Create" method="post" id="invoiceForm">
-            <div asp-validation-summary="All" class="text-danger"></div>
+<form asp-action="Create" method="post" id="invoiceForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
 
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <label asp-for="CustomerId" class="form-label required-asterisk"></label>
-                    <select asp-for="CustomerId" asp-items="customerList" class="form-select">
-                        <option value="">-- select customer --</option>
-                    </select>
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Invoice Details</h3>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
-                    @if (warehouseScoped)
-                    {
-                        <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Selected)?.Text" readonly />
-                        <input type="hidden" asp-for="WarehouseId" id="warehouseId" />
-                    }
-                    else
-                    {
-                        <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select" id="warehouseId">
-                            <option value="">-- select warehouse --</option>
-                        </select>
-                    }
-                </div>
-                <div class="col-md-2 mb-3">
-                    <label asp-for="Date" class="form-label required-asterisk"></label>
-                    <input asp-for="Date" class="form-control" type="date" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label asp-for="Notes" class="form-label"></label>
-                    <input asp-for="Notes" class="form-control" />
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="CustomerId" class="form-label required-asterisk"></label>
+                            <select asp-for="CustomerId" asp-items="customerList" class="form-select">
+                                <option value="">-- select customer --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
+                            @if (warehouseScoped)
+                            {
+                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Selected)?.Text" readonly />
+                                <input type="hidden" asp-for="WarehouseId" id="warehouseId" />
+                            }
+                            else
+                            {
+                                <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select" id="warehouseId">
+                                    <option value="">-- select warehouse --</option>
+                                </select>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12 mb-0">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <input asp-for="Notes" class="form-control" placeholder="Optional note for this invoice" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <table class="table table-bordered" id="itemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 40%">Product</th>
-                        <th style="width: 15%">Quantity</th>
-                        <th style="width: 15%" class="text-end">Unit Price</th>
-                        <th style="width: 20%" class="text-end">Line Total</th>
-                        <th style="width: 5%"></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsBody"></tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="3" class="text-end fw-bold">Grand Total</td>
-                        <td class="text-end fw-bold" id="grandTotal">0.00</td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-
-            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
-
-            <div>
-                <button type="submit" class="btn btn-primary">Post Sales Invoice</button>
-                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Line Items</h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
+                </div>
+                <div class="card-body p-0 table-responsive-card">
+                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 3%">#</th>
+                                <th style="width: 37%">Product</th>
+                                <th style="width: 13%">Quantity</th>
+                                <th style="width: 15%" class="text-end">Unit Price</th>
+                                <th style="width: 17%" class="text-end">Line Total</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                    <div id="emptyState" class="text-center text-muted py-4 d-none">
+                        No product lines yet — click "Add product line" to get started.
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 text-muted fw-normal">Product lines</dt>
+                        <dd class="col-5 text-end" id="summaryLineCount">0</dd>
+                        <dt class="col-7 text-muted fw-normal">Total quantity</dt>
+                        <dd class="col-5 text-end" id="summaryQty">0</dd>
+                    </dl>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Grand Total</span>
+                        <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
+                    </div>
+                    <div class="form-text mt-1">
+                        Price is determined automatically per batch (FIFO) once you pick a product and quantity.
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Post Sales Invoice</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</form>
 
 @section Scripts {
     <script>
@@ -91,17 +124,31 @@
             return html;
         }
 
+        function updateEmptyState() {
+            const hasRows = document.querySelectorAll('#itemsBody tr:not(.allocation-row)').length > 0;
+            document.getElementById('itemsTable').classList.toggle('d-none', !hasRows);
+            document.getElementById('emptyState').classList.toggle('d-none', hasRows);
+        }
+
+        function renumberRows() {
+            document.querySelectorAll('#itemsBody tr.item-row').forEach((tr, i) => {
+                tr.querySelector('.row-number').textContent = i + 1;
+            });
+        }
+
         function addRow() {
             const tbody = document.getElementById('itemsBody');
             const tr = document.createElement('tr');
+            tr.className = 'item-row';
             tr.innerHTML = `
+                <td class="row-number text-muted"></td>
                 <td>
                     <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions()}</select>
                 </td>
                 <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="1" /></td>
                 <td class="text-end unit-price-cell text-muted">&mdash;</td>
-                <td class="text-end line-total">0.00</td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="fas fa-times"></i></button></td>
+                <td class="text-end line-total fw-semibold">0.00</td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
             `;
             tbody.appendChild(tr);
 
@@ -109,7 +156,7 @@
             const allocationTr = document.createElement('tr');
             allocationTr.className = 'allocation-row d-none';
             allocationTr.innerHTML = `
-                <td colspan="5" class="bg-body-tertiary p-2">
+                <td colspan="6" class="bg-body-tertiary p-2">
                     <div class="small text-muted mb-1">FIFO batch allocation</div>
                     <table class="table table-sm mb-0 allocation-table">
                         <thead><tr><th>Batch</th><th class="text-end">Available</th><th class="text-end">Allocated</th><th class="text-end">Purchase Price</th><th class="text-end">Sale Price</th></tr></thead>
@@ -121,6 +168,8 @@
 
             rowIndex++;
             wireRow(tr, allocationTr);
+            renumberRows();
+            updateEmptyState();
         }
 
         function wireRow(tr, allocationTr) {
@@ -132,13 +181,20 @@
 
             let debounceHandle = null;
 
-            function clearAllocation(message) {
-                priceCell.textContent = message || '—';
-                priceCell.classList.add('text-muted');
+            function clearAllocation(message, isError) {
+                priceCell.innerHTML = message || '&mdash;';
+                priceCell.classList.toggle('text-danger', !!isError);
+                priceCell.classList.toggle('text-muted', !isError);
                 totalCell.textContent = '0.00';
                 allocationTr.classList.add('d-none');
                 allocationBody.innerHTML = '';
                 recalc();
+            }
+
+            function showLoading() {
+                priceCell.classList.remove('text-danger');
+                priceCell.classList.add('text-muted');
+                priceCell.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             }
 
             async function refreshAllocation() {
@@ -151,18 +207,20 @@
                     return;
                 }
 
+                showLoading();
+
                 const url = `${previewUrl}?productId=${productId}&warehouseId=${warehouseId}&quantity=${quantity}`;
                 let data;
                 try {
                     const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                     data = await response.json();
                 } catch {
-                    clearAllocation('Unable to check stock');
+                    clearAllocation('Unable to check stock', true);
                     return;
                 }
 
                 if (!data.ok) {
-                    clearAllocation(data.error || 'Insufficient stock');
+                    clearAllocation(data.error || 'Insufficient stock', true);
                     return;
                 }
 
@@ -196,6 +254,8 @@
             tr.querySelector('.remove-row').addEventListener('click', () => {
                 tr.remove();
                 allocationTr.remove();
+                renumberRows();
+                updateEmptyState();
                 recalc();
             });
 
@@ -207,20 +267,24 @@
                 jQuery(select).on('select2:select select2:clear', debouncedRefresh);
             }
 
-            tr.dataset.refresh = 'pending';
             tr.refreshAllocation = refreshAllocation;
         }
 
         function recalc() {
             let grand = 0;
-            document.querySelectorAll('#itemsBody tr:not(.allocation-row)').forEach(tr => {
+            let totalQty = 0;
+            const rows = document.querySelectorAll('#itemsBody tr.item-row');
+            rows.forEach(tr => {
                 grand += parseFloat(tr.querySelector('.line-total').textContent) || 0;
+                totalQty += parseFloat(tr.querySelector('.qty-input').value) || 0;
             });
             document.getElementById('grandTotal').textContent = grand.toFixed(2);
+            document.getElementById('summaryLineCount').textContent = rows.length;
+            document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
         }
 
         function refreshAllRows() {
-            document.querySelectorAll('#itemsBody tr:not(.allocation-row)').forEach(tr => {
+            document.querySelectorAll('#itemsBody tr.item-row').forEach(tr => {
                 if (typeof tr.refreshAllocation === 'function') {
                     tr.refreshAllocation();
                 }

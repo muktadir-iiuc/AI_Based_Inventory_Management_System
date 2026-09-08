@@ -10,9 +10,9 @@ namespace WebApplication1.Controllers;
 
 public class UnitsController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index()
     {
-        return View(await PagedList<UnitOfMeasure>.CreateAsync(db.UnitOfMeasures.OrderBy(u => u.Name), page));
+        return View(await db.UnitOfMeasures.OrderBy(u => u.Name).ToListAsync());
     }
 
     [Authorize(Roles = Roles.PurchaseManagers)]

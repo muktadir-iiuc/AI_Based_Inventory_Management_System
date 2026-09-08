@@ -3,37 +3,85 @@
     ViewData["Title"] = "New Customer";
 }
 
-<div class="card col-md-6">
-    <div class="card-body">
-        <form asp-action="Create" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="mb-3">
-                <label asp-for="Name" class="form-label required-asterisk"></label>
-                <input asp-for="Name" class="form-control" />
-                <span asp-validation-for="Name" class="text-danger small"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="ContactPerson" class="form-label"></label>
-                <input asp-for="ContactPerson" class="form-control" />
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label asp-for="Phone" class="form-label"></label>
-                    <input asp-for="Phone" class="form-control" />
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label asp-for="Email" class="form-label"></label>
-                    <input asp-for="Email" class="form-control" />
-                </div>
-            </div>
-            <div class="mb-3">
-                <label asp-for="Address" class="form-label"></label>
-                <textarea asp-for="Address" class="form-control" rows="2"></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary">Save</button>
-            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
-        </form>
-    </div>
-</div>
+<form asp-action="Create" method="post" id="customerForm">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Customer Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label required-asterisk"></label>
+                        <input asp-for="Name" class="form-control" id="nameInput" placeholder="e.g. Rahim Traders" autofocus />
+                        <span asp-validation-for="Name" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="ContactPerson" class="form-label"></label>
+                        <input asp-for="ContactPerson" class="form-control" id="contactInput" placeholder="Person to reach for this account" />
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <input asp-for="Phone" class="form-control" id="phoneInput" placeholder="e.g. 01XXXXXXXXX" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" id="emailInput" placeholder="name@example.com" />
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="Address" class="form-label"></label>
+                        <textarea asp-for="Address" class="form-control" rows="3" placeholder="Optional — shown on sales invoices and receipts"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Preview</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small mb-1">This customer will appear as</div>
+                    <div class="fw-semibold fs-5" id="namePreview">Customer name</div>
+                    <div class="text-muted small" id="contactPreview"></div>
+                    <hr />
+                    <div class="small text-muted">
+                        Once saved, you can raise sales invoices against this customer and track their outstanding due from the Customers list.
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Save Customer</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            const nameInput = document.getElementById('nameInput');
+            const contactInput = document.getElementById('contactInput');
+            const phoneInput = document.getElementById('phoneInput');
+            const emailInput = document.getElementById('emailInput');
+            const namePreview = document.getElementById('namePreview');
+            const contactPreview = document.getElementById('contactPreview');
+
+            function updatePreview() {
+                namePreview.textContent = nameInput.value.trim() || 'Customer name';
+                const parts = [contactInput.value.trim(), phoneInput.value.trim(), emailInput.value.trim()].filter(Boolean);
+                contactPreview.textContent = parts.join(' · ');
+            }
+
+            [nameInput, contactInput, phoneInput, emailInput].forEach(el => el.addEventListener('input', updatePreview));
+            updatePreview();
+        })();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

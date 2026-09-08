@@ -1,4 +1,4 @@
-@model PagedList<UserListItem>
+@model List<UserListItem>
 @{
     ViewData["Title"] = "Users & Roles";
 }
@@ -9,8 +9,8 @@
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Full Name</th><th>Email</th><th>Role</th><th>Warehouse</th><th>Status</th><th></th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table">
+            <thead><tr><th>Full Name</th><th>Email</th><th>Role</th><th>Warehouse</th><th data-filter="select">Status</th><th data-filter="false"></th></tr></thead>
             <tbody>
             @foreach (var u in Model)
             {
@@ -29,12 +29,13 @@
                         else { <span class="badge text-bg-secondary">Inactive</span> }
                     </td>
                     <td class="text-end">
-                        <a asp-action="Edit" asp-route-id="@u.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                        <div class="table-actions">
+                            <a asp-action="Edit" asp-route-id="@u.Id" class="btn btn-sm btn-outline-primary" title="Edit user"><i class="fas fa-pen"></i></a>
+                        </div>
                     </td>
                 </tr>
             }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>

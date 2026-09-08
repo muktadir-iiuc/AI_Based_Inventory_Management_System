@@ -18,7 +18,7 @@ public class PurchaseInvoicesController(
     IAccountingService accountingService,
     IActivityNotifier notifier) : Controller
 {
-    public async Task<IActionResult> Index(int? supplierId, int? warehouseId, int page = 1)
+    public async Task<IActionResult> Index(int? supplierId, int? warehouseId)
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.PurchaseInvoices.Include(p => p.Supplier).Include(p => p.Warehouse).AsQueryable();
@@ -41,8 +41,7 @@ public class PurchaseInvoicesController(
         ViewData["WarehouseId"] = new SelectList(await db.Warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
         ViewData["WarehouseScoped"] = warehouseIds is not null;
 
-        return View(await PagedList<PurchaseInvoice>.CreateAsync(
-            query.Include(p => p.Items).OrderByDescending(p => p.Date).ThenByDescending(p => p.Id), page));
+        return View(await query.Include(p => p.Items).OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)

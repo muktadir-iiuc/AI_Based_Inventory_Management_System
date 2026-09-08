@@ -1,4 +1,4 @@
-@model PagedList<Warehouse>
+@model List<Warehouse>
 @{
     ViewData["Title"] = "Warehouses";
 }
@@ -12,8 +12,8 @@
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Status</th><th></th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table">
+            <thead><tr><th>Code</th><th>Name</th><th>Location</th><th data-filter="select">Status</th><th data-filter="false"></th></tr></thead>
             <tbody>
             @foreach (var w in Model)
             {
@@ -28,17 +28,14 @@
                     <td class="text-end">
                         @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager))
                         {
-                            <a asp-action="Edit" asp-route-id="@w.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <div class="table-actions">
+                                <a asp-action="Edit" asp-route-id="@w.Id" class="btn btn-sm btn-outline-primary" title="Edit warehouse"><i class="fas fa-pen"></i></a>
+                            </div>
                         }
                     </td>
                 </tr>
             }
-            @if (!Model.Any())
-            {
-                <tr><td colspan="5" class="text-center text-muted py-3">No warehouses found.</td></tr>
-            }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>

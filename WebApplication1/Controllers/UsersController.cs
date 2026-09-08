@@ -17,13 +17,12 @@ public class UsersController(
 {
     private static readonly string[] UnrestrictedRoles = [Roles.Admin, Roles.Manager];
 
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index()
     {
-        var pagedUsers = await PagedList<ApplicationUser>.CreateAsync(
-            userManager.Users.Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email), page);
+        var users = await userManager.Users.Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email).ToListAsync();
 
         var items = new List<UserListItem>();
-        foreach (var user in pagedUsers)
+        foreach (var user in users)
         {
             var roles = await userManager.GetRolesAsync(user);
             items.Add(new UserListItem
@@ -37,7 +36,7 @@ public class UsersController(
             });
         }
 
-        return View(new PagedList<UserListItem>(items, pagedUsers.Paging.TotalCount, pagedUsers.Paging.PageNumber, pagedUsers.Paging.PageSize));
+        return View(items);
     }
 
     public async Task<IActionResult> Create()

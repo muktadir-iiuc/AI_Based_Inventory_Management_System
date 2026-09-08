@@ -10,29 +10,36 @@ namespace WebApplication1.Controllers;
 
 public class WarehousesController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index()
     {
-        return View(await PagedList<Warehouse>.CreateAsync(db.Warehouses.OrderBy(w => w.Name), page));
+        return View(await db.Warehouses.OrderBy(w => w.Name).ToListAsync());
     }
 
     [Authorize(Roles = $"{Roles.Admin},{Roles.Manager}")]
-    public IActionResult Create() => View(new Warehouse());
+    public async Task<IActionResult> Create()
+    {
+        ViewData["NextCode"] = await GenerateWarehouseCodeAsync();
+        return View(new Warehouse());
+    }
 
     [HttpPost]
     [Authorize(Roles = $"{Roles.Admin},{Roles.Manager}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Warehouse model)
     {
-        if (await db.Warehouses.AnyAsync(w => w.Code == model.Code))
-        {
-            ModelState.AddModelError(nameof(Warehouse.Code), "This warehouse code is already in use.");
-        }
-        if (!ModelState.IsValid) return View(model);
+        ModelState.Remove(nameof(Warehouse.Code)); // auto-generated below, not user input
 
+        if (!ModelState.IsValid)
+        {
+            ViewData["NextCode"] = await GenerateWarehouseCodeAsync();
+            return View(model);
+        }
+
+        model.Code = await GenerateWarehouseCodeAsync();
         model.CreatedBy = User.Identity?.Name;
         db.Warehouses.Add(model);
         await db.SaveChangesAsync();
-        TempData["Success"] = "Warehouse created.";
+        TempData["Success"] = $"Warehouse created with code {model.Code}.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -67,5 +74,18 @@ public class WarehousesController(ApplicationDbContext db) : Controller
         await db.SaveChangesAsync();
         TempData["Success"] = "Warehouse updated.";
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task<string> GenerateWarehouseCodeAsync()
+    {
+        var existingCodes = await db.Warehouses.Select(w => w.Code).ToListAsync();
+
+        var nextNumber = existingCodes
+            .Where(c => c.StartsWith("WH-") && c[3..].All(char.IsDigit))
+            .Select(c => int.Parse(c[3..]))
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+
+        return $"WH-{nextNumber:D2}";
     }
 }

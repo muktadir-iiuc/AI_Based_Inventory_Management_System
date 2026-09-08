@@ -15,29 +15,36 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 {
     // ---- Chart of Accounts ----
 
-    public async Task<IActionResult> ChartOfAccounts(int page = 1)
+    public async Task<IActionResult> ChartOfAccounts()
     {
-        return View(await PagedList<Account>.CreateAsync(db.Accounts.OrderBy(a => a.Code), page));
+        return View(await db.Accounts.OrderBy(a => a.Code).ToListAsync());
     }
 
     [Authorize(Roles = Roles.AccountingManagers)]
-    public IActionResult CreateAccount() => View(new Account());
+    public async Task<IActionResult> CreateAccount()
+    {
+        ViewData["NextCodes"] = await GenerateNextAccountCodesAsync();
+        return View(new Account());
+    }
 
     [HttpPost]
     [Authorize(Roles = Roles.AccountingManagers)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateAccount(Account model)
     {
-        if (await db.Accounts.AnyAsync(a => a.Code == model.Code))
-        {
-            ModelState.AddModelError(nameof(Account.Code), "This account code is already in use.");
-        }
-        if (!ModelState.IsValid) return View(model);
+        ModelState.Remove(nameof(Account.Code)); // auto-generated below, not user input
 
+        if (!ModelState.IsValid)
+        {
+            ViewData["NextCodes"] = await GenerateNextAccountCodesAsync();
+            return View(model);
+        }
+
+        model.Code = await GenerateAccountCodeAsync(model.Type);
         model.CreatedBy = User.Identity?.Name;
         db.Accounts.Add(model);
         await db.SaveChangesAsync();
-        TempData["Success"] = "Account created.";
+        TempData["Success"] = $"Account created with code {model.Code}.";
         return RedirectToAction(nameof(ChartOfAccounts));
     }
 
@@ -74,10 +81,9 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 
     // ---- Journal Entries ----
 
-    public async Task<IActionResult> JournalEntries(int page = 1)
+    public async Task<IActionResult> JournalEntries()
     {
-        return View(await PagedList<JournalEntry>.CreateAsync(
-            db.JournalEntries.Include(j => j.Lines).OrderByDescending(j => j.Date).ThenByDescending(j => j.Id), page));
+        return View(await db.JournalEntries.Include(j => j.Lines).OrderByDescending(j => j.Date).ThenByDescending(j => j.Id).ToListAsync());
     }
 
     public async Task<IActionResult> JournalEntryDetails(int id)
@@ -149,7 +155,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 
     // ---- Payments & Receipts ----
 
-    public async Task<IActionResult> Payments(int page = 1)
+    public async Task<IActionResult> Payments()
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.Payments
@@ -164,7 +170,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
                 (p.SalesInvoice != null && warehouseIds.Contains(p.SalesInvoice.WarehouseId)));
         }
 
-        return View(await PagedList<Payment>.CreateAsync(query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id), page));
+        return View(await query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
     }
 
     [Authorize(Roles = Roles.AccountingManagers)]
@@ -222,7 +228,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
         return View(await accountingService.GetTrialBalanceAsync());
     }
 
-    public async Task<IActionResult> Ledger(int accountId, int page = 1)
+    public async Task<IActionResult> Ledger(int accountId)
     {
         var account = await db.Accounts.FindAsync(accountId);
         if (account is null) return NotFound();
@@ -236,7 +242,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             return new LedgerLineRow(l.JournalEntry?.Date, l.JournalEntryId, l.JournalEntry?.EntryNumber, l.Memo, l.Debit, l.Credit, running);
         }).ToList();
 
-        return View(new LedgerViewModel { Account = account, Rows = PagedList<LedgerLineRow>.Create(rows, page) });
+        return View(new LedgerViewModel { Account = account, Rows = rows });
     }
 
     private async Task PopulateAccountsAsync()
@@ -270,5 +276,32 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             await salesInvoices.OrderByDescending(s => s.Date)
                 .Select(s => new { s.Id, Label = s.InvoiceNumber + " - " + s.Customer!.Name }).ToListAsync(),
             "Id", "Label");
+    }
+
+    // Account codes follow the chart-of-accounts numbering convention seeded in DbInitializer
+    // (Asset 1xxx, Liability 2xxx, Equity 3xxx, Income 4xxx, Expense 5xxx), spaced by 100 within
+    // each type's block so codes stay stable and readable as more accounts are added.
+    private async Task<string> GenerateAccountCodeAsync(AccountType type)
+    {
+        var baseCode = (int)type * 1000;
+        var existingCodes = await db.Accounts.Select(a => a.Code).ToListAsync();
+
+        var maxInBlock = existingCodes
+            .Select(c => int.TryParse(c, out var n) ? n : -1)
+            .Where(n => n >= baseCode && n < baseCode + 1000)
+            .DefaultIfEmpty(baseCode)
+            .Max();
+
+        return (maxInBlock + 100).ToString();
+    }
+
+    private async Task<Dictionary<AccountType, string>> GenerateNextAccountCodesAsync()
+    {
+        var result = new Dictionary<AccountType, string>();
+        foreach (AccountType type in Enum.GetValues<AccountType>())
+        {
+            result[type] = await GenerateAccountCodeAsync(type);
+        }
+        return result;
     }
 }

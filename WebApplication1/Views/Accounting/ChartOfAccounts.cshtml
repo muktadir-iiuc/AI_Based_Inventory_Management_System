@@ -1,4 +1,4 @@
-@model PagedList<Account>
+@model List<Account>
 @{
     ViewData["Title"] = "Chart of Accounts";
 }
@@ -12,14 +12,14 @@
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th><th></th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table" id="accountTable">
+            <thead><tr><th>Code</th><th>Name</th><th data-filter="select">Type</th><th data-filter="select">Status</th><th data-filter="false"></th></tr></thead>
             <tbody>
             @foreach (var a in Model)
             {
-                <tr>
+                <tr class="clickable-row" data-href="@Url.Action("Ledger", new { accountId = a.Id })">
                     <td>@a.Code</td>
-                    <td><a asp-action="Ledger" asp-route-accountId="@a.Id">@a.Name</a></td>
+                    <td><a asp-action="Ledger" asp-route-accountId="@a.Id" class="fw-semibold">@a.Name</a></td>
                     <td>@a.Type</td>
                     <td>
                         @if (a.IsActive) { <span class="badge text-bg-success">Active</span> }
@@ -28,7 +28,9 @@
                     <td class="text-end">
                         @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant))
                         {
-                            <a asp-action="EditAccount" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+                            <div class="table-actions">
+                                <a asp-action="EditAccount" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary" title="Edit account"><i class="fas fa-pen"></i></a>
+                            </div>
                         }
                     </td>
                 </tr>
@@ -36,5 +38,21 @@
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #accountTable tbody tr.clickable-row { cursor: pointer; }
+    #accountTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('accountTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input, form')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

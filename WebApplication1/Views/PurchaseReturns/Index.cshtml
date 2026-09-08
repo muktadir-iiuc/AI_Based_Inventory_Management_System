@@ -1,29 +1,61 @@
-@model PagedList<PurchaseReturn>
+@model List<PurchaseReturn>
 @{
     ViewData["Title"] = "Purchase Returns";
+    var totalAmount = Model.Sum(r => r.TotalAmount);
 }
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Returns Listed</div>
+                <div class="fs-4 fw-bold">@Model.Count</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Total Returned Value</div>
+                <div class="fs-4 fw-bold">@totalAmount.ToString("C")</div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Return #</th><th>Invoice #</th><th>Supplier</th><th>Date</th><th class="text-end">Amount</th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table" id="returnTable">
+            <thead><tr><th>Return #</th><th>Invoice #</th><th>Supplier</th><th data-filter="date">Date</th><th class="text-end">Amount</th></tr></thead>
             <tbody>
             @foreach (var r in Model)
             {
-                <tr>
-                    <td><a asp-action="Details" asp-route-id="@r.Id">@r.ReturnNumber</a></td>
+                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = r.Id })">
+                    <td><a asp-action="Details" asp-route-id="@r.Id" class="fw-semibold">@r.ReturnNumber</a></td>
                     <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@r.PurchaseInvoiceId">@r.PurchaseInvoice?.InvoiceNumber</a></td>
                     <td>@r.PurchaseInvoice?.Supplier?.Name</td>
-                    <td>@r.Date.ToString("MMM dd, yyyy")</td>
-                    <td class="text-end">@r.TotalAmount.ToString("C")</td>
+                    <td data-date="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("MMM dd, yyyy")</td>
+                    <td class="text-end fw-semibold">@r.TotalAmount.ToString("C")</td>
                 </tr>
-            }
-            @if (!Model.Any())
-            {
-                <tr><td colspan="5" class="text-center text-muted py-3">No purchase returns found.</td></tr>
             }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #returnTable tbody tr.clickable-row { cursor: pointer; }
+    #returnTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('returnTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

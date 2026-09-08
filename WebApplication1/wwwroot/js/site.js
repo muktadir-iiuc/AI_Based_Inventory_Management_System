@@ -9,7 +9,103 @@ document.addEventListener('DOMContentLoaded', function () {
 
     initSelect2(document);
     initEnterKeyNavigation(document);
+    initDataTables(document);
 });
+
+// Turns every table.data-table into a sortable, per-column-filterable grid via DataTables.
+// These pages used to paginate server-side (20 rows/page via PagedList + _Pager); with
+// DataTables client-side sorting/search/pagination this fully replaces that, so the
+// controller now sends every row matching the page's own filters in one response and lets
+// DataTables handle sort/search/paging entirely in the browser (fine at this data volume).
+// Mark a <th> with data-filter="false" to skip the per-column filter box for it (action
+// columns with just buttons/links, or anything not meaningfully text-searchable).
+// Mark a <th> with data-filter="select" to get a dropdown of that column's distinct values
+// instead of a free-text box (useful for low-cardinality columns like Warehouse or Status).
+// Mark a <th> with data-filter="date" to get a native date-picker filter — pair it with a
+// data-date="yyyy-MM-dd" attribute on that column's <td> so the picker can match exactly
+// regardless of how the date is formatted for display.
+function initDataTables(root) {
+    if (typeof jQuery === 'undefined' || !jQuery.fn.DataTable) {
+        return;
+    }
+
+    jQuery(root).find('table.data-table').each(function () {
+        var $table = jQuery(this);
+        if (jQuery.fn.DataTable.isDataTable(this)) {
+            return;
+        }
+
+        var $headerRow = $table.find('thead tr').first();
+        var $filterRow = jQuery('<tr class="filter-row"></tr>');
+        var selectColumns = [];
+        var dateColumns = [];
+
+        $headerRow.find('th').each(function (index) {
+            var $filterCell = jQuery('<th></th>');
+            var filterType = jQuery(this).data('filter');
+            if (filterType !== false) {
+                if (filterType === 'select') {
+                    $filterCell.html('<select class="form-select form-select-sm column-filter"><option value="">All</option></select>');
+                    selectColumns.push(index);
+                } else if (filterType === 'date') {
+                    $filterCell.html('<input type="date" class="form-control form-control-sm column-filter" />');
+                    dateColumns.push(index);
+                } else {
+                    $filterCell.html('<input type="text" class="form-control form-control-sm column-filter" placeholder="Filter" />');
+                }
+            }
+            $filterRow.append($filterCell);
+        });
+        $table.find('thead').append($filterRow);
+
+        var dt = $table.DataTable({
+            order: [],
+            orderCellsTop: true,
+            pageLength: 20,
+            lengthMenu: [10, 20, 50, 100],
+            // Drop the built-in global search box (topEnd) — per-column filters below replace
+            // it — while keeping DataTables 2's Bootstrap5 layout renderer (and its styling of
+            // the length dropdown/pagination) intact, unlike the legacy 'dom' string option.
+            layout: { topStart: 'pageLength', topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
+            language: { emptyTable: 'No records found.' }
+        });
+
+        selectColumns.forEach(function (index) {
+            var $select = $filterRow.find('th').eq(index).find('select');
+            dt.column(index).data().unique().sort().each(function (value) {
+                var text = jQuery('<div>').html(value).text().trim();
+                if (text) {
+                    $select.append(jQuery('<option></option>').val(text).text(text));
+                }
+            });
+        });
+
+        dateColumns.forEach(function (index) {
+            var selectedDate = '';
+            jQuery.fn.dataTable.ext.search.push(function (settings, searchData, rowIdx) {
+                if (settings.nTable !== dt.table().node() || !selectedDate) {
+                    return true;
+                }
+                var cell = dt.cell(rowIdx, index).node();
+                return !!cell && cell.getAttribute('data-date') === selectedDate;
+            });
+            $filterRow.find('th').eq(index).find('input[type=date]').on('change', function () {
+                selectedDate = this.value;
+                dt.draw();
+            });
+        });
+
+        $filterRow.find('th').each(function (index) {
+            jQuery('input[type=text], input[type=date], select', this).on('click', function (e) { e.stopPropagation(); });
+            jQuery('input[type=text]', this).on('input', function () { dt.column(index).search(this.value).draw(); });
+            jQuery('select', this).on('change', function () {
+                var value = this.value;
+                var regex = value ? '^' + value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$' : '';
+                dt.column(index).search(regex, true, false).draw();
+            });
+        });
+    });
+}
 
 // Initializes Select2 on every dropdown within the given root element or document.
 // Call this again with a newly-created row/element after inserting it into the DOM

@@ -6,73 +6,105 @@
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
 }
 
-<div class="card">
-    <div class="card-body">
-        <form asp-action="Create" method="post" id="invoiceForm">
-            <div asp-validation-summary="All" class="text-danger"></div>
+<form asp-action="Create" method="post" id="invoiceForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
 
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <label asp-for="SupplierId" class="form-label required-asterisk"></label>
-                    <select asp-for="SupplierId" asp-items="supplierList" class="form-select">
-                        <option value="">-- select supplier --</option>
-                    </select>
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Invoice Details</h3>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
-                    @if (warehouseScoped)
-                    {
-                        <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Selected)?.Text" readonly />
-                        <input type="hidden" asp-for="WarehouseId" />
-                    }
-                    else
-                    {
-                        <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select">
-                            <option value="">-- select warehouse --</option>
-                        </select>
-                    }
-                </div>
-                <div class="col-md-2 mb-3">
-                    <label asp-for="Date" class="form-label required-asterisk"></label>
-                    <input asp-for="Date" class="form-control" type="date" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label asp-for="Notes" class="form-label"></label>
-                    <input asp-for="Notes" class="form-control" />
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="SupplierId" class="form-label required-asterisk"></label>
+                            <select asp-for="SupplierId" asp-items="supplierList" class="form-select">
+                                <option value="">-- select supplier --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
+                            @if (warehouseScoped)
+                            {
+                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Selected)?.Text" readonly />
+                                <input type="hidden" asp-for="WarehouseId" />
+                            }
+                            else
+                            {
+                                <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select">
+                                    <option value="">-- select warehouse --</option>
+                                </select>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12 mb-0">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <input asp-for="Notes" class="form-control" placeholder="Optional note for this invoice" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <table class="table table-bordered" id="itemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 32%">Product</th>
-                        <th style="width: 13%">Quantity</th>
-                        <th style="width: 13%">Unit Cost</th>
-                        <th style="width: 15%">Sale Price</th>
-                        <th style="width: 17%" class="text-end">Line Total</th>
-                        <th style="width: 5%"></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsBody"></tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="4" class="text-end fw-bold">Grand Total</td>
-                        <td class="text-end fw-bold" id="grandTotal">0.00</td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div class="form-text mb-3">Each line becomes its own batch: this Sale Price is what that specific batch will sell at, independent of any other purchase's price for the same product.</div>
-
-            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
-
-            <div>
-                <button type="submit" class="btn btn-primary">Post Purchase Invoice</button>
-                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Line Items</h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
+                </div>
+                <div class="card-body p-0 table-responsive-card">
+                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 3%">#</th>
+                                <th style="width: 30%">Product</th>
+                                <th style="width: 12%">Quantity</th>
+                                <th style="width: 13%">Unit Cost</th>
+                                <th style="width: 14%">Sale Price</th>
+                                <th style="width: 18%" class="text-end">Line Total</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                    <div id="emptyState" class="text-center text-muted py-4 d-none">
+                        No product lines yet — click "Add product line" to get started.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="form-text mb-0">Each line becomes its own batch: this Sale Price is what that specific batch will sell at, independent of any other purchase's price for the same product.</div>
+                </div>
             </div>
-        </form>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 text-muted fw-normal">Product lines</dt>
+                        <dd class="col-5 text-end" id="summaryLineCount">0</dd>
+                        <dt class="col-7 text-muted fw-normal">Total quantity</dt>
+                        <dd class="col-5 text-end" id="summaryQty">0</dd>
+                    </dl>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Grand Total</span>
+                        <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Post Purchase Invoice</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</form>
 
 @section Scripts {
     <script>
@@ -88,22 +120,37 @@
             return html;
         }
 
+        function updateEmptyState() {
+            const hasRows = document.querySelectorAll('#itemsBody tr').length > 0;
+            document.getElementById('itemsTable').classList.toggle('d-none', !hasRows);
+            document.getElementById('emptyState').classList.toggle('d-none', hasRows);
+        }
+
+        function renumberRows() {
+            document.querySelectorAll('#itemsBody tr').forEach((tr, i) => {
+                tr.querySelector('.row-number').textContent = i + 1;
+            });
+        }
+
         function addRow() {
             const tbody = document.getElementById('itemsBody');
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td class="row-number text-muted"></td>
                 <td>
                     <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions()}</select>
                 </td>
                 <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="1" /></td>
                 <td><input name="Items[${rowIndex}].UnitPrice" type="number" step="0.01" min="0" class="form-control price-input" value="0" /></td>
                 <td><input name="Items[${rowIndex}].SalePrice" type="number" step="0.01" min="0" class="form-control sale-price-input" value="0" /></td>
-                <td class="text-end line-total">0.00</td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="fas fa-times"></i></button></td>
+                <td class="text-end line-total fw-semibold">0.00</td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
             `;
             tbody.appendChild(tr);
             rowIndex++;
             wireRow(tr);
+            renumberRows();
+            updateEmptyState();
         }
 
         function wireRow(tr) {
@@ -112,32 +159,47 @@
             const price = tr.querySelector('.price-input');
             const salePrice = tr.querySelector('.sale-price-input');
 
-            select.addEventListener('change', () => {
+            const applyProductSelection = () => {
                 const opt = select.options[select.selectedIndex];
-                price.value = opt.dataset.cost || 0;
-                salePrice.value = opt.dataset.sale || 0;
+                price.value = opt && opt.value ? (opt.dataset.cost || 0) : 0;
+                salePrice.value = opt && opt.value ? (opt.dataset.sale || 0) : 0;
                 recalc();
-            });
+            };
+
+            select.addEventListener('change', applyProductSelection);
             qty.addEventListener('input', recalc);
             price.addEventListener('input', recalc);
             tr.querySelector('.remove-row').addEventListener('click', () => {
                 tr.remove();
+                renumberRows();
+                updateEmptyState();
                 recalc();
             });
 
             initSelect2(tr);
+
+            // Select2 replaces the native dropdown UI; its own selection events fire more
+            // reliably across browsers than the plain 'change' event once it's active.
+            if (typeof jQuery !== 'undefined') {
+                jQuery(select).on('select2:select select2:clear', applyProductSelection);
+            }
         }
 
         function recalc() {
             let grand = 0;
-            document.querySelectorAll('#itemsBody tr').forEach(tr => {
+            let totalQty = 0;
+            const rows = document.querySelectorAll('#itemsBody tr');
+            rows.forEach(tr => {
                 const qty = parseFloat(tr.querySelector('.qty-input').value) || 0;
                 const price = parseFloat(tr.querySelector('.price-input').value) || 0;
                 const total = qty * price;
                 tr.querySelector('.line-total').textContent = total.toFixed(2);
                 grand += total;
+                totalQty += qty;
             });
             document.getElementById('grandTotal').textContent = grand.toFixed(2);
+            document.getElementById('summaryLineCount').textContent = rows.length;
+            document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
         }
 
         document.getElementById('addRow').addEventListener('click', addRow);

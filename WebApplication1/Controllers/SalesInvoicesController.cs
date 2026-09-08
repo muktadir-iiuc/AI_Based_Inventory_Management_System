@@ -23,7 +23,7 @@ public class SalesInvoicesController(
     ICompanySettingsService companySettings,
     IWebHostEnvironment env) : Controller
 {
-    public async Task<IActionResult> Index(int? customerId, int? warehouseId, int page = 1)
+    public async Task<IActionResult> Index(int? customerId, int? warehouseId)
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.SalesInvoices.Include(s => s.Customer).Include(s => s.Warehouse).AsQueryable();
@@ -46,8 +46,7 @@ public class SalesInvoicesController(
         ViewData["WarehouseId"] = new SelectList(await db.Warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
         ViewData["WarehouseScoped"] = warehouseIds is not null;
 
-        return View(await PagedList<SalesInvoice>.CreateAsync(
-            query.Include(s => s.Items).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id), page));
+        return View(await query.Include(s => s.Items).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
@@ -69,11 +68,10 @@ public class SalesInvoicesController(
     public async Task<IActionResult> Create()
     {
         await PopulateDropdownsAsync();
-        var warehouseIds = User.GetWarehouseIds();
         return View(new SalesInvoiceCreateViewModel
         {
             Items = [new SalesLineInput()],
-            WarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : 0
+            WarehouseId = (int)(ViewData["DefaultWarehouseId"] ?? 0)
         });
     }
 
@@ -502,13 +500,21 @@ public class SalesInvoicesController(
             warehouses = warehouses.Where(w => warehouseIds.Contains(w.Id));
         }
 
+        var warehouseList = await warehouses.OrderBy(w => w.Name).ToListAsync();
+
         // A readonly, locked warehouse field only makes sense when the user has exactly one
-        // assigned warehouse; with several, they still pick from among their assigned set.
+        // assigned warehouse; with several (or none — unrestricted), they still pick from a
+        // dropdown. Default it to the first option rather than leaving it blank: unit price
+        // now depends on the batch(es) FIFO would draw from at the *selected* warehouse, so an
+        // empty selection means no price can be computed until the user picks one — defaulting
+        // to a real warehouse means pricing works immediately without that extra step.
         var singleWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : (int?)null;
+        var defaultWarehouseId = singleWarehouseId ?? warehouseList.FirstOrDefault()?.Id;
 
         ViewData["Customers"] = new SelectList(await db.Customers.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
-        ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", singleWarehouseId);
+        ViewData["Warehouses"] = new SelectList(warehouseList, "Id", "Name", defaultWarehouseId);
         ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
+        ViewData["DefaultWarehouseId"] = defaultWarehouseId;
 
         // When the user is scoped to one warehouse, show that warehouse's actual stock in the picker;
         // otherwise fall back to the global total as a guide (the server re-validates against the chosen warehouse on submit).

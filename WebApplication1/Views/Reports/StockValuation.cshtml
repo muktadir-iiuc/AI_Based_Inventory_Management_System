@@ -34,10 +34,10 @@
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
+        <table class="table table-striped table-hover mb-0 data-table">
             <thead>
                 <tr>
-                    <th>SKU</th><th>Product</th><th>Category</th>
+                    <th>SKU</th><th>Product</th><th data-filter="select">Category</th>
                     <th class="text-end">Stock</th><th class="text-end">Cost</th>
                     <th class="text-end">Value at Cost</th><th class="text-end">Value at Sale Price</th>
                 </tr>
@@ -55,12 +55,7 @@
                     <td class="text-end">@r.ValueAtSalePrice.ToString("C")</td>
                 </tr>
             }
-            @if (!Model.Rows.Any())
-            {
-                <tr><td colspan="7" class="text-center text-muted py-3">No stock found.</td></tr>
-            }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Rows.Paging" />
 </div>

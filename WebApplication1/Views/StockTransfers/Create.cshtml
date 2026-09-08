@@ -5,68 +5,108 @@
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
 }
 
-<div class="card">
-    <div class="card-body">
-        <form asp-action="Create" method="post" id="transferForm">
-            <div asp-validation-summary="All" class="text-danger"></div>
+<form asp-action="Create" method="post" id="transferForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
 
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <label asp-for="FromWarehouseId" class="form-label required-asterisk">From Warehouse</label>
-                    @if (warehouseScoped)
-                    {
-                        <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Value == Model.FromWarehouseId.ToString())?.Text" readonly />
-                        <input type="hidden" asp-for="FromWarehouseId" id="fromWarehouseId" />
-                    }
-                    else
-                    {
-                        <select asp-for="FromWarehouseId" asp-items="warehouseList" id="fromWarehouseId" class="form-select">
-                            <option value="">-- select source --</option>
-                        </select>
-                    }
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Transfer Details</h3>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <label asp-for="ToWarehouseId" class="form-label required-asterisk">To Warehouse</label>
-                    <select asp-for="ToWarehouseId" asp-items="warehouseList" class="form-select">
-                        <option value="">-- select destination --</option>
-                    </select>
-                </div>
-                <div class="col-md-2 mb-3">
-                    <label asp-for="Date" class="form-label required-asterisk"></label>
-                    <input asp-for="Date" class="form-control" type="date" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label asp-for="Notes" class="form-label"></label>
-                    <input asp-for="Notes" class="form-control" />
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="FromWarehouseId" class="form-label required-asterisk">From Warehouse</label>
+                            @if (warehouseScoped)
+                            {
+                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Value == Model.FromWarehouseId.ToString())?.Text" readonly />
+                                <input type="hidden" asp-for="FromWarehouseId" id="fromWarehouseId" />
+                            }
+                            else
+                            {
+                                <select asp-for="FromWarehouseId" asp-items="warehouseList" id="fromWarehouseId" class="form-select">
+                                    <option value="">-- select source --</option>
+                                </select>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="ToWarehouseId" class="form-label required-asterisk">To Warehouse</label>
+                            <select asp-for="ToWarehouseId" asp-items="warehouseList" id="toWarehouseId" class="form-select">
+                                <option value="">-- select destination --</option>
+                            </select>
+                            <span class="text-danger small d-none" id="sameWarehouseWarning">Source and destination must be different warehouses.</span>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12 mb-0">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <input asp-for="Notes" class="form-control" placeholder="Optional note for this transfer" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <table class="table table-bordered" id="itemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 55%">Product</th>
-                        <th style="width: 20%">Quantity to Transfer</th>
-                        <th style="width: 20%">Available in Source</th>
-                        <th style="width: 5%"></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsBody"></tbody>
-            </table>
-
-            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
-
-            <div>
-                <button type="submit" class="btn btn-primary">Post Transfer</button>
-                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Line Items</h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
+                </div>
+                <div class="card-body p-0 table-responsive-card">
+                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 3%">#</th>
+                                <th style="width: 42%">Product</th>
+                                <th style="width: 20%">Quantity to Transfer</th>
+                                <th style="width: 20%">Available in Source</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                    <div id="emptyState" class="text-center text-muted py-4 d-none">
+                        No product lines yet — click "Add product line" to get started.
+                    </div>
+                </div>
             </div>
-        </form>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 text-muted fw-normal">Product lines</dt>
+                        <dd class="col-5 text-end" id="summaryLineCount">0</dd>
+                        <dt class="col-7 text-muted fw-normal">Total quantity</dt>
+                        <dd class="col-5 text-end" id="summaryQty">0</dd>
+                    </dl>
+                    <div class="form-text mt-1">
+                        Each line is checked against the current stock in the source warehouse — a line turns red if the requested quantity exceeds what's available.
+                    </div>
+                    <div class="alert alert-danger py-2 small mt-3 mb-0 d-none" id="shortageWarning">
+                        <i class="fas fa-triangle-exclamation"></i> One or more lines exceed available stock — adjust the quantity before posting.
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Post Transfer</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</form>
 
 @section Scripts {
     <script>
         const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
         const fromWarehouseEl = document.getElementById('fromWarehouseId');
+        const toWarehouseEl = document.getElementById('toWarehouseId');
         let rowIndex = 0;
 
         function stockInFrom(product) {
@@ -83,49 +123,121 @@
             return html;
         }
 
+        function updateEmptyState() {
+            const hasRows = document.querySelectorAll('#itemsBody tr').length > 0;
+            document.getElementById('itemsTable').classList.toggle('d-none', !hasRows);
+            document.getElementById('emptyState').classList.toggle('d-none', hasRows);
+        }
+
+        function renumberRows() {
+            document.querySelectorAll('#itemsBody tr').forEach((tr, i) => {
+                tr.querySelector('.row-number').textContent = i + 1;
+            });
+        }
+
         function addRow() {
             const tbody = document.getElementById('itemsBody');
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td class="row-number text-muted"></td>
                 <td>
                     <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions()}</select>
                 </td>
                 <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="1" /></td>
                 <td class="available-cell text-muted">&mdash;</td>
-                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="fas fa-times"></i></button></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
             `;
             tbody.appendChild(tr);
             rowIndex++;
             wireRow(tr);
+            renumberRows();
+            updateEmptyState();
         }
 
         function wireRow(tr) {
             const select = tr.querySelector('.product-select');
+            const qty = tr.querySelector('.qty-input');
             const available = tr.querySelector('.available-cell');
 
             function updateAvailable() {
                 const product = products.find(p => p.Id == select.value);
-                available.textContent = product ? stockInFrom(product).toFixed(2) : '—';
+                const stock = product ? stockInFrom(product) : null;
+                available.textContent = stock === null ? '—' : stock.toFixed(2);
+                checkShortage();
+            }
+
+            function checkShortage() {
+                const product = products.find(p => p.Id == select.value);
+                const stock = product ? stockInFrom(product) : null;
+                const requested = parseFloat(qty.value) || 0;
+                const short = stock !== null && requested > stock;
+                tr.classList.toggle('table-danger', short);
+                available.classList.toggle('text-danger', short);
+                available.classList.toggle('fw-semibold', short);
+                available.classList.toggle('text-muted', !short);
+                recalc();
             }
 
             select.addEventListener('change', updateAvailable);
-            tr.querySelector('.remove-row').addEventListener('click', () => tr.remove());
+            qty.addEventListener('input', checkShortage);
+            tr.querySelector('.remove-row').addEventListener('click', () => {
+                tr.remove();
+                renumberRows();
+                updateEmptyState();
+                recalc();
+            });
 
             initSelect2(tr);
+
+            // Select2 replaces the native dropdown UI; its own selection events fire more
+            // reliably across browsers than the plain 'change' event once it's active.
+            if (typeof jQuery !== 'undefined') {
+                jQuery(select).on('select2:select select2:clear', updateAvailable);
+            }
+
+            tr.updateAvailable = updateAvailable;
             updateAvailable();
+        }
+
+        function recalc() {
+            const rows = document.querySelectorAll('#itemsBody tr');
+            let totalQty = 0;
+            let hasShortage = false;
+            rows.forEach(tr => {
+                totalQty += parseFloat(tr.querySelector('.qty-input').value) || 0;
+                if (tr.classList.contains('table-danger')) hasShortage = true;
+            });
+            document.getElementById('summaryLineCount').textContent = rows.length;
+            document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
+            document.getElementById('shortageWarning').classList.toggle('d-none', !hasShortage);
+        }
+
+        function refreshAllRows() {
+            document.querySelectorAll('#itemsBody tr').forEach(tr => {
+                if (typeof tr.updateAvailable === 'function') tr.updateAvailable();
+            });
+        }
+
+        function checkSameWarehouse() {
+            const from = fromWarehouseEl.value;
+            const to = toWarehouseEl.value;
+            const same = !!from && !!to && from === to;
+            document.getElementById('sameWarehouseWarning').classList.toggle('d-none', !same);
+            toWarehouseEl.classList.toggle('is-invalid', same);
         }
 
         document.getElementById('addRow').addEventListener('click', addRow);
         if (fromWarehouseEl.tagName === 'SELECT') {
-            fromWarehouseEl.addEventListener('change', () => {
-                document.querySelectorAll('#itemsBody tr').forEach(tr => {
-                    const select = tr.querySelector('.product-select');
-                    const available = tr.querySelector('.available-cell');
-                    const product = products.find(p => p.Id == select.value);
-                    available.textContent = product ? stockInFrom(product).toFixed(2) : '—';
-                });
-            });
+            fromWarehouseEl.addEventListener('change', () => { refreshAllRows(); checkSameWarehouse(); });
+            if (typeof jQuery !== 'undefined') {
+                jQuery(fromWarehouseEl).on('select2:select select2:clear', () => { refreshAllRows(); checkSameWarehouse(); });
+            }
         }
+        toWarehouseEl.addEventListener('change', checkSameWarehouse);
+        if (typeof jQuery !== 'undefined') {
+            jQuery(toWarehouseEl).on('select2:select select2:clear', checkSameWarehouse);
+        }
+
         addRow();
     </script>
     <partial name="_ValidationScriptsPartial" />

@@ -11,7 +11,7 @@ namespace WebApplication1.Controllers;
 
 public class ProductsController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int? categoryId, int page = 1)
+    public async Task<IActionResult> Index(string? search, int? categoryId)
     {
         var query = db.Products.Include(p => p.Category).Include(p => p.UnitOfMeasure).AsQueryable();
 
@@ -27,7 +27,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
         ViewData["Search"] = search;
         ViewData["CategoryId"] = new SelectList(await db.Categories.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
 
-        return View(await PagedList<Product>.CreateAsync(query.OrderBy(p => p.Name), page));
+        return View(await query.OrderBy(p => p.Name).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)

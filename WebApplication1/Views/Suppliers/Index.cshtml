@@ -1,4 +1,4 @@
-@model PagedList<Supplier>
+@model List<Supplier>
 @{
     ViewData["Title"] = "Suppliers";
 }
@@ -18,13 +18,13 @@
         </form>
     </div>
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Status</th><th></th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table" id="supplierTable">
+            <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th data-filter="select">Status</th><th data-filter="false"></th></tr></thead>
             <tbody>
             @foreach (var s in Model)
             {
-                <tr>
-                    <td><a asp-action="Details" asp-route-id="@s.Id">@s.Name</a></td>
+                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = s.Id })">
+                    <td><a asp-action="Details" asp-route-id="@s.Id" class="fw-semibold">@s.Name</a></td>
                     <td>@s.ContactPerson</td>
                     <td>@s.Phone</td>
                     <td>@s.Email</td>
@@ -35,20 +35,34 @@
                     <td class="text-end">
                         @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
                         {
-                            <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
-                            <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this supplier?">
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
-                            </form>
+                            <div class="table-actions">
+                                <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary" title="Edit supplier"><i class="fas fa-pen"></i></a>
+                                <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="confirm-delete" data-confirm-message="Delete this supplier?">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete supplier"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </div>
                         }
                     </td>
                 </tr>
             }
-            @if (!Model.Any())
-            {
-                <tr><td colspan="6" class="text-center text-muted py-3">No suppliers found.</td></tr>
-            }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #supplierTable tbody tr.clickable-row { cursor: pointer; }
+    #supplierTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('supplierTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input, form')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

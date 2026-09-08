@@ -18,7 +18,7 @@ public class StockValuationViewModel
     public bool WarehouseScoped { get; set; }
     public decimal TotalCostValue { get; set; }
     public decimal TotalSaleValue { get; set; }
-    public PagedList<StockValuationRow> Rows { get; set; } = null!;
+    public List<StockValuationRow> Rows { get; set; } = null!;
 }
 
 // One row per batch allocation actually sold (see SalesInvoiceItem) — profit is computed from
@@ -43,5 +43,5 @@ public class SalesProfitabilityViewModel
     public decimal TotalSales { get; set; }
     public decimal TotalCost { get; set; }
     public decimal TotalProfit { get; set; }
-    public PagedList<SalesProfitabilityRow> Rows { get; set; } = null!;
+    public List<SalesProfitabilityRow> Rows { get; set; } = null!;
 }

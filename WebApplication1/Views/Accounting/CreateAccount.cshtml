@@ -1,30 +1,77 @@
 @model Account
 @{
     ViewData["Title"] = "New Account";
+    var nextCodes = (Dictionary<AccountType, string>)ViewData["NextCodes"]!;
 }
 
-<div class="card col-md-6">
-    <div class="card-body">
-        <form asp-action="CreateAccount" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="mb-3">
-                <label asp-for="Code" class="form-label required-asterisk"></label>
-                <input asp-for="Code" class="form-control" />
-                <span asp-validation-for="Code" class="text-danger small"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="Name" class="form-label required-asterisk"></label>
-                <input asp-for="Name" class="form-control" />
-                <span asp-validation-for="Name" class="text-danger small"></span>
-            </div>
-            <div class="mb-3">
-                <label asp-for="Type" class="form-label required-asterisk"></label>
-                <select asp-for="Type" asp-items="Html.GetEnumSelectList<AccountType>()" class="form-select"></select>
-            </div>
-            <button type="submit" class="btn btn-primary">Save</button>
-            <a asp-action="ChartOfAccounts" class="btn btn-secondary">Cancel</a>
-        </form>
-    </div>
-</div>
+<form asp-action="CreateAccount" method="post" id="accountForm">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="alert alert-info py-2 small mb-3"><i class="fas fa-circle-info"></i> The account code is generated automatically from the selected type once you save.</div>
 
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Account Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label required-asterisk"></label>
+                        <input asp-for="Name" class="form-control" id="nameInput" placeholder="e.g. Petty Cash" autofocus />
+                        <span asp-validation-for="Name" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="Type" class="form-label required-asterisk"></label>
+                        <select asp-for="Type" asp-items="Html.GetEnumSelectList<AccountType>()" class="form-select" id="typeSelect"></select>
+                        <span asp-validation-for="Type" class="text-danger small"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Preview</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small mb-1">This account will appear as</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge text-bg-primary fs-6" id="codePreview">—</span>
+                        <span class="fw-semibold" id="namePreview">Account name</span>
+                    </div>
+                    <div class="form-text mt-1">Codes are spaced by 100 within each account type's block, matching the existing chart of accounts.</div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Save Account</button>
+                    <a asp-action="ChartOfAccounts" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            const nextCodes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(nextCodes.ToDictionary(kv => (int)kv.Key, kv => kv.Value)));
+            const nameInput = document.getElementById('nameInput');
+            const typeSelect = document.getElementById('typeSelect');
+            const codePreview = document.getElementById('codePreview');
+            const namePreview = document.getElementById('namePreview');
+
+            function updatePreview() {
+                codePreview.textContent = nextCodes[typeSelect.value] || '—';
+                namePreview.textContent = nameInput.value.trim() || 'Account name';
+            }
+
+            nameInput.addEventListener('input', updatePreview);
+            typeSelect.addEventListener('change', updatePreview);
+            if (typeof jQuery !== 'undefined') {
+                jQuery(typeSelect).on('select2:select select2:clear', updatePreview);
+            }
+            updatePreview();
+        })();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

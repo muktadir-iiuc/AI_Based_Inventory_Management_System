@@ -1,4 +1,4 @@
-@model PagedList<Product>
+@model List<Product>
 @{
     ViewData["Title"] = "Products";
     var categoryList = (SelectList)ViewData["CategoryId"]!;
@@ -28,21 +28,21 @@
         </form>
     </div>
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
+        <table class="table table-striped table-hover mb-0 data-table" id="productTable">
             <thead>
                 <tr>
-                    <th>SKU</th><th>Name</th><th>Category</th><th>Unit</th>
+                    <th>SKU</th><th>Name</th><th data-filter="select">Category</th><th>Unit</th>
                     <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Last Cost</th>
                     <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Default Price</th>
-                    <th class="text-end">Stock</th><th></th>
+                    <th class="text-end">Stock</th><th data-filter="false"></th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var p in Model)
             {
-                <tr class="@(p.CurrentStock <= p.ReorderLevel ? "table-warning" : "")">
+                <tr class="clickable-row @(p.CurrentStock <= p.ReorderLevel ? "table-warning" : "")" data-href="@Url.Action("Details", new { id = p.Id })">
                     <td>@p.Sku</td>
-                    <td><a asp-action="Details" asp-route-id="@p.Id">@p.Name</a></td>
+                    <td><a asp-action="Details" asp-route-id="@p.Id" class="fw-semibold">@p.Name</a></td>
                     <td>@p.Category?.Name</td>
                     <td>@p.UnitOfMeasure?.Symbol</td>
                     <td class="text-end">@p.CostPrice.ToString("C")</td>
@@ -57,20 +57,34 @@
                     <td class="text-end">
                         @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
                         {
-                            <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
-                            <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Delete this product?">
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
-                            </form>
+                            <div class="table-actions">
+                                <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary" title="Edit product"><i class="fas fa-pen"></i></a>
+                                <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="confirm-delete" data-confirm-message="Delete this product?">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete product"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </div>
                         }
                     </td>
                 </tr>
             }
-            @if (!Model.Any())
-            {
-                <tr><td colspan="8" class="text-center text-muted py-3">No products found.</td></tr>
-            }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #productTable tbody tr.clickable-row { cursor: pointer; }
+    #productTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('productTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input, form')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

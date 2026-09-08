@@ -17,6 +17,25 @@
     overflow-x: auto;
 }
 
+/* The card-body wrapping a data-table is padding-free (p-0) so the table itself sits flush
+   with the card edges, but DataTables' own length/info/pagination controls render inside that
+   same card-body and inherit the zero padding too — pushing them flush left/right instead of
+   sitting inset like the rest of the card's content. Those controls sit in Bootstrap .row cells
+   whose gutter padding and the row's own negative margin cancel out to zero net inset by
+   design, so instead of fighting that cancellation, add an explicit margin directly on
+   DataTables' own "start"/"end" position classes — additive on top of the row/column box model,
+   so it can't be cancelled out the same way. Leaves the table's own row (marked with
+   DataTables' "dt-layout-table" class) untouched so it still spans edge-to-edge. */
+.table-responsive-card .dt-layout-start {
+    margin-left: 1.25rem !important;
+}
+.table-responsive-card .dt-layout-end {
+    margin-right: 1.25rem !important;
+}
+.table-responsive-card .dt-layout-row:last-child {
+    padding-bottom: 0.75rem;
+}
+
 .required-asterisk::after {
     content: " *";
     color: #dc3545;
@@ -91,6 +110,23 @@
     transition: all 0.15s ease;
 }
 
+/* Row action buttons (Edit/Delete etc. in table listings) -------------- */
+
+.table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.table-actions .btn {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.table-actions .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .dashboard-page .dash-in {
         opacity: 1;
@@ -106,6 +142,10 @@
     .dashboard-page .small-box:hover,
     .dashboard-page .info-box:hover,
     .dashboard-page .dash-table tbody tr:hover {
+        transform: none;
+    }
+
+    .table-actions .btn:hover {
         transform: none;
     }
 }

@@ -10,7 +10,7 @@ namespace WebApplication1.Controllers;
 
 public class SuppliersController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int page = 1)
+    public async Task<IActionResult> Index(string? search)
     {
         var query = db.Suppliers.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -18,7 +18,7 @@ public class SuppliersController(ApplicationDbContext db) : Controller
             query = query.Where(s => s.Name.Contains(search));
         }
         ViewData["Search"] = search;
-        return View(await PagedList<Supplier>.CreateAsync(query.OrderBy(s => s.Name), page));
+        return View(await query.OrderBy(s => s.Name).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)

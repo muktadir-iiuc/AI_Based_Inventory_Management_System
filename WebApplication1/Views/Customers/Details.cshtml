@@ -14,6 +14,8 @@
                     <dt class="col-4">Phone</dt><dd class="col-8">@Model.Phone</dd>
                     <dt class="col-4">Email</dt><dd class="col-8">@Model.Email</dd>
                     <dt class="col-4">Address</dt><dd class="col-8">@Model.Address</dd>
+                    <dt class="col-4">Outstanding Due</dt>
+                    <dd class="col-8 fw-bold @(Model.OutstandingDue > 0 ? "text-danger" : "text-success")">@Model.OutstandingDue.ToString("C")</dd>
                 </dl>
             </div>
             <div class="card-footer">

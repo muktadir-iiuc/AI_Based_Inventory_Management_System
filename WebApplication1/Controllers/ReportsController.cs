@@ -9,7 +9,7 @@ namespace WebApplication1.Controllers;
 
 public class ReportsController(ApplicationDbContext db, IForecastService forecastService) : Controller
 {
-    public async Task<IActionResult> StockValuation(int page = 1)
+    public async Task<IActionResult> StockValuation()
     {
         var warehouseIds = User.GetWarehouseIds();
         var vm = new StockValuationViewModel { WarehouseScoped = warehouseIds is not null };
@@ -18,7 +18,7 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
 
         vm.TotalCostValue = rows.Sum(r => r.ValueAtCost);
         vm.TotalSaleValue = rows.Sum(r => r.ValueAtSalePrice);
-        vm.Rows = PagedList<StockValuationRow>.Create(rows, page);
+        vm.Rows = rows;
 
         return View(vm);
     }
@@ -69,18 +69,18 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         }).ToList();
     }
 
-    public async Task<IActionResult> ReorderSuggestions(int page = 1)
+    public async Task<IActionResult> ReorderSuggestions()
     {
         var warehouseIds = User.GetWarehouseIds();
         var suggestions = await forecastService.GetReorderSuggestionsAsync(warehouseIds);
         ViewData["ReorderCount"] = suggestions.Count(r => r.ShouldReorder);
-        return View(PagedList<ReorderSuggestion>.Create(suggestions, page));
+        return View(suggestions);
     }
 
     // One row per batch allocation actually sold — Unit Cost/Unit Sale Price are the exact
     // prices frozen on that SalesInvoiceItem at the time of sale (see §7: historical prices
     // never change because a batch's price changed later), so Profit here is always real.
-    public async Task<IActionResult> SalesProfitability(int page = 1)
+    public async Task<IActionResult> SalesProfitability()
     {
         var warehouseIds = User.GetWarehouseIds();
 
@@ -115,7 +115,7 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
             TotalSales = rows.Sum(r => r.SalesAmount),
             TotalCost = rows.Sum(r => r.CostAmount),
             TotalProfit = rows.Sum(r => r.Profit),
-            Rows = PagedList<SalesProfitabilityRow>.Create(rows, page)
+            Rows = rows
         };
 
         return View(vm);

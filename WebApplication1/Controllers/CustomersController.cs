@@ -10,21 +10,25 @@ namespace WebApplication1.Controllers;
 
 public class CustomersController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int page = 1)
+    public async Task<IActionResult> Index(string? search)
     {
-        var query = db.Customers.AsQueryable();
+        var query = db.Customers
+            .Include(c => c.SalesInvoices).ThenInclude(s => s.Items)
+            .Include(c => c.SalesInvoices).ThenInclude(s => s.Payments)
+            .AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(c => c.Name.Contains(search));
         }
         ViewData["Search"] = search;
-        return View(await PagedList<Customer>.CreateAsync(query.OrderBy(c => c.Name), page));
+        return View(await query.OrderBy(c => c.Name).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
     {
         var customer = await db.Customers
-            .Include(c => c.SalesInvoices)
+            .Include(c => c.SalesInvoices).ThenInclude(s => s.Items)
+            .Include(c => c.SalesInvoices).ThenInclude(s => s.Payments)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (customer is null) return NotFound();
         return View(customer);

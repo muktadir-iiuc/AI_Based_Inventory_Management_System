@@ -10,7 +10,7 @@ namespace WebApplication1.Controllers;
 
 public class CategoriesController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int page = 1)
+    public async Task<IActionResult> Index(string? search)
     {
         var query = db.Categories.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -18,7 +18,7 @@ public class CategoriesController(ApplicationDbContext db) : Controller
             query = query.Where(c => c.Name.Contains(search));
         }
         ViewData["Search"] = search;
-        return View(await PagedList<Category>.CreateAsync(query.Include(c => c.Products).OrderBy(c => c.Name), page));
+        return View(await query.Include(c => c.Products).OrderBy(c => c.Name).ToListAsync());
     }
 
     [Authorize(Roles = Roles.PurchaseManagers)]

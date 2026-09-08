@@ -47,7 +47,7 @@ public class PaymentCreateViewModel
 public class LedgerViewModel
 {
     public Account Account { get; set; } = null!;
-    public PagedList<LedgerLineRow> Rows { get; set; } = null!;
+    public List<LedgerLineRow> Rows { get; set; } = null!;
 }
 
 // Running balance is order-dependent, so it's computed once over the full ledger

@@ -1,9 +1,12 @@
-@model PagedList<SalesInvoice>
+@model List<SalesInvoice>
 @{
     ViewData["Title"] = "Sales Invoices";
     var customerList = (SelectList)ViewData["CustomerId"]!;
     var warehouseList = (SelectList)ViewData["WarehouseId"]!;
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
+    var hasFilters = Context.Request.Query.ContainsKey("customerId") || Context.Request.Query.ContainsKey("warehouseId");
+    var postedCount = Model.Count(i => i.Status == DocumentStatus.Posted);
+    var postedTotal = Model.Where(i => i.Status == DocumentStatus.Posted).Sum(i => i.TotalAmount);
 }
 
 @section Toolbar {
@@ -13,45 +16,102 @@
     }
 }
 
+<div class="row g-3 mb-3">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Invoices Listed</div>
+                <div class="fs-4 fw-bold">@Model.Count</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Posted</div>
+                <div class="fs-4 fw-bold text-success">@postedCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Posted Total Value</div>
+                <div class="fs-4 fw-bold">@postedTotal.ToString("C")</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
-        <form method="get" class="d-flex gap-2">
-            <select name="customerId" asp-items="customerList" class="form-select form-select-sm" style="max-width: 260px;">
-                <option value="">All customers</option>
-            </select>
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Customer</label>
+                <select name="customerId" asp-items="customerList" class="form-select form-select-sm" style="min-width: 220px;">
+                    <option value="">All customers</option>
+                </select>
+            </div>
             @if (!warehouseScoped)
             {
-                <select name="warehouseId" asp-items="warehouseList" class="form-select form-select-sm" style="max-width: 260px;">
-                    <option value="">All warehouses</option>
-                </select>
+                <div class="col-auto">
+                    <label class="form-label small text-muted mb-1">Warehouse</label>
+                    <select name="warehouseId" asp-items="warehouseList" class="form-select form-select-sm" style="min-width: 220px;">
+                        <option value="">All warehouses</option>
+                    </select>
+                </div>
             }
-            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+                @if (hasFilters)
+                {
+                    <a asp-action="Index" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-xmark"></i> Clear</a>
+                }
+            </div>
         </form>
     </div>
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
-            <thead><tr><th>Invoice #</th><th>Customer</th><th>Warehouse</th><th>Date</th><th>Status</th><th class="text-end">Total</th></tr></thead>
+        <table class="table table-striped table-hover mb-0 data-table" id="invoiceTable">
+            <thead><tr><th>Invoice #</th><th>Customer</th><th data-filter="select">Warehouse</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th class="text-end">Total</th></tr></thead>
             <tbody>
             @foreach (var inv in Model)
             {
-                <tr>
-                    <td><a asp-action="Details" asp-route-id="@inv.Id">@inv.InvoiceNumber</a></td>
+                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = inv.Id })">
+                    <td><a asp-action="Details" asp-route-id="@inv.Id" class="fw-semibold">@inv.InvoiceNumber</a></td>
                     <td>@inv.Customer?.Name</td>
                     <td>@inv.Warehouse?.Name</td>
-                    <td>@inv.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@inv.Date.ToString("yyyy-MM-dd")">@inv.Date.ToString("MMM dd, yyyy")</td>
                     <td>
-                        @if (inv.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
-                        else { <span class="badge text-bg-secondary">Cancelled</span> }
+                        @if (inv.Status == DocumentStatus.Posted)
+                        {
+                            <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>
+                        }
                     </td>
-                    <td class="text-end">@inv.TotalAmount.ToString("C")</td>
+                    <td class="text-end fw-semibold">@inv.TotalAmount.ToString("C")</td>
                 </tr>
-            }
-            @if (!Model.Any())
-            {
-                <tr><td colspan="6" class="text-center text-muted py-3">No sales invoices found.</td></tr>
             }
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #invoiceTable tbody tr.clickable-row { cursor: pointer; }
+    #invoiceTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('invoiceTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

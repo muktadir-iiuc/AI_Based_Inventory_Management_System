@@ -14,7 +14,7 @@ namespace WebApplication1.Controllers;
 
 public class StockTransfersController(ApplicationDbContext db, IStockService stockService, IActivityNotifier notifier) : Controller
 {
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index()
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.StockTransfers.Include(t => t.FromWarehouse).Include(t => t.ToWarehouse).AsQueryable();
@@ -24,8 +24,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             query = query.Where(t => warehouseIds.Contains(t.FromWarehouseId) || warehouseIds.Contains(t.ToWarehouseId));
         }
 
-        return View(await PagedList<StockTransfer>.CreateAsync(
-            query.Include(t => t.Items).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id), page));
+        return View(await query.Include(t => t.Items).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)

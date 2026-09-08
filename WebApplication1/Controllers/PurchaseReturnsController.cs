@@ -16,7 +16,7 @@ public class PurchaseReturnsController(
     IAccountingService accountingService,
     IActivityNotifier notifier) : Controller
 {
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index()
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.PurchaseReturns.Include(r => r.PurchaseInvoice).ThenInclude(i => i!.Supplier).AsQueryable();
@@ -26,8 +26,7 @@ public class PurchaseReturnsController(
             query = query.Where(r => warehouseIds.Contains(r.PurchaseInvoice!.WarehouseId));
         }
 
-        return View(await PagedList<PurchaseReturn>.CreateAsync(
-            query.Include(r => r.Items).OrderByDescending(r => r.Date).ThenByDescending(r => r.Id), page));
+        return View(await query.Include(r => r.Items).OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)

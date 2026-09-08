@@ -1,4 +1,4 @@
-@model PagedList<ReorderSuggestion>
+@model List<ReorderSuggestion>
 @{
     ViewData["Title"] = "AI Reorder Suggestions";
     var toReorder = (int)ViewData["ReorderCount"]!;
@@ -17,22 +17,22 @@
 
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped mb-0">
+        <table class="table table-striped table-hover mb-0 data-table" id="reorderTable">
             <thead>
                 <tr>
                     <th>SKU</th><th>Product</th>
                     <th class="text-end">Current Stock</th><th class="text-end">Reorder Level</th>
                     <th class="text-end">Forecasted 30-day Demand</th>
                     <th class="text-end">Suggested Reorder Qty</th>
-                    <th>Method</th><th>Action</th>
+                    <th data-filter="select">Method</th><th data-filter="select">Action</th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var r in Model)
             {
-                <tr class="@(r.ShouldReorder ? "table-warning" : "")">
+                <tr class="clickable-row @(r.ShouldReorder ? "table-warning" : "")" data-href="@Url.Action("Details", "Products", new { id = r.ProductId })">
                     <td>@r.Sku</td>
-                    <td><a asp-controller="Products" asp-action="Details" asp-route-id="@r.ProductId">@r.ProductName</a></td>
+                    <td><a asp-controller="Products" asp-action="Details" asp-route-id="@r.ProductId" class="fw-semibold">@r.ProductName</a></td>
                     <td class="text-end">@r.CurrentStock.ToString("0.##")</td>
                     <td class="text-end">@r.ReorderLevel.ToString("0.##")</td>
                     <td class="text-end">@r.Forecasted30DayDemand.ToString("0.#")</td>
@@ -53,5 +53,21 @@
             </tbody>
         </table>
     </div>
-    <partial name="_Pager" model="Model.Paging" />
 </div>
+
+<style>
+    #reorderTable tbody tr.clickable-row { cursor: pointer; }
+    #reorderTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('reorderTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}
