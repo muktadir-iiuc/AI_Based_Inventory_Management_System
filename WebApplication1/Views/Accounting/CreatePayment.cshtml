@@ -5,57 +5,110 @@
     var salesList = (SelectList)ViewData["SalesInvoices"]!;
 }
 
-<div class="card col-md-6">
-    <div class="card-body">
-        <form asp-action="CreatePayment" method="post">
-            <div asp-validation-summary="All" class="text-danger"></div>
+<form asp-action="CreatePayment" method="post" id="paymentForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
 
-            <div class="mb-3">
-                <label class="form-label required-asterisk">Direction</label>
-                <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check" name="Direction" id="dirIn" value="@((int)PaymentDirection.In)" checked>
-                    <label class="btn btn-outline-success" for="dirIn"><i class="fas fa-arrow-down"></i> Receive from Customer</label>
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Payment Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label required-asterisk">Direction</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="Direction" id="dirIn" value="@((int)PaymentDirection.In)" checked>
+                            <label class="btn btn-outline-success" for="dirIn"><i class="fas fa-arrow-down"></i> Receive from Customer</label>
 
-                    <input type="radio" class="btn-check" name="Direction" id="dirOut" value="@((int)PaymentDirection.Out)">
-                    <label class="btn btn-outline-danger" for="dirOut"><i class="fas fa-arrow-up"></i> Pay to Supplier</label>
+                            <input type="radio" class="btn-check" name="Direction" id="dirOut" value="@((int)PaymentDirection.Out)">
+                            <label class="btn btn-outline-danger" for="dirOut"><i class="fas fa-arrow-up"></i> Pay to Supplier</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="salesInvoiceGroup">
+                        <label asp-for="SalesInvoiceId" class="form-label">Sales Invoice</label>
+                        <select asp-for="SalesInvoiceId" asp-items="salesList" class="form-select" id="salesInvoiceSelect">
+                            <option value="">-- select sales invoice --</option>
+                        </select>
+                        <div class="alert alert-info py-2 small mt-2 mb-0 d-none" id="salesInvoiceInfo">
+                            <dl class="row mb-0">
+                                <dt class="col-7 fw-normal">Invoice Amount</dt>
+                                <dd class="col-5 text-end" id="salesInvoiceAmount">0.00</dd>
+                                <dt class="col-7 fw-normal">This Invoice's Due</dt>
+                                <dd class="col-5 text-end" id="salesInvoiceDue">0.00</dd>
+                                <dt class="col-7 fw-normal">Customer Total Outstanding</dt>
+                                <dd class="col-5 text-end fw-bold" id="customerOutstanding">0.00</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="purchaseInvoiceGroup">
+                        <label asp-for="PurchaseInvoiceId" class="form-label">Purchase Invoice</label>
+                        <select asp-for="PurchaseInvoiceId" asp-items="purchaseList" class="form-select" id="purchaseInvoiceSelect">
+                            <option value="">-- select purchase invoice --</option>
+                        </select>
+                        <div class="alert alert-info py-2 small mt-2 mb-0 d-none" id="purchaseInvoiceInfo">
+                            <dl class="row mb-0">
+                                <dt class="col-7 fw-normal">Invoice Amount</dt>
+                                <dd class="col-5 text-end" id="purchaseInvoiceAmount">0.00</dd>
+                                <dt class="col-7 fw-normal">This Invoice's Due</dt>
+                                <dd class="col-5 text-end" id="purchaseInvoiceDue">0.00</dd>
+                                <dt class="col-7 fw-normal">Supplier Total Outstanding</dt>
+                                <dd class="col-5 text-end fw-bold" id="supplierOutstanding">0.00</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Amount" class="form-label required-asterisk"></label>
+                            <input asp-for="Amount" class="form-control" type="number" step="0.01" min="0.01" id="amountInput" />
+                            <span asp-validation-for="Amount" class="text-danger small"></span>
+                            <div class="form-text">Pre-filled with the selected invoice's due amount — adjust for a partial payment.</div>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <input asp-for="Notes" class="form-control" placeholder="Optional note for this payment" />
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="mb-3" id="salesInvoiceGroup">
-                <label asp-for="SalesInvoiceId" class="form-label">Sales Invoice</label>
-                <select asp-for="SalesInvoiceId" asp-items="salesList" class="form-select">
-                    <option value="">-- select sales invoice --</option>
-                </select>
-            </div>
-
-            <div class="mb-3 d-none" id="purchaseInvoiceGroup">
-                <label asp-for="PurchaseInvoiceId" class="form-label">Purchase Invoice</label>
-                <select asp-for="PurchaseInvoiceId" asp-items="purchaseList" class="form-select">
-                    <option value="">-- select purchase invoice --</option>
-                </select>
-            </div>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label asp-for="Date" class="form-label required-asterisk"></label>
-                    <input asp-for="Date" class="form-control" type="date" />
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label asp-for="Amount" class="form-label required-asterisk"></label>
-                    <input asp-for="Amount" class="form-control" type="number" step="0.01" />
-                    <span asp-validation-for="Amount" class="text-danger small"></span>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge fs-6" id="directionBadge">Receive from Customer</span>
+                    </div>
+                    <dl class="row mb-0">
+                        <dt class="col-6 text-muted fw-normal">Invoice</dt>
+                        <dd class="col-6 text-end" id="summaryInvoice">&mdash;</dd>
+                        <dt class="col-6 text-muted fw-normal">Party</dt>
+                        <dd class="col-6 text-end" id="summaryParty">&mdash;</dd>
+                    </dl>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Amount</span>
+                        <span class="fs-3 fw-bold text-primary" id="summaryAmount">0.00</span>
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Save Payment</button>
+                    <a asp-action="Payments" class="btn btn-outline-secondary">Cancel</a>
                 </div>
             </div>
-            <div class="mb-3">
-                <label asp-for="Notes" class="form-label"></label>
-                <input asp-for="Notes" class="form-control" />
-            </div>
-
-            <button type="submit" class="btn btn-primary">Save</button>
-            <a asp-action="Payments" class="btn btn-secondary">Cancel</a>
-        </form>
+        </div>
     </div>
-</div>
+</form>
 
 @section Scripts {
     <script>
@@ -63,14 +116,23 @@
         const dirOut = document.getElementById('dirOut');
         const salesGroup = document.getElementById('salesInvoiceGroup');
         const purchaseGroup = document.getElementById('purchaseInvoiceGroup');
+        const directionBadge = document.getElementById('directionBadge');
+        const amountInput = document.getElementById('amountInput');
+        const summaryInvoice = document.getElementById('summaryInvoice');
+        const summaryParty = document.getElementById('summaryParty');
+        const summaryAmount = document.getElementById('summaryAmount');
 
         function toggle() {
             if (dirIn.checked) {
                 salesGroup.classList.remove('d-none');
                 purchaseGroup.classList.add('d-none');
+                directionBadge.textContent = 'Receive from Customer';
+                directionBadge.className = 'badge fs-6 text-bg-success';
             } else {
                 salesGroup.classList.add('d-none');
                 purchaseGroup.classList.remove('d-none');
+                directionBadge.textContent = 'Pay to Supplier';
+                directionBadge.className = 'badge fs-6 text-bg-danger';
             }
 
             // Select2 computes its width from the element's visible container, so a widget
@@ -79,9 +141,67 @@
                 jQuery(el).select2('destroy');
             });
             initSelect2(document);
+            updateSummary();
         }
         dirIn.addEventListener('change', toggle);
         dirOut.addEventListener('change', toggle);
+
+        const salesInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["SalesInvoiceMeta"]));
+        const purchaseInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["PurchaseInvoiceMeta"]));
+
+        function money(n) {
+            return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function updateSummary() {
+            const inSales = dirIn.checked;
+            const select = document.getElementById(inSales ? 'salesInvoiceSelect' : 'purchaseInvoiceSelect');
+            const meta = inSales ? salesInvoiceMeta : purchaseInvoiceMeta;
+            const id = parseInt(select.value, 10);
+            const row = meta.find(m => m.Id === id);
+            summaryInvoice.textContent = select.selectedOptions[0]?.value ? select.selectedOptions[0].text.split(' - ')[0] : '—';
+            summaryParty.textContent = row ? (row.CustomerName || row.SupplierName) : '—';
+            summaryAmount.textContent = money(amountInput.value);
+        }
+
+        function wireInvoiceInfo(selectId, meta, infoId, amountId, dueId, partyOutstandingId) {
+            const select = document.getElementById(selectId);
+            const info = document.getElementById(infoId);
+            let amountManuallyEdited = false;
+
+            function update() {
+                const id = parseInt(select.value, 10);
+                const row = meta.find(m => m.Id === id);
+                if (!row) {
+                    info.classList.add('d-none');
+                    updateSummary();
+                    return;
+                }
+                document.getElementById(amountId).textContent = money(row.InvoiceAmount);
+                document.getElementById(dueId).textContent = money(row.InvoiceDue);
+                document.getElementById(partyOutstandingId).textContent = money(row.SupplierOutstanding ?? row.CustomerOutstanding);
+                info.classList.remove('d-none');
+
+                if (!amountManuallyEdited) {
+                    amountInput.value = row.InvoiceDue.toFixed(2);
+                }
+                updateSummary();
+            }
+
+            select.addEventListener('change', update);
+            if (typeof jQuery !== 'undefined') {
+                jQuery(select).on('select2:select select2:clear', update);
+            }
+            amountInput.addEventListener('input', () => {
+                amountManuallyEdited = true;
+                updateSummary();
+            });
+            select.wireUpdate = update;
+        }
+
+        wireInvoiceInfo('salesInvoiceSelect', salesInvoiceMeta, 'salesInvoiceInfo', 'salesInvoiceAmount', 'salesInvoiceDue', 'customerOutstanding');
+        wireInvoiceInfo('purchaseInvoiceSelect', purchaseInvoiceMeta, 'purchaseInvoiceInfo', 'purchaseInvoiceAmount', 'purchaseInvoiceDue', 'supplierOutstanding');
+
         toggle();
     </script>
     <partial name="_ValidationScriptsPartial" />

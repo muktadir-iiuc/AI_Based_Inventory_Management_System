@@ -256,26 +256,70 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
     {
         var warehouseIds = User.GetWarehouseIds();
 
-        var purchaseInvoices = db.PurchaseInvoices.Include(p => p.Supplier)
+        var purchaseInvoicesQuery = db.PurchaseInvoices
+            .Include(p => p.Supplier)
+            .Include(p => p.Items)
+            .Include(p => p.Payments)
             .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted);
-        var salesInvoices = db.SalesInvoices.Include(s => s.Customer)
+        var salesInvoicesQuery = db.SalesInvoices
+            .Include(s => s.Customer)
+            .Include(s => s.Items)
+            .Include(s => s.Payments)
             .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted);
 
         if (warehouseIds is not null)
         {
-            purchaseInvoices = purchaseInvoices.Where(p => warehouseIds.Contains(p.WarehouseId));
-            salesInvoices = salesInvoices.Where(s => warehouseIds.Contains(s.WarehouseId));
+            purchaseInvoicesQuery = purchaseInvoicesQuery.Where(p => warehouseIds.Contains(p.WarehouseId));
+            salesInvoicesQuery = salesInvoicesQuery.Where(s => warehouseIds.Contains(s.WarehouseId));
         }
 
+        var purchaseInvoices = await purchaseInvoicesQuery.OrderByDescending(p => p.Date).ToListAsync();
+        var salesInvoices = await salesInvoicesQuery.OrderByDescending(s => s.Date).ToListAsync();
+
         ViewData["PurchaseInvoices"] = new SelectList(
-            await purchaseInvoices.OrderByDescending(p => p.Date)
-                .Select(p => new { p.Id, Label = p.InvoiceNumber + " - " + p.Supplier!.Name }).ToListAsync(),
+            purchaseInvoices.Select(p => new { p.Id, Label = p.InvoiceNumber + " - " + p.Supplier!.Name }),
             "Id", "Label");
 
         ViewData["SalesInvoices"] = new SelectList(
-            await salesInvoices.OrderByDescending(s => s.Date)
-                .Select(s => new { s.Id, Label = s.InvoiceNumber + " - " + s.Customer!.Name }).ToListAsync(),
+            salesInvoices.Select(s => new { s.Id, Label = s.InvoiceNumber + " - " + s.Customer!.Name }),
             "Id", "Label");
+
+        // A supplier/customer's total outstanding balance spans every posted invoice they
+        // have, not just the (possibly warehouse-scoped) ones in the dropdowns above — so this
+        // is computed from a separate, unscoped query rather than summed from the lists above.
+        var supplierOutstanding = await db.PurchaseInvoices
+            .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted)
+            .Select(p => new { p.SupplierId, Due = p.Items.Sum(i => i.Quantity * i.UnitPrice) - p.Payments.Sum(pay => pay.Amount) })
+            .ToListAsync();
+        var supplierOutstandingTotals = supplierOutstanding
+            .GroupBy(x => x.SupplierId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Due));
+
+        var customerOutstanding = await db.SalesInvoices
+            .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted)
+            .Select(s => new { s.CustomerId, Due = s.Items.Sum(i => i.Quantity * i.UnitPrice) - s.Payments.Sum(pay => pay.Amount) })
+            .ToListAsync();
+        var customerOutstandingTotals = customerOutstanding
+            .GroupBy(x => x.CustomerId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Due));
+
+        ViewData["PurchaseInvoiceMeta"] = purchaseInvoices.Select(p => new
+        {
+            p.Id,
+            SupplierName = p.Supplier!.Name,
+            InvoiceAmount = p.TotalAmount,
+            InvoiceDue = p.TotalAmount - p.Payments.Sum(pay => pay.Amount),
+            SupplierOutstanding = supplierOutstandingTotals.GetValueOrDefault(p.SupplierId)
+        }).ToList();
+
+        ViewData["SalesInvoiceMeta"] = salesInvoices.Select(s => new
+        {
+            s.Id,
+            CustomerName = s.Customer!.Name,
+            InvoiceAmount = s.TotalAmount,
+            InvoiceDue = s.TotalAmount - s.Payments.Sum(pay => pay.Amount),
+            CustomerOutstanding = customerOutstandingTotals.GetValueOrDefault(s.CustomerId)
+        }).ToList();
     }
 
     // Account codes follow the chart-of-accounts numbering convention seeded in DbInitializer
