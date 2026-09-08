@@ -47,5 +47,9 @@ public class PaymentCreateViewModel
 public class LedgerViewModel
 {
     public Account Account { get; set; } = null!;
-    public List<JournalEntryLine> Lines { get; set; } = [];
+    public PagedList<LedgerLineRow> Rows { get; set; } = null!;
 }
+
+// Running balance is order-dependent, so it's computed once over the full ledger
+// in the controller and carried on each row, rather than recomputed per page.
+public record LedgerLineRow(DateTime? Date, int JournalEntryId, string? EntryNumber, string? Memo, decimal Debit, decimal Credit, decimal RunningBalance);

@@ -71,6 +71,64 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
         return entry;
     }
 
+    // Mirrors PostSalesInvoiceAsync in reverse: revenue and cost are unwound at exactly the
+    // prices frozen on the original sale's batch allocations (SalesReturnItem.UnitPrice/UnitCost
+    // are copied from those, never recomputed from current batch or Product prices).
+    public async Task<JournalEntry> PostSalesReturnAsync(SalesReturn salesReturn)
+    {
+        var receivable = await GetAccountAsync(SystemAccountCodes.AccountsReceivable);
+        var salesRevenue = await GetAccountAsync(SystemAccountCodes.SalesRevenue);
+        var cogs = await GetAccountAsync(SystemAccountCodes.CostOfGoodsSold);
+        var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
+
+        var returnTotal = salesReturn.Items.Sum(i => i.Quantity * i.UnitPrice);
+        var costTotal = salesReturn.Items.Sum(i => i.Quantity * i.UnitCost);
+
+        var entry = new JournalEntry
+        {
+            EntryNumber = await NextEntryNumberAsync(),
+            Date = salesReturn.Date,
+            Description = $"Sales return {salesReturn.ReturnNumber}",
+            Source = JournalSource.SalesReturn,
+            SourceReference = salesReturn.ReturnNumber,
+            Lines =
+            [
+                new JournalEntryLine { AccountId = salesRevenue.Id, Debit = returnTotal, Credit = 0, Memo = "Revenue reversed for returned goods" },
+                new JournalEntryLine { AccountId = receivable.Id, Debit = 0, Credit = returnTotal, Memo = "Amount receivable reduced" },
+                new JournalEntryLine { AccountId = inventory.Id, Debit = costTotal, Credit = 0, Memo = "Inventory restored at cost" },
+                new JournalEntryLine { AccountId = cogs.Id, Debit = 0, Credit = costTotal, Memo = "Cost of goods sold reversed" }
+            ]
+        };
+
+        db.JournalEntries.Add(entry);
+        return entry;
+    }
+
+    // Mirrors PostPurchaseInvoiceAsync in reverse.
+    public async Task<JournalEntry> PostPurchaseReturnAsync(PurchaseReturn purchaseReturn)
+    {
+        var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
+        var payable = await GetAccountAsync(SystemAccountCodes.AccountsPayable);
+        var total = purchaseReturn.Items.Sum(i => i.Quantity * i.UnitCost);
+
+        var entry = new JournalEntry
+        {
+            EntryNumber = await NextEntryNumberAsync(),
+            Date = purchaseReturn.Date,
+            Description = $"Purchase return {purchaseReturn.ReturnNumber}",
+            Source = JournalSource.PurchaseReturn,
+            SourceReference = purchaseReturn.ReturnNumber,
+            Lines =
+            [
+                new JournalEntryLine { AccountId = payable.Id, Debit = total, Credit = 0, Memo = "Payable reduced for returned goods" },
+                new JournalEntryLine { AccountId = inventory.Id, Debit = 0, Credit = total, Memo = "Inventory reduced at cost" }
+            ]
+        };
+
+        db.JournalEntries.Add(entry);
+        return entry;
+    }
+
     public async Task<JournalEntry> PostPaymentAsync(Payment payment)
     {
         var cash = await GetAccountAsync(SystemAccountCodes.Cash);

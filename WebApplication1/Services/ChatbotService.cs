@@ -14,7 +14,7 @@ namespace WebApplication1.Services;
 /// </summary>
 public class ChatbotService(ApplicationDbContext db) : IChatbotService
 {
-    public async Task<ChatbotAnswer> AskAsync(string question, int? warehouseId)
+    public async Task<ChatbotAnswer> AskAsync(string question, List<int>? warehouseIds)
     {
         var q = (question ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -28,12 +28,12 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (product is not null && Has(q, "price", "cost", "sell for", "sale price", "cost price", "how much is", "how much does"))
         {
-            return ProductPriceAnswer(product);
+            return await ProductPriceAnswerAsync(product, warehouseIds);
         }
 
         if (product is not null && Has(q, "stock", "quantity", "available", "in hand", "how many", "left", "have"))
         {
-            return await ProductStockAnswerAsync(product, warehouseId);
+            return await ProductStockAnswerAsync(product, warehouseIds);
         }
 
         var duesKeywords = new[] { "due", "dues", "owe", "owes", "outstanding", "balance", "unpaid", "pending payment", "pending amount" };
@@ -41,39 +41,39 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         var customer = await FindCustomerAsync(q);
         if (customer is not null && Has(q, duesKeywords))
         {
-            return await CustomerDuesAnswerAsync(customer, warehouseId);
+            return await CustomerDuesAnswerAsync(customer, warehouseIds);
         }
 
         var supplier = await FindSupplierAsync(q);
         if (supplier is not null && Has(q, duesKeywords))
         {
-            return await SupplierDuesAnswerAsync(supplier, warehouseId);
+            return await SupplierDuesAnswerAsync(supplier, warehouseIds);
         }
 
         if (Has(q, "out of stock", "zero stock", "no stock left", "finished stock"))
         {
-            return await OutOfStockAnswerAsync(warehouseId);
+            return await OutOfStockAnswerAsync(warehouseIds);
         }
 
         if (Has(q, "reorder", "restock", "running low", "need to order", "need restocking") || HasAll(q, "low", "stock"))
         {
-            return await LowStockAnswerAsync(warehouseId);
+            return await LowStockAnswerAsync(warehouseIds);
         }
 
         var ranking = Has(q, "top", "best", "biggest", "largest", "most");
         if (ranking && q.Contains("customer"))
         {
-            return await TopCustomersAnswerAsync(q, warehouseId);
+            return await TopCustomersAnswerAsync(q, warehouseIds);
         }
 
         if (ranking && q.Contains("supplier"))
         {
-            return await TopSuppliersAnswerAsync(q, warehouseId);
+            return await TopSuppliersAnswerAsync(q, warehouseIds);
         }
 
         if (ranking && Has(q, "sell", "sold", "product"))
         {
-            return await TopSellingProductsAnswerAsync(q, warehouseId);
+            return await TopSellingProductsAnswerAsync(q, warehouseIds);
         }
 
         if (Has(q, "receivable", "customers owe", "owed by customer", "customer due", "customer balance", "customer outstanding"))
@@ -93,7 +93,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "invoice"))
         {
-            var invoiceAnswer = await InvoiceLookupAnswerAsync(q, warehouseId);
+            var invoiceAnswer = await InvoiceLookupAnswerAsync(q, warehouseIds);
             if (invoiceAnswer is not null)
             {
                 return invoiceAnswer;
@@ -102,22 +102,22 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "recent sale", "latest sale", "recent sales invoice", "last sale"))
         {
-            return await RecentInvoicesAnswerAsync(isSales: true, warehouseId);
+            return await RecentInvoicesAnswerAsync(isSales: true, warehouseIds);
         }
 
         if (Has(q, "recent purchase", "latest purchase", "recent purchase invoice", "last purchase"))
         {
-            return await RecentInvoicesAnswerAsync(isSales: false, warehouseId);
+            return await RecentInvoicesAnswerAsync(isSales: false, warehouseIds);
         }
 
         if (Has(q, "sale", "sold", "revenue") && !Has(q, "purchase"))
         {
-            return await SalesTotalAnswerAsync(q, warehouseId);
+            return await SalesTotalAnswerAsync(q, warehouseIds);
         }
 
         if (Has(q, "purchase", "bought", "spent on"))
         {
-            return await PurchaseTotalAnswerAsync(q, warehouseId);
+            return await PurchaseTotalAnswerAsync(q, warehouseIds);
         }
 
         if (Has(q, "how many product", "number of product", "total product", "count of product", "products do we have", "products are there"))
@@ -147,7 +147,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (product is not null)
         {
-            return await ProductStockAnswerAsync(product, warehouseId);
+            return await ProductStockAnswerAsync(product, warehouseIds);
         }
 
         return Unknown();
@@ -230,11 +230,11 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return match is null ? null : await db.Suppliers.FirstOrDefaultAsync(s => s.Id == match.Id);
     }
 
-    private async Task<ChatbotAnswer> CustomerDuesAnswerAsync(Models.Sales.Customer customer, int? warehouseId)
+    private async Task<ChatbotAnswer> CustomerDuesAnswerAsync(Models.Sales.Customer customer, List<int>? warehouseIds)
     {
         var invoices = await db.SalesInvoices.Include(s => s.Items).Include(s => s.Payments)
             .Where(s => s.CustomerId == customer.Id && s.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || s.WarehouseId == warehouseId))
+                        && (warehouseIds == null || warehouseIds.Contains(s.WarehouseId)))
             .ToListAsync();
 
         var totalInvoiced = invoices.Sum(s => s.TotalAmount);
@@ -249,11 +249,11 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         };
     }
 
-    private async Task<ChatbotAnswer> SupplierDuesAnswerAsync(Supplier supplier, int? warehouseId)
+    private async Task<ChatbotAnswer> SupplierDuesAnswerAsync(Supplier supplier, List<int>? warehouseIds)
     {
         var invoices = await db.PurchaseInvoices.Include(p => p.Items).Include(p => p.Payments)
             .Where(p => p.SupplierId == supplier.Id && p.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || p.WarehouseId == warehouseId))
+                        && (warehouseIds == null || warehouseIds.Contains(p.WarehouseId)))
             .ToListAsync();
 
         var totalInvoiced = invoices.Sum(p => p.TotalAmount);
@@ -270,37 +270,72 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
     private static string UnitLabel(Product product) => product.UnitOfMeasure?.Symbol ?? product.UnitOfMeasure?.Name ?? "unit(s)";
 
-    private async Task<ChatbotAnswer> ProductStockAnswerAsync(Product product, int? warehouseId)
+    private async Task<ChatbotAnswer> ProductStockAnswerAsync(Product product, List<int>? warehouseIds)
     {
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             var stock = await db.ProductWarehouseStocks
-                .Where(s => s.ProductId == product.Id && s.WarehouseId == warehouseId)
-                .Select(s => (decimal?)s.Quantity)
-                .FirstOrDefaultAsync() ?? 0;
-            var warehouseName = await db.Warehouses.Where(w => w.Id == warehouseId).Select(w => w.Name).FirstOrDefaultAsync();
+                .Where(s => s.ProductId == product.Id && warehouseIds.Contains(s.WarehouseId))
+                .SumAsync(s => (decimal?)s.Quantity) ?? 0;
             var note = stock <= product.ReorderLevel ? " That's at or below its reorder level." : "";
-            return new ChatbotAnswer { Text = $"{product.Name} ({product.Sku}) has {stock:0.##} {UnitLabel(product)} in stock at {warehouseName}.{note}" };
+
+            if (warehouseIds.Count == 1)
+            {
+                var warehouseName = await db.Warehouses.Where(w => w.Id == warehouseIds[0]).Select(w => w.Name).FirstOrDefaultAsync();
+                return new ChatbotAnswer { Text = $"{product.Name} ({product.Sku}) has {stock:0.##} {UnitLabel(product)} in stock at {warehouseName}.{note}" };
+            }
+
+            return new ChatbotAnswer { Text = $"{product.Name} ({product.Sku}) has {stock:0.##} {UnitLabel(product)} in stock across your assigned warehouses.{note}" };
         }
 
         var totalNote = product.CurrentStock <= product.ReorderLevel ? " That's at or below its reorder level." : "";
         return new ChatbotAnswer { Text = $"{product.Name} ({product.Sku}) has {product.CurrentStock:0.##} {UnitLabel(product)} in stock across all warehouses.{totalNote}" };
     }
 
-    private static ChatbotAnswer ProductPriceAnswer(Product product) => new()
+    // Selling price now lives on whichever batch is next to be consumed (FIFO), not on the
+    // product itself — Product.SalePrice/CostPrice are only ever a default suggested at
+    // purchase time, never authoritative for what something actually sells for.
+    private async Task<ChatbotAnswer> ProductPriceAnswerAsync(Product product, List<int>? warehouseIds)
     {
-        Text = $"{product.Name} ({product.Sku}): sale price {product.SalePrice:C}, cost price {product.CostPrice:C}."
-    };
+        var batchesQuery = db.ProductBatches
+            .Where(b => b.ProductId == product.Id && b.IsActive && b.RemainingQuantity > 0);
+        if (warehouseIds is not null)
+        {
+            batchesQuery = batchesQuery.Where(b => warehouseIds.Contains(b.WarehouseId));
+        }
 
-    private async Task<ChatbotAnswer> OutOfStockAnswerAsync(int? warehouseId)
+        var batches = await batchesQuery
+            .OrderBy(b => b.PurchaseDate).ThenBy(b => b.Id)
+            .Select(b => new { b.PurchasePrice, b.SalePrice })
+            .ToListAsync();
+
+        if (batches.Count == 0)
+        {
+            return new ChatbotAnswer { Text = $"{product.Name} ({product.Sku}) has no stock batches to price right now." };
+        }
+
+        var next = batches[0];
+        var distinctSalePrices = batches.Select(b => b.SalePrice).Distinct().Count();
+        var note = distinctSalePrices > 1
+            ? $" ({batches.Count} batches in stock at different prices — this is the next one to be sold, oldest first)"
+            : "";
+
+        return new ChatbotAnswer
+        {
+            Text = $"{product.Name} ({product.Sku}): current selling price {next.SalePrice:C}, cost {next.PurchasePrice:C}{note}."
+        };
+    }
+
+    private async Task<ChatbotAnswer> OutOfStockAnswerAsync(List<int>? warehouseIds)
     {
         List<string> names;
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             names = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive && s.Quantity <= 0)
+                .Where(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= 0)
                 .Select(s => s.Product!.Name)
+                .Distinct()
                 .OrderBy(n => n)
                 .ToListAsync();
         }
@@ -318,14 +353,14 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
             : new ChatbotAnswer { Text = $"{names.Count} product(s) are out of stock:", Lines = names };
     }
 
-    private async Task<ChatbotAnswer> LowStockAnswerAsync(int? warehouseId)
+    private async Task<ChatbotAnswer> LowStockAnswerAsync(List<int>? warehouseIds)
     {
         List<string> lines;
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             lines = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel)
+                .Where(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel)
                 .OrderBy(s => s.Quantity)
                 .Select(s => $"{s.Product!.Name}: {s.Quantity:0.##} in stock (reorder level {s.Product!.ReorderLevel:0.##})")
                 .ToListAsync();
@@ -368,12 +403,12 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return (null, null, "all time");
     }
 
-    private async Task<ChatbotAnswer> SalesTotalAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer> SalesTotalAnswerAsync(string q, List<int>? warehouseIds)
     {
         var (start, end, label) = ParsePeriod(q);
         var total = await db.SalesInvoiceItems
             .Where(i => i.SalesInvoice!.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId)
+                        && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId))
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
@@ -381,12 +416,12 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return new ChatbotAnswer { Text = $"Total sales {label}: {total:C}." };
     }
 
-    private async Task<ChatbotAnswer> PurchaseTotalAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer> PurchaseTotalAnswerAsync(string q, List<int>? warehouseIds)
     {
         var (start, end, label) = ParsePeriod(q);
         var total = await db.PurchaseInvoiceItems
             .Where(i => i.PurchaseInvoice!.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId)
+                        && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId))
                         && (!start.HasValue || i.PurchaseInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.PurchaseInvoice!.Date.Date <= end))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
@@ -407,14 +442,14 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return 5;
     }
 
-    private async Task<ChatbotAnswer> TopSellingProductsAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer> TopSellingProductsAnswerAsync(string q, List<int>? warehouseIds)
     {
         var (start, end, label) = ParsePeriod(q);
         var top = ParseTopN(q);
 
         var rows = await db.SalesInvoiceItems
             .Where(i => i.SalesInvoice!.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId)
+                        && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId))
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
             .GroupBy(i => i.Product!.Name)
@@ -432,14 +467,14 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
             };
     }
 
-    private async Task<ChatbotAnswer> TopCustomersAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer> TopCustomersAnswerAsync(string q, List<int>? warehouseIds)
     {
         var (start, end, label) = ParsePeriod(q);
         var top = ParseTopN(q);
 
         var rows = await db.SalesInvoiceItems
             .Where(i => i.SalesInvoice!.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId)
+                        && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId))
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
             .GroupBy(i => i.SalesInvoice!.Customer!.Name)
@@ -457,14 +492,14 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
             };
     }
 
-    private async Task<ChatbotAnswer> TopSuppliersAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer> TopSuppliersAnswerAsync(string q, List<int>? warehouseIds)
     {
         var (start, end, label) = ParsePeriod(q);
         var top = ParseTopN(q);
 
         var rows = await db.PurchaseInvoiceItems
             .Where(i => i.PurchaseInvoice!.Status == DocumentStatus.Posted
-                        && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId)
+                        && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId))
                         && (!start.HasValue || i.PurchaseInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.PurchaseInvoice!.Date.Date <= end))
             .GroupBy(i => i.PurchaseInvoice!.Supplier!.Name)
@@ -497,7 +532,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return new ChatbotAnswer { Text = $"{label}: {balance:C}." };
     }
 
-    private async Task<ChatbotAnswer?> InvoiceLookupAnswerAsync(string q, int? warehouseId)
+    private async Task<ChatbotAnswer?> InvoiceLookupAnswerAsync(string q, List<int>? warehouseIds)
     {
         var tokens = q.Split([' ', ',', '?', '.', '!'], StringSplitOptions.RemoveEmptyEntries);
         var candidate = tokens.FirstOrDefault(t => t.Any(char.IsDigit) && t.Any(char.IsLetter));
@@ -507,7 +542,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         }
 
         var salesInvoice = await db.SalesInvoices.Include(s => s.Customer).Include(s => s.Items).ThenInclude(i => i.Product)
-            .Where(s => (!warehouseId.HasValue || s.WarehouseId == warehouseId) && s.InvoiceNumber.ToLower() == candidate)
+            .Where(s => (warehouseIds == null || warehouseIds.Contains(s.WarehouseId)) && s.InvoiceNumber.ToLower() == candidate)
             .FirstOrDefaultAsync();
         if (salesInvoice is not null)
         {
@@ -519,7 +554,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         }
 
         var purchaseInvoice = await db.PurchaseInvoices.Include(p => p.Supplier).Include(p => p.Items).ThenInclude(i => i.Product)
-            .Where(p => (!warehouseId.HasValue || p.WarehouseId == warehouseId) && p.InvoiceNumber.ToLower() == candidate)
+            .Where(p => (warehouseIds == null || warehouseIds.Contains(p.WarehouseId)) && p.InvoiceNumber.ToLower() == candidate)
             .FirstOrDefaultAsync();
         if (purchaseInvoice is not null)
         {
@@ -533,12 +568,12 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return new ChatbotAnswer { Text = $"I couldn't find any invoice numbered \"{candidate}\" in the system." };
     }
 
-    private async Task<ChatbotAnswer> RecentInvoicesAnswerAsync(bool isSales, int? warehouseId)
+    private async Task<ChatbotAnswer> RecentInvoicesAnswerAsync(bool isSales, List<int>? warehouseIds)
     {
         if (isSales)
         {
             var rows = await db.SalesInvoices.Include(s => s.Customer)
-                .Where(s => !warehouseId.HasValue || s.WarehouseId == warehouseId)
+                .Where(s => warehouseIds == null || warehouseIds.Contains(s.WarehouseId))
                 .OrderByDescending(s => s.Date).ThenByDescending(s => s.Id)
                 .Take(5)
                 .Select(s => $"{s.InvoiceNumber} - {s.Customer!.Name}, {s.Date:d}, {s.Status}, {s.Items.Sum(i => i.Quantity * i.UnitPrice):C}")
@@ -551,7 +586,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         else
         {
             var rows = await db.PurchaseInvoices.Include(p => p.Supplier)
-                .Where(p => !warehouseId.HasValue || p.WarehouseId == warehouseId)
+                .Where(p => warehouseIds == null || warehouseIds.Contains(p.WarehouseId))
                 .OrderByDescending(p => p.Date).ThenByDescending(p => p.Id)
                 .Take(5)
                 .Select(p => $"{p.InvoiceNumber} - {p.Supplier!.Name}, {p.Date:d}, {p.Status}, {p.Items.Sum(i => i.Quantity * i.UnitPrice):C}")

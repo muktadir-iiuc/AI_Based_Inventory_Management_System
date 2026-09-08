@@ -56,14 +56,16 @@ public class AccountController(
             new("FullName", user.FullName)
         };
 
-        if (user.WarehouseId.HasValue)
+        var warehouses = await db.UserWarehouses
+            .Where(uw => uw.UserId == user.Id)
+            .Include(uw => uw.Warehouse)
+            .Select(uw => uw.Warehouse!)
+            .ToListAsync();
+
+        foreach (var warehouse in warehouses)
         {
-            var warehouse = await db.Warehouses.FindAsync(user.WarehouseId.Value);
-            if (warehouse is not null)
-            {
-                extraClaims.Add(new Claim("WarehouseId", warehouse.Id.ToString()));
-                extraClaims.Add(new Claim("WarehouseName", warehouse.Name));
-            }
+            extraClaims.Add(new Claim("WarehouseId", warehouse.Id.ToString()));
+            extraClaims.Add(new Claim("WarehouseName", warehouse.Name));
         }
 
         await signInManager.SignInWithClaimsAsync(user, model.RememberMe, extraClaims);
@@ -82,6 +84,52 @@ public class AccountController(
     {
         await signInManager.SignOutAsync();
         return RedirectToAction(nameof(Login));
+    }
+
+    [HttpGet]
+    public IActionResult ChangePassword()
+    {
+        if (!signInManager.IsSignedIn(User))
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        return View(new ChangePasswordViewModel());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        if (!signInManager.IsSignedIn(User))
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var user = await userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        var result = await userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+            return View(model);
+        }
+
+        await signInManager.RefreshSignInAsync(user);
+        TempData["Success"] = "Your password has been changed.";
+        return RedirectToAction("Index", "Home");
     }
 
     [HttpGet]

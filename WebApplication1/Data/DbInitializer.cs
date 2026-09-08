@@ -26,7 +26,7 @@ public static class DbInitializer
         await SeedCompanySettingsAsync(db, scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>());
         await SeedRolesAsync(roleManager);
         var warehouses = await SeedWarehousesAsync(db);
-        await SeedUsersAsync(userManager, warehouses);
+        await SeedUsersAsync(db, userManager, warehouses);
         await SeedDefaultPermissionsAsync(db);
 
         if (await db.Accounts.AnyAsync())
@@ -64,6 +64,7 @@ public static class DbInitializer
         {
             CompanyName = CompanySettingsService.DefaultCompanyName,
             ShortName = CompanySettingsService.DefaultShortName,
+            Address = "House 14, Road 7, Banani, Dhaka-1213, Bangladesh",
             LogoImage = logo,
             LogoMimeType = logo is null ? null : "image/png"
         });
@@ -122,22 +123,22 @@ public static class DbInitializer
         return warehouses.ToList();
     }
 
-    private static async Task SeedUsersAsync(UserManager<ApplicationUser> userManager, List<Warehouse> warehouses)
+    private static async Task SeedUsersAsync(ApplicationDbContext db, UserManager<ApplicationUser> userManager, List<Warehouse> warehouses)
     {
         var mainWarehouseId = warehouses[0].Id;
         var branchWarehouseId = warehouses[1].Id;
 
-        var seedUsers = new (string Email, string FullName, string Role, string Password, int? WarehouseId)[]
+        var seedUsers = new (string Email, string FullName, string Role, string Password, int[] WarehouseIds)[]
         {
-            ("admin@inventory.local", "System Administrator", Roles.Admin, "Admin@123", null),
-            ("manager@inventory.local", "Morgan Manager", Roles.Manager, "Manager@123", null),
-            ("purchase@inventory.local", "Pat Purchasing", Roles.PurchaseOfficer, "Purchase@123", mainWarehouseId),
-            ("sales@inventory.local", "Sam Sales", Roles.SalesOfficer, "Sales@123", branchWarehouseId),
-            ("accounts@inventory.local", "Alex Accountant", Roles.Accountant, "Accounts@123", mainWarehouseId),
-            ("viewer@inventory.local", "Val Viewer", Roles.Viewer, "Viewer@123", branchWarehouseId),
+            ("admin@inventory.local", "System Administrator", Roles.Admin, "Admin@123", []),
+            ("manager@inventory.local", "Morgan Manager", Roles.Manager, "Manager@123", []),
+            ("purchase@inventory.local", "Pat Purchasing", Roles.PurchaseOfficer, "Purchase@123", [mainWarehouseId]),
+            ("sales@inventory.local", "Sam Sales", Roles.SalesOfficer, "Sales@123", [branchWarehouseId]),
+            ("accounts@inventory.local", "Alex Accountant", Roles.Accountant, "Accounts@123", [mainWarehouseId]),
+            ("viewer@inventory.local", "Val Viewer", Roles.Viewer, "Viewer@123", [branchWarehouseId]),
         };
 
-        foreach (var (email, fullName, role, password, warehouseId) in seedUsers)
+        foreach (var (email, fullName, role, password, warehouseIds) in seedUsers)
         {
             if (await userManager.FindByEmailAsync(email) is not null)
             {
@@ -150,16 +151,18 @@ public static class DbInitializer
                 Email = email,
                 FullName = fullName,
                 EmailConfirmed = true,
-                IsActive = true,
-                WarehouseId = warehouseId
+                IsActive = true
             };
 
             var result = await userManager.CreateAsync(user, password);
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(user, role);
+                db.UserWarehouses.AddRange(warehouseIds.Select(id => new UserWarehouse { UserId = user.Id, WarehouseId = id }));
             }
         }
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task SeedChartOfAccountsAsync(ApplicationDbContext db, IAccountingService accountingService)
@@ -256,12 +259,12 @@ public static class DbInitializer
     {
         var customers = new[]
         {
-            new Customer { Name = "Rahman Retail Store", ContactPerson = "Abdur Rahman", Phone = "+880-1811-000001", Email = "rahman.retail@example.com" },
-            new Customer { Name = "City Mart", ContactPerson = "Sultana Begum", Phone = "+880-1811-000002", Email = "citymart@example.com" },
-            new Customer { Name = "Greenfield Supermart", ContactPerson = "Rafiq Ahmed", Phone = "+880-1811-000003", Email = "greenfield@example.com" },
-            new Customer { Name = "Downtown Traders", ContactPerson = "Mitu Akter", Phone = "+880-1811-000004", Email = "downtown@example.com" },
-            new Customer { Name = "Sunrise Enterprise", ContactPerson = "Jahangir Alam", Phone = "+880-1811-000005", Email = "sunrise@example.com" },
-            new Customer { Name = "Lakeview Stores", ContactPerson = "Nasrin Sultana", Phone = "+880-1811-000006", Email = "lakeview@example.com" },
+            new Customer { Name = "Rahman Retail Store", ContactPerson = "Abdur Rahman", Phone = "+880-1811-000001", Email = "rahman.retail@example.com", Address = "45 New Market Road, Dhanmondi, Dhaka-1205" },
+            new Customer { Name = "City Mart", ContactPerson = "Sultana Begum", Phone = "+880-1811-000002", Email = "citymart@example.com", Address = "12 Gulshan Avenue, Gulshan-1, Dhaka-1212" },
+            new Customer { Name = "Greenfield Supermart", ContactPerson = "Rafiq Ahmed", Phone = "+880-1811-000003", Email = "greenfield@example.com", Address = "78 Agrabad Commercial Area, Chattogram-4100" },
+            new Customer { Name = "Downtown Traders", ContactPerson = "Mitu Akter", Phone = "+880-1811-000004", Email = "downtown@example.com", Address = "23 Zindabazar, Sylhet-3100" },
+            new Customer { Name = "Sunrise Enterprise", ContactPerson = "Jahangir Alam", Phone = "+880-1811-000005", Email = "sunrise@example.com", Address = "9 Shaheb Bazar, Rajshahi-6100" },
+            new Customer { Name = "Lakeview Stores", ContactPerson = "Nasrin Sultana", Phone = "+880-1811-000006", Email = "lakeview@example.com", Address = "56 Nawab Road, Khulna-9100" },
         };
 
         db.Customers.AddRange(customers);
@@ -332,7 +335,7 @@ public static class DbInitializer
 
                 foreach (var item in invoice.Items)
                 {
-                    await stockService.ReceiveStockAsync(item.ProductId, warehouse.Id, item.Quantity, invoice.InvoiceNumber, "Seed data restock");
+                    await stockService.ReceiveStockAsync(item.ProductId, warehouse.Id, item.Quantity, invoice.InvoiceNumber, notes: "Seed data restock");
                 }
 
                 await accountingService.PostPurchaseInvoiceAsync(invoice);
@@ -389,7 +392,7 @@ public static class DbInitializer
 
                 foreach (var item in invoice.Items)
                 {
-                    await stockService.IssueStockAsync(item.ProductId, warehouse.Id, item.Quantity, invoice.InvoiceNumber, "Seed data sale");
+                    await stockService.IssueStockAsync(item.ProductId, warehouse.Id, item.Quantity, invoice.InvoiceNumber, notes: "Seed data sale");
                 }
 
                 await accountingService.PostSalesInvoiceAsync(invoice);

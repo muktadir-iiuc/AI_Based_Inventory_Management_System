@@ -27,12 +27,10 @@
                 <div class="form-text">A user can hold more than one role at once (e.g. Sales Officer and Accountant together).</div>
             </div>
             <div class="mb-3" id="warehouseGroup">
-                <label asp-for="WarehouseId" class="form-label required-asterisk">Warehouse</label>
-                <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select">
-                    <option value="">-- select warehouse --</option>
-                </select>
-                <span asp-validation-for="WarehouseId" class="text-danger small"></span>
-                <div class="form-text">This user's activity (invoices, stock) will be limited to this warehouse.</div>
+                <label asp-for="WarehouseIds" class="form-label required-asterisk">Warehouses</label>
+                <select asp-for="WarehouseIds" asp-items="warehouseList" class="form-select" multiple></select>
+                <span asp-validation-for="WarehouseIds" class="text-danger small"></span>
+                <div class="form-text">Hold Ctrl (Cmd on Mac) to select multiple. This user's activity (invoices, stock) will be limited to the selected warehouse(s).</div>
             </div>
             <div class="form-check mb-3">
                 <input asp-for="IsActive" class="form-check-input" />

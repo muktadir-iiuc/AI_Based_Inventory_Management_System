@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Extensions;
 using WebApplication1.Models.Identity;
+using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 using WebApplication1.Models.ViewModels;
@@ -16,19 +17,20 @@ namespace WebApplication1.Controllers;
 public class SalesInvoicesController(
     ApplicationDbContext db,
     IStockService stockService,
+    IFifoAllocationService fifoService,
     IAccountingService accountingService,
     IActivityNotifier notifier,
     ICompanySettingsService companySettings,
     IWebHostEnvironment env) : Controller
 {
-    public async Task<IActionResult> Index(int? customerId, int? warehouseId)
+    public async Task<IActionResult> Index(int? customerId, int? warehouseId, int page = 1)
     {
-        var scopedWarehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         var query = db.SalesInvoices.Include(s => s.Customer).Include(s => s.Warehouse).AsQueryable();
 
-        if (scopedWarehouseId.HasValue)
+        if (warehouseIds is not null)
         {
-            query = query.Where(s => s.WarehouseId == scopedWarehouseId);
+            query = query.Where(s => warehouseIds.Contains(s.WarehouseId));
         }
         else if (warehouseId.HasValue)
         {
@@ -42,9 +44,10 @@ public class SalesInvoicesController(
 
         ViewData["CustomerId"] = new SelectList(await db.Customers.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", customerId);
         ViewData["WarehouseId"] = new SelectList(await db.Warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
-        ViewData["WarehouseScoped"] = scopedWarehouseId.HasValue;
+        ViewData["WarehouseScoped"] = warehouseIds is not null;
 
-        return View(await query.Include(s => s.Items).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync());
+        return View(await PagedList<SalesInvoice>.CreateAsync(
+            query.Include(s => s.Items).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id), page));
     }
 
     public async Task<IActionResult> Details(int id)
@@ -53,10 +56,12 @@ public class SalesInvoicesController(
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
             .Include(s => s.Items).ThenInclude(i => i.Product)
+            .Include(s => s.Items).ThenInclude(i => i.Batch)
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
         if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
         return View(invoice);
     }
 
@@ -64,12 +69,49 @@ public class SalesInvoicesController(
     public async Task<IActionResult> Create()
     {
         await PopulateDropdownsAsync();
-        var scopedWarehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         return View(new SalesInvoiceCreateViewModel
         {
-            Items = [new InvoiceLineInput()],
-            WarehouseId = scopedWarehouseId ?? 0
+            Items = [new SalesLineInput()],
+            WarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : 0
         });
+    }
+
+    // Read-only: computes (but does not apply) the FIFO batch breakdown for a requested
+    // quantity, so the Create page can show the salesperson exactly which batches/prices a
+    // line will draw from before they submit. The server always decides FIFO order — this
+    // endpoint never lets the client pick a batch, it only previews what the server would do.
+    [HttpGet]
+    [Authorize(Roles = Roles.SalesManagers)]
+    public async Task<IActionResult> PreviewAllocation(int productId, int warehouseId, decimal quantity)
+    {
+        if (productId <= 0 || warehouseId <= 0 || quantity <= 0 || !User.IsWarehouseAllowed(warehouseId))
+        {
+            return Json(new { ok = false });
+        }
+
+        try
+        {
+            var allocations = await fifoService.PreviewAsync(productId, warehouseId, quantity);
+            return Json(new
+            {
+                ok = true,
+                lines = allocations.Select(a => new
+                {
+                    a.Batch.BatchNumber,
+                    Available = a.Batch.RemainingQuantity,
+                    Allocated = a.Quantity,
+                    PurchasePrice = a.Batch.PurchasePrice,
+                    SalePrice = a.Batch.SalePrice
+                }),
+                unitPrice = allocations.Count > 0 ? allocations[0].Batch.SalePrice : 0,
+                lineTotal = allocations.Sum(a => a.Quantity * a.Batch.SalePrice)
+            });
+        }
+        catch (InsufficientStockException ex)
+        {
+            return Json(new { ok = false, error = ex.Message });
+        }
     }
 
     [HttpPost]
@@ -83,27 +125,24 @@ public class SalesInvoicesController(
             ModelState.AddModelError(string.Empty, "Add at least one product line.");
         }
 
-        // A warehouse-scoped user can only sell from their own warehouse, regardless of what was submitted.
-        var scopedWarehouseId = User.GetWarehouseId();
-        if (scopedWarehouseId.HasValue)
-        {
-            model.WarehouseId = scopedWarehouseId.Value;
-        }
-
         if (model.WarehouseId <= 0 || !await db.Warehouses.AnyAsync(w => w.Id == model.WarehouseId))
         {
             ModelState.AddModelError(nameof(model.WarehouseId), "Please select a warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.WarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.WarehouseId), "You are not assigned to this warehouse.");
         }
 
         var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await db.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
 
-        if (model.WarehouseId > 0)
+        if (model.WarehouseId > 0 && ModelState.IsValid)
         {
-            var warehouseStocks = await db.ProductWarehouseStocks
-                .Where(s => s.WarehouseId == model.WarehouseId && productIds.Contains(s.ProductId))
-                .ToDictionaryAsync(s => s.ProductId, s => s.Quantity);
-
+            // Read-only check up front: reject the whole submission together (no partial sale)
+            // if any line can't be fully covered by currently available batches. Prices/batches
+            // are determined for real — and re-validated — inside the save-and-retry loop below,
+            // since stock can change between this check and the actual allocation.
             foreach (var item in model.Items)
             {
                 if (!products.TryGetValue(item.ProductId, out var product))
@@ -111,11 +150,13 @@ public class SalesInvoicesController(
                     continue;
                 }
 
-                var availableInWarehouse = warehouseStocks.GetValueOrDefault(item.ProductId, 0);
-                if (item.Quantity > availableInWarehouse)
+                try
                 {
-                    ModelState.AddModelError(string.Empty,
-                        $"Insufficient stock for {product.Name} in the selected warehouse: available {availableInWarehouse:0.##}, requested {item.Quantity:0.##}.");
+                    await fifoService.PreviewAsync(item.ProductId, model.WarehouseId, item.Quantity);
+                }
+                catch (InsufficientStockException ex)
+                {
+                    ModelState.AddModelError(string.Empty, $"{product.Name}: {ex.Message}");
                 }
             }
         }
@@ -126,48 +167,86 @@ public class SalesInvoicesController(
             return View(model);
         }
 
-        var invoiceCount = await db.SalesInvoices.CountAsync();
-        var invoice = new SalesInvoice
+        // FIFO allocation mutates ProductBatch.RemainingQuantity on tracked entities; two
+        // concurrent sales racing for the same batch make the loser's SaveChangesAsync throw
+        // DbUpdateConcurrencyException (ProductBatch.RowVersion). Retry against freshly-loaded
+        // batches rather than fail the sale outright — see FifoAllocationService remarks.
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
         {
-            InvoiceNumber = $"SINV-{invoiceCount + 1:D6}",
-            CustomerId = model.CustomerId,
-            WarehouseId = model.WarehouseId,
-            Date = model.Date,
-            Notes = model.Notes,
-            Status = DocumentStatus.Posted,
-            CreatedBy = User.Identity?.Name
-        };
-
-        foreach (var item in model.Items)
-        {
-            invoice.Items.Add(new SalesInvoiceItem
+            var invoiceCount = await db.SalesInvoices.CountAsync();
+            var invoice = new SalesInvoice
             {
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                UnitCost = products[item.ProductId].CostPrice
-            });
+                InvoiceNumber = $"SINV-{invoiceCount + 1:D6}",
+                CustomerId = model.CustomerId,
+                WarehouseId = model.WarehouseId,
+                Date = model.Date,
+                Notes = model.Notes,
+                Status = DocumentStatus.Posted,
+                CreatedBy = User.Identity?.Name
+            };
+
+            foreach (var item in model.Items)
+            {
+                List<BatchAllocation> allocations;
+                try
+                {
+                    allocations = await fifoService.AllocateAsync(item.ProductId, model.WarehouseId, item.Quantity);
+                }
+                catch (InsufficientStockException ex)
+                {
+                    ModelState.AddModelError(string.Empty, $"{products[item.ProductId].Name}: {ex.Message}");
+                    continue;
+                }
+
+                foreach (var allocation in allocations)
+                {
+                    invoice.Items.Add(new SalesInvoiceItem
+                    {
+                        ProductId = item.ProductId,
+                        Quantity = allocation.Quantity,
+                        UnitPrice = allocation.Batch.SalePrice,
+                        UnitCost = allocation.Batch.PurchasePrice,
+                        Batch = allocation.Batch
+                    });
+
+                    await stockService.IssueStockAsync(item.ProductId, model.WarehouseId, allocation.Quantity, invoice.InvoiceNumber,
+                        batch: allocation.Batch, unitCost: allocation.Batch.PurchasePrice, unitSalePrice: allocation.Batch.SalePrice);
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await PopulateDropdownsAsync();
+                return View(model);
+            }
+
+            db.SalesInvoices.Add(invoice);
+            await accountingService.PostSalesInvoiceAsync(invoice);
+
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < maxAttempts)
+            {
+                foreach (var entry in db.ChangeTracker.Entries().ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+                continue;
+            }
+
+            var warehouseName = (await db.Warehouses.FindAsync(invoice.WarehouseId))?.Name;
+            await notifier.NotifyAsync(
+                "Sales Invoice Posted",
+                $"{invoice.InvoiceNumber} — {invoice.Items.Count} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
+                "fas fa-cash-register text-success",
+                [invoice.WarehouseId]);
+
+            TempData["Success"] = $"Sales invoice {invoice.InvoiceNumber} posted.";
+            return RedirectToAction(nameof(Details), new { id = invoice.Id });
         }
-
-        db.SalesInvoices.Add(invoice);
-
-        foreach (var item in invoice.Items)
-        {
-            await stockService.IssueStockAsync(item.ProductId, invoice.WarehouseId, item.Quantity, invoice.InvoiceNumber);
-        }
-
-        await accountingService.PostSalesInvoiceAsync(invoice);
-        await db.SaveChangesAsync();
-
-        var warehouseName = (await db.Warehouses.FindAsync(invoice.WarehouseId))?.Name;
-        await notifier.NotifyAsync(
-            "Sales Invoice Posted",
-            $"{invoice.InvoiceNumber} — {invoice.Items.Count} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
-            "fas fa-cash-register text-success",
-            [invoice.WarehouseId]);
-
-        TempData["Success"] = $"Sales invoice {invoice.InvoiceNumber} posted.";
-        return RedirectToAction(nameof(Details), new { id = invoice.Id });
     }
 
     public async Task<IActionResult> PrintPdf(int id)
@@ -180,6 +259,7 @@ public class SalesInvoicesController(
             .FirstOrDefaultAsync(s => s.Id == id);
 
         if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
 
         var lines = invoice.Items.Select((item, index) => new SalesInvoiceReportLine
         {
@@ -227,6 +307,33 @@ public class SalesInvoicesController(
 
     public async Task<IActionResult> PrintThermal(int id)
     {
+        var invoice = await db.SalesInvoices.Where(s => s.Id == id)
+            .Select(s => new { s.InvoiceNumber, s.WarehouseId }).FirstOrDefaultAsync();
+        if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
+
+        ViewData["Title"] = $"Receipt Preview — {invoice.InvoiceNumber}";
+        return View(new ThermalReceiptPreviewViewModel(id, invoice.InvoiceNumber));
+    }
+
+    public async Task<IActionResult> ThermalReceiptPdf(int id)
+    {
+        var pdf = await GenerateThermalReceiptPdfAsync(id);
+        if (pdf is null) return NotFound();
+
+        return File(pdf.Value.Bytes, "application/pdf");
+    }
+
+    public async Task<IActionResult> ThermalReceiptDownload(int id)
+    {
+        var pdf = await GenerateThermalReceiptPdfAsync(id);
+        if (pdf is null) return NotFound();
+
+        return File(pdf.Value.Bytes, "application/pdf", $"{pdf.Value.InvoiceNumber}-receipt.pdf");
+    }
+
+    private async Task<(byte[] Bytes, string InvoiceNumber)?> GenerateThermalReceiptPdfAsync(int id)
+    {
         var invoice = await db.SalesInvoices
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
@@ -234,7 +341,8 @@ public class SalesInvoicesController(
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
-        if (invoice is null) return NotFound();
+        if (invoice is null) return null;
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return null;
 
         var itemLines = invoice.Items.Select((item, index) => new SalesInvoiceReportLine
         {
@@ -248,6 +356,11 @@ public class SalesInvoicesController(
 
         var paidAmount = invoice.Payments.Sum(p => p.Amount);
         var dueAmount = invoice.TotalAmount - paidAmount;
+
+        var customerOutstandingDue = await db.SalesInvoices
+            .Where(s => s.CustomerId == invoice.CustomerId && s.Status != DocumentStatus.Cancelled)
+            .Select(s => s.Items.Sum(i => i.Quantity * i.UnitPrice) - s.Payments.Sum(p => p.Amount))
+            .SumAsync();
 
         var company = await companySettings.GetAsync();
 
@@ -266,7 +379,8 @@ public class SalesInvoicesController(
             Notes = invoice.Notes ?? string.Empty,
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
-            DueAmount = dueAmount.ToString("N2")
+            DueAmount = dueAmount.ToString("N2"),
+            CustomerOutstandingDue = customerOutstandingDue.ToString("N2")
         };
 
         var detailLines = ThermalReceiptFormatter.BuildDetailLines(header, itemLines);
@@ -278,7 +392,7 @@ public class SalesInvoicesController(
         const double dynamicSectionTop = 1.78;
         const double dynamicRowHeightDesign = 0.16; // cosmetic only, for the Tablix's own declared <Height>
         const double dynamicRowAllowance = 0.34; // visual layout only — see pageHeight comment for the real per-row cost
-        const double totalsHeight = 0.66; // Total + Paid + Balance Due rows, fixed count
+        const double totalsHeight = 0.9; // Total + Paid + Balance Due + Customer Outstanding rows, fixed count
         const double bottomMargin = 0.08;
         const double maxPageHeightIn = 60;
 
@@ -286,6 +400,7 @@ public class SalesInvoicesController(
         var dynamicEnd = dynamicSectionTop + detailLines.Count * dynamicRowAllowance;
         var divider3Top = dynamicEnd + 0.04;
         var totalsTop = dynamicEnd + 0.10;
+        var customerDueDividerTop = totalsTop + 0.66; // Total + Paid + Balance Due rows end here
         var totalsEnd = totalsTop + totalsHeight;
         var divider4Top = totalsEnd + 0.04;
         var footerTop = divider4Top + 0.08;
@@ -300,8 +415,9 @@ public class SalesInvoicesController(
         // total exceeds the page's printable height everything remaining spills to a
         // second page. Empirically fit against two calibration points (4 detail lines
         // -> ~5.2in required, 30 detail lines -> ~17.95in required): required(n) =
-        // 3.24in + 0.49in/line. The constants below add a ~15% safety margin on top.
-        var pageHeight = Math.Min(3.6 + detailLines.Count * 0.55 + bottomMargin + 0.2, maxPageHeightIn);
+        // 3.24in + 0.49in/line. The constants below add a ~15% safety margin on top,
+        // plus extra headroom for the added Customer Outstanding totals row.
+        var pageHeight = Math.Min(4.0 + detailLines.Count * 0.55 + bottomMargin + 0.2, maxPageHeightIn);
 
         var templatePath = Path.Combine(env.ContentRootPath, "Reports", "SalesInvoiceThermalReceipt.rdlc");
         var rdlc = await System.IO.File.ReadAllTextAsync(templatePath);
@@ -309,6 +425,7 @@ public class SalesInvoicesController(
             .Replace("__DYNAMICHEIGHT__", dynamicHeight.ToString("0.00"))
             .Replace("__DIVIDER3_TOP__", divider3Top.ToString("0.00"))
             .Replace("__TOTALS_TOP__", totalsTop.ToString("0.00"))
+            .Replace("__CUSTOMER_DUE_DIVIDER_TOP__", customerDueDividerTop.ToString("0.00"))
             .Replace("__FOOTER_NOTE_TOP__", footerNoteTop.ToString("0.00"))
             .Replace("__FOOTER_TOP__", footerTop.ToString("0.00"))
             .Replace("__DIVIDER4_TOP__", divider4Top.ToString("0.00"))
@@ -325,7 +442,7 @@ public class SalesInvoicesController(
             report.AddDataSource("ReceiptLines", detailLines);
 
             var result = report.Execute(RenderType.Pdf, 1, null, string.Empty);
-            return File(result.MainStream, "application/pdf", $"{invoice.InvoiceNumber}-receipt.pdf");
+            return (result.MainStream, invoice.InvoiceNumber);
         }
         finally
         {
@@ -338,13 +455,26 @@ public class SalesInvoicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancel(int id)
     {
-        var invoice = await db.SalesInvoices.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == id);
+        var invoice = await db.SalesInvoices
+            .Include(s => s.Items).ThenInclude(i => i.Batch)
+            .FirstOrDefaultAsync(s => s.Id == id);
         if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
 
         if (invoice.Status == DocumentStatus.Cancelled)
         {
             TempData["Error"] = "This invoice is already cancelled.";
             return RedirectToAction(nameof(Details), new { id });
+        }
+
+        // Restore each line's quantity to the specific batch it was drawn from (not just the
+        // warehouse aggregate), so a batch this sale depleted becomes available again for FIFO.
+        foreach (var item in invoice.Items)
+        {
+            if (item.Batch is not null)
+            {
+                item.Batch.RemainingQuantity += item.Quantity;
+            }
         }
 
         await stockService.ReverseTransactionsForReferenceAsync(invoice.InvoiceNumber);
@@ -365,20 +495,26 @@ public class SalesInvoicesController(
 
     private async Task PopulateDropdownsAsync()
     {
-        var scopedWarehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         var warehouses = db.Warehouses.Where(w => w.IsActive).AsQueryable();
-        if (scopedWarehouseId.HasValue)
+        if (warehouseIds is not null)
         {
-            warehouses = warehouses.Where(w => w.Id == scopedWarehouseId);
+            warehouses = warehouses.Where(w => warehouseIds.Contains(w.Id));
         }
 
+        // A readonly, locked warehouse field only makes sense when the user has exactly one
+        // assigned warehouse; with several, they still pick from among their assigned set.
+        var singleWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : (int?)null;
+
         ViewData["Customers"] = new SelectList(await db.Customers.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
-        ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", scopedWarehouseId);
-        ViewData["WarehouseScoped"] = scopedWarehouseId.HasValue;
+        ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", singleWarehouseId);
+        ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
 
         // When the user is scoped to one warehouse, show that warehouse's actual stock in the picker;
         // otherwise fall back to the global total as a guide (the server re-validates against the chosen warehouse on submit).
-        if (scopedWarehouseId.HasValue)
+        // Unit price is no longer shown here at all — it depends on which batch(es) FIFO draws
+        // from for the entered quantity, computed live via PreviewAllocation as the user types.
+        if (singleWarehouseId.HasValue)
         {
             ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
                 .Select(p => new
@@ -386,15 +522,14 @@ public class SalesInvoicesController(
                     p.Id,
                     p.Sku,
                     p.Name,
-                    p.SalePrice,
-                    CurrentStock = p.WarehouseStocks.Where(s => s.WarehouseId == scopedWarehouseId).Select(s => s.Quantity).FirstOrDefault(),
+                    CurrentStock = p.WarehouseStocks.Where(s => s.WarehouseId == singleWarehouseId).Select(s => s.Quantity).FirstOrDefault(),
                     p.UnitOfMeasure!.Symbol
                 }).ToListAsync();
         }
         else
         {
             ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-                .Select(p => new { p.Id, p.Sku, p.Name, p.SalePrice, p.CurrentStock, p.UnitOfMeasure!.Symbol }).ToListAsync();
+                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol }).ToListAsync();
         }
     }
 }

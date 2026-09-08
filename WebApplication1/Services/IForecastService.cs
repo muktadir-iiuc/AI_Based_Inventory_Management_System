@@ -15,6 +15,6 @@ public class ReorderSuggestion
 
 public interface IForecastService
 {
-    /// <summary>When warehouseId is given, current stock and sales history are scoped to that warehouse only.</summary>
-    Task<List<ReorderSuggestion>> GetReorderSuggestionsAsync(int? warehouseId = null);
+    /// <summary>When warehouseIds is given, current stock and sales history are scoped to those warehouses only.</summary>
+    Task<List<ReorderSuggestion>> GetReorderSuggestionsAsync(List<int>? warehouseIds = null);
 }

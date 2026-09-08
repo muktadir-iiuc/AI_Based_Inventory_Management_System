@@ -23,14 +23,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
 
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
     public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
+    public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
+    public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
     public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+    public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
+    public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
+
+    public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
 
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
@@ -68,6 +75,36 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(s => s.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Entity<StockTransaction>()
+            .HasOne(s => s.Batch)
+            .WithMany()
+            .HasForeignKey(s => s.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductBatch>()
+            .HasIndex(b => new { b.WarehouseId, b.ProductId, b.PurchaseDate });
+
+        builder.Entity<ProductBatch>()
+            .HasIndex(b => b.RemainingQuantity);
+
+        builder.Entity<ProductBatch>()
+            .HasOne(b => b.Product)
+            .WithMany()
+            .HasForeignKey(b => b.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductBatch>()
+            .HasOne(b => b.Warehouse)
+            .WithMany()
+            .HasForeignKey(b => b.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductBatch>()
+            .HasOne(b => b.PurchaseInvoiceItem)
+            .WithOne(i => i.Batch)
+            .HasForeignKey<ProductBatch>(b => b.PurchaseInvoiceItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<Warehouse>()
             .HasIndex(w => w.Code).IsUnique();
 
@@ -86,10 +123,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(s => s.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Entity<ApplicationUser>()
-            .HasOne(u => u.Warehouse)
+        builder.Entity<UserWarehouse>()
+            .HasKey(uw => new { uw.UserId, uw.WarehouseId });
+
+        builder.Entity<UserWarehouse>()
+            .HasOne(uw => uw.User)
+            .WithMany(u => u.UserWarehouses)
+            .HasForeignKey(uw => uw.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<UserWarehouse>()
+            .HasOne(uw => uw.Warehouse)
             .WithMany()
-            .HasForeignKey(u => u.WarehouseId)
+            .HasForeignKey(uw => uw.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<StockTransfer>()
@@ -174,6 +220,54 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(i => i.Product)
             .WithMany(p => p.SalesInvoiceItems)
             .HasForeignKey(i => i.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SalesInvoiceItem>()
+            .HasOne(i => i.Batch)
+            .WithMany()
+            .HasForeignKey(i => i.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SalesReturn>()
+            .HasIndex(r => r.ReturnNumber).IsUnique();
+
+        builder.Entity<SalesReturn>()
+            .HasOne(r => r.SalesInvoice)
+            .WithMany()
+            .HasForeignKey(r => r.SalesInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SalesReturnItem>()
+            .HasOne(i => i.SalesReturn)
+            .WithMany(r => r.Items)
+            .HasForeignKey(i => i.SalesReturnId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<SalesReturnItem>()
+            .HasOne(i => i.SalesInvoiceItem)
+            .WithMany()
+            .HasForeignKey(i => i.SalesInvoiceItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PurchaseReturn>()
+            .HasIndex(r => r.ReturnNumber).IsUnique();
+
+        builder.Entity<PurchaseReturn>()
+            .HasOne(r => r.PurchaseInvoice)
+            .WithMany()
+            .HasForeignKey(r => r.PurchaseInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PurchaseReturnItem>()
+            .HasOne(i => i.PurchaseReturn)
+            .WithMany(r => r.Items)
+            .HasForeignKey(i => i.PurchaseReturnId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<PurchaseReturnItem>()
+            .HasOne(i => i.PurchaseInvoiceItem)
+            .WithMany()
+            .HasForeignKey(i => i.PurchaseInvoiceItemId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Account>()

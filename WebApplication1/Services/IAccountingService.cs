@@ -8,6 +8,8 @@ public interface IAccountingService
 {
     Task<JournalEntry> PostPurchaseInvoiceAsync(PurchaseInvoice invoice);
     Task<JournalEntry> PostSalesInvoiceAsync(SalesInvoice invoice);
+    Task<JournalEntry> PostSalesReturnAsync(SalesReturn salesReturn);
+    Task<JournalEntry> PostPurchaseReturnAsync(PurchaseReturn purchaseReturn);
     Task<JournalEntry> PostPaymentAsync(Payment payment);
     Task ReverseJournalEntriesForReferenceAsync(string sourceReference, string reason);
     Task<List<TrialBalanceRow>> GetTrialBalanceAsync();

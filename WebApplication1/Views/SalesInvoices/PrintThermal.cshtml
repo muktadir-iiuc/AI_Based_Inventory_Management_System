@@ -1,0 +1,38 @@
+@model ThermalReceiptPreviewViewModel
+@{
+    ViewData["Title"] = $"Receipt Preview — {Model.InvoiceNumber}";
+    var pdfUrl = Url.Action("ThermalReceiptPdf", new { id = Model.SalesInvoiceId });
+    var downloadUrl = Url.Action("ThermalReceiptDownload", new { id = Model.SalesInvoiceId });
+}
+
+@section Toolbar {
+    <a asp-action="Details" asp-route-id="@Model.SalesInvoiceId" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> Back to Invoice
+    </a>
+    <button type="button" id="printReceiptBtn" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-print"></i> Print
+    </button>
+    <a href="@downloadUrl" id="downloadReceiptBtn" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-download"></i> Download
+    </a>
+}
+
+<div class="card">
+    <div class="card-body p-0">
+        <iframe id="receiptFrame" src="@pdfUrl" title="Receipt preview" style="width: 100%; height: 80vh; border: 0;"></iframe>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('printReceiptBtn').addEventListener('click', function () {
+            var frame = document.getElementById('receiptFrame');
+            try {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            } catch (e) {
+                frame.contentWindow.location = '@pdfUrl';
+            }
+        });
+    </script>
+}

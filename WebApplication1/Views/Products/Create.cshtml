@@ -9,17 +9,11 @@
     <div class="card-body">
         <form asp-action="Create" method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label asp-for="Sku" class="form-label required-asterisk"></label>
-                    <input asp-for="Sku" class="form-control" />
-                    <span asp-validation-for="Sku" class="text-danger small"></span>
-                </div>
-                <div class="col-md-8 mb-3">
-                    <label asp-for="Name" class="form-label required-asterisk"></label>
-                    <input asp-for="Name" class="form-control" />
-                    <span asp-validation-for="Name" class="text-danger small"></span>
-                </div>
+            <div class="alert alert-info py-2 small mb-3"><i class="fas fa-circle-info"></i> The SKU code is generated automatically from the selected category once you save.</div>
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label required-asterisk"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger small"></span>
             </div>
             <div class="mb-3">
                 <label asp-for="Description" class="form-label"></label>
@@ -39,15 +33,8 @@
                     </select>
                 </div>
             </div>
+            <div class="alert alert-info py-2 small mb-3"><i class="fas fa-circle-info"></i> Cost and sale price are set per batch on each purchase, not on the product itself — record the first purchase to price this product.</div>
             <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label asp-for="CostPrice" class="form-label required-asterisk"></label>
-                    <input asp-for="CostPrice" class="form-control" type="number" step="0.01" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label asp-for="SalePrice" class="form-label required-asterisk"></label>
-                    <input asp-for="SalePrice" class="form-control" type="number" step="0.01" />
-                </div>
                 <div class="col-md-4 mb-3">
                     <label asp-for="ReorderLevel" class="form-label required-asterisk"></label>
                     <input asp-for="ReorderLevel" class="form-control" type="number" step="0.01" />

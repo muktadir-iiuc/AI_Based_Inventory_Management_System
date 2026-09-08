@@ -6,6 +6,9 @@
 @section Toolbar {
     @if (Model.Status == DocumentStatus.Posted && (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer)))
     {
+        <a asp-controller="PurchaseReturns" asp-action="Create" asp-route-purchaseInvoiceId="@Model.Id" class="btn btn-outline-warning btn-sm">
+            <i class="fas fa-rotate-left"></i> Return
+        </a>
         <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Cancel this purchase invoice? This will reverse stock and accounting entries.">
             <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-ban"></i> Cancel Invoice</button>
         </form>

@@ -15,9 +15,9 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 {
     // ---- Chart of Accounts ----
 
-    public async Task<IActionResult> ChartOfAccounts()
+    public async Task<IActionResult> ChartOfAccounts(int page = 1)
     {
-        return View(await db.Accounts.OrderBy(a => a.Code).ToListAsync());
+        return View(await PagedList<Account>.CreateAsync(db.Accounts.OrderBy(a => a.Code), page));
     }
 
     [Authorize(Roles = Roles.AccountingManagers)]
@@ -74,10 +74,10 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 
     // ---- Journal Entries ----
 
-    public async Task<IActionResult> JournalEntries()
+    public async Task<IActionResult> JournalEntries(int page = 1)
     {
-        return View(await db.JournalEntries.Include(j => j.Lines)
-            .OrderByDescending(j => j.Date).ThenByDescending(j => j.Id).ToListAsync());
+        return View(await PagedList<JournalEntry>.CreateAsync(
+            db.JournalEntries.Include(j => j.Lines).OrderByDescending(j => j.Date).ThenByDescending(j => j.Id), page));
     }
 
     public async Task<IActionResult> JournalEntryDetails(int id)
@@ -149,22 +149,22 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 
     // ---- Payments & Receipts ----
 
-    public async Task<IActionResult> Payments()
+    public async Task<IActionResult> Payments(int page = 1)
     {
-        var warehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         var query = db.Payments
             .Include(p => p.PurchaseInvoice).ThenInclude(pi => pi!.Supplier)
             .Include(p => p.SalesInvoice).ThenInclude(si => si!.Customer)
             .AsQueryable();
 
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             query = query.Where(p =>
-                (p.PurchaseInvoice != null && p.PurchaseInvoice.WarehouseId == warehouseId) ||
-                (p.SalesInvoice != null && p.SalesInvoice.WarehouseId == warehouseId));
+                (p.PurchaseInvoice != null && warehouseIds.Contains(p.PurchaseInvoice.WarehouseId)) ||
+                (p.SalesInvoice != null && warehouseIds.Contains(p.SalesInvoice.WarehouseId)));
         }
 
-        return View(await query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
+        return View(await PagedList<Payment>.CreateAsync(query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id), page));
     }
 
     [Authorize(Roles = Roles.AccountingManagers)]
@@ -222,13 +222,21 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
         return View(await accountingService.GetTrialBalanceAsync());
     }
 
-    public async Task<IActionResult> Ledger(int accountId)
+    public async Task<IActionResult> Ledger(int accountId, int page = 1)
     {
         var account = await db.Accounts.FindAsync(accountId);
         if (account is null) return NotFound();
 
         var lines = await accountingService.GetLedgerAsync(accountId);
-        return View(new LedgerViewModel { Account = account, Lines = lines });
+        var normalDebit = account.Type is AccountType.Asset or AccountType.Expense;
+        decimal running = 0;
+        var rows = lines.Select(l =>
+        {
+            running += normalDebit ? (l.Debit - l.Credit) : (l.Credit - l.Debit);
+            return new LedgerLineRow(l.JournalEntry?.Date, l.JournalEntryId, l.JournalEntry?.EntryNumber, l.Memo, l.Debit, l.Credit, running);
+        }).ToList();
+
+        return View(new LedgerViewModel { Account = account, Rows = PagedList<LedgerLineRow>.Create(rows, page) });
     }
 
     private async Task PopulateAccountsAsync()
@@ -240,17 +248,17 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
 
     private async Task PopulateInvoicesAsync()
     {
-        var warehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
 
         var purchaseInvoices = db.PurchaseInvoices.Include(p => p.Supplier)
             .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted);
         var salesInvoices = db.SalesInvoices.Include(s => s.Customer)
             .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted);
 
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
-            purchaseInvoices = purchaseInvoices.Where(p => p.WarehouseId == warehouseId);
-            salesInvoices = salesInvoices.Where(s => s.WarehouseId == warehouseId);
+            purchaseInvoices = purchaseInvoices.Where(p => warehouseIds.Contains(p.WarehouseId));
+            salesInvoices = salesInvoices.Where(s => warehouseIds.Contains(s.WarehouseId));
         }
 
         ViewData["PurchaseInvoices"] = new SelectList(

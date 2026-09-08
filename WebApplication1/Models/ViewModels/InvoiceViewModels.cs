@@ -15,7 +15,7 @@ public class PurchaseInvoiceCreateViewModel
 
     public string? Notes { get; set; }
 
-    public List<InvoiceLineInput> Items { get; set; } = [];
+    public List<PurchaseLineInput> Items { get; set; } = [];
 }
 
 public class SalesInvoiceCreateViewModel
@@ -31,10 +31,10 @@ public class SalesInvoiceCreateViewModel
 
     public string? Notes { get; set; }
 
-    public List<InvoiceLineInput> Items { get; set; } = [];
+    public List<SalesLineInput> Items { get; set; } = [];
 }
 
-public class InvoiceLineInput
+public class PurchaseLineInput
 {
     [Required]
     public int ProductId { get; set; }
@@ -44,6 +44,22 @@ public class InvoiceLineInput
 
     [Range(0, double.MaxValue)]
     public decimal UnitPrice { get; set; }
+
+    // The price the resulting batch will sell at (see ProductBatch) — set once at purchase
+    // time and frozen on that batch from then on, independent of any other batch's price.
+    [Range(0, double.MaxValue)]
+    public decimal SalePrice { get; set; }
+}
+
+// A sale only asks for Product + Quantity: FIFO determines which batch(es) it draws from and
+// therefore its price, so the salesperson never enters a unit price directly.
+public class SalesLineInput
+{
+    [Required]
+    public int ProductId { get; set; }
+
+    [Range(0.01, double.MaxValue, ErrorMessage = "Quantity must be greater than zero.")]
+    public decimal Quantity { get; set; }
 }
 
 public class StockTransferCreateViewModel

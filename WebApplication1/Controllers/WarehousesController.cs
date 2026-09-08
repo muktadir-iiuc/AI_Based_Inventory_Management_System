@@ -4,14 +4,15 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
+using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
 public class WarehousesController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
-        return View(await db.Warehouses.OrderBy(w => w.Name).ToListAsync());
+        return View(await PagedList<Warehouse>.CreateAsync(db.Warehouses.OrderBy(w => w.Name), page));
     }
 
     [Authorize(Roles = $"{Roles.Admin},{Roles.Manager}")]

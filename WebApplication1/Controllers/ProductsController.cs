@@ -5,12 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
+using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
 public class ProductsController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int? categoryId)
+    public async Task<IActionResult> Index(string? search, int? categoryId, int page = 1)
     {
         var query = db.Products.Include(p => p.Category).Include(p => p.UnitOfMeasure).AsQueryable();
 
@@ -26,7 +27,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
         ViewData["Search"] = search;
         ViewData["CategoryId"] = new SelectList(await db.Categories.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
 
-        return View(await query.OrderBy(p => p.Name).ToListAsync());
+        return View(await PagedList<Product>.CreateAsync(query.OrderBy(p => p.Name), page));
     }
 
     public async Task<IActionResult> Details(int id)
@@ -54,10 +55,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Product model)
     {
-        if (await db.Products.AnyAsync(p => p.Sku == model.Sku))
-        {
-            ModelState.AddModelError(nameof(Product.Sku), "This SKU is already in use.");
-        }
+        ModelState.Remove(nameof(Product.Sku)); // auto-generated below, not user input
 
         if (!ModelState.IsValid)
         {
@@ -65,10 +63,11 @@ public class ProductsController(ApplicationDbContext db) : Controller
             return View(model);
         }
 
+        model.Sku = await GenerateSkuAsync(model.CategoryId);
         model.CreatedBy = User.Identity?.Name;
         db.Products.Add(model);
         await db.SaveChangesAsync();
-        TempData["Success"] = "Product created.";
+        TempData["Success"] = $"Product created with SKU {model.Sku}.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -87,11 +86,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
     public async Task<IActionResult> Edit(int id, Product model)
     {
         if (id != model.Id) return NotFound();
-
-        if (await db.Products.AnyAsync(p => p.Sku == model.Sku && p.Id != id))
-        {
-            ModelState.AddModelError(nameof(Product.Sku), "This SKU is already in use.");
-        }
+        ModelState.Remove(nameof(Product.Sku)); // SKU is fixed at creation and not editable
 
         if (!ModelState.IsValid)
         {
@@ -102,7 +97,6 @@ public class ProductsController(ApplicationDbContext db) : Controller
         var product = await db.Products.FindAsync(id);
         if (product is null) return NotFound();
 
-        product.Sku = model.Sku;
         product.Name = model.Name;
         product.Description = model.Description;
         product.CategoryId = model.CategoryId;
@@ -141,5 +135,33 @@ public class ProductsController(ApplicationDbContext db) : Controller
     {
         ViewData["Categories"] = new SelectList(await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
         ViewData["Units"] = new SelectList(await db.UnitOfMeasures.Where(u => u.IsActive).OrderBy(u => u.Name).ToListAsync(), "Id", "Name");
+    }
+
+    // Generates SKUs like "ELE-001": a 3-letter category prefix plus a per-prefix
+    // running sequence, following the same shape as the seeded demo catalog.
+    private async Task<string> GenerateSkuAsync(int categoryId)
+    {
+        var categoryName = await db.Categories.Where(c => c.Id == categoryId).Select(c => c.Name).FirstOrDefaultAsync();
+        var prefix = BuildSkuPrefix(categoryName);
+
+        var existingSuffixes = await db.Products
+            .Where(p => p.Sku.StartsWith(prefix + "-"))
+            .Select(p => p.Sku)
+            .ToListAsync();
+
+        var nextNumber = existingSuffixes
+            .Select(sku => sku[(prefix.Length + 1)..])
+            .Where(suffix => suffix.Length > 0 && suffix.All(char.IsDigit))
+            .Select(int.Parse)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+
+        return $"{prefix}-{nextNumber:D3}";
+    }
+
+    private static string BuildSkuPrefix(string? categoryName)
+    {
+        var letters = new string((categoryName ?? string.Empty).Where(char.IsLetter).ToArray()).ToUpperInvariant();
+        return letters.Length >= 3 ? letters[..3] : letters.PadRight(3, 'X');
     }
 }

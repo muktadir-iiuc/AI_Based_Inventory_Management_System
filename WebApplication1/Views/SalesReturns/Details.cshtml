@@ -1,0 +1,48 @@
+@model SalesReturn
+@{
+    ViewData["Title"] = $"Sales Return {Model.ReturnNumber}";
+}
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Summary</h3></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Return #</dt><dd class="col-7">@Model.ReturnNumber</dd>
+                    <dt class="col-5">Invoice</dt>
+                    <dd class="col-7"><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@Model.SalesInvoiceId">@Model.SalesInvoice?.InvoiceNumber</a></dd>
+                    <dt class="col-5">Customer</dt><dd class="col-7">@Model.SalesInvoice?.Customer?.Name</dd>
+                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
+                    <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
+                    <dt class="col-5">Total</dt><dd class="col-7 fw-bold">@Model.TotalAmount.ToString("C")</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title">Returned Lines</h3></div>
+            <div class="card-body p-0 table-responsive-card">
+                <table class="table table-striped mb-0">
+                    <thead><tr><th>Product</th><th>Batch</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Line Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>@item.SalesInvoiceItem?.Product?.Name</td>
+                            <td>@(item.SalesInvoiceItem?.Batch?.BatchNumber ?? "—")</td>
+                            <td class="text-end">@item.Quantity.ToString("0.##")</td>
+                            <td class="text-end">@item.UnitPrice.ToString("C")</td>
+                            <td class="text-end">@item.LineTotal.ToString("C")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,4 +1,4 @@
-@model List<PurchaseInvoice>
+@model PagedList<PurchaseInvoice>
 @{
     ViewData["Title"] = "Purchase Invoices";
     var supplierList = (SelectList)ViewData["SupplierId"]!;
@@ -53,4 +53,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

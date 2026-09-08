@@ -28,4 +28,15 @@ public class StockTransaction
     public string? Notes { get; set; }
 
     public DateTime Date { get; set; } = DateTime.UtcNow;
+
+    // Populated for batch-driven movements (purchase/sale/returns); null for movements that
+    // predate the batch model or aren't tied to a specific batch (e.g. manual adjustments).
+    public int? BatchId { get; set; }
+    public ProductBatch? Batch { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? UnitCost { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? UnitSalePrice { get; set; }
 }

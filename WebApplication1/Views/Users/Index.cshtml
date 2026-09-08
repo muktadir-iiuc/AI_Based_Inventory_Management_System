@@ -1,4 +1,4 @@
-@model List<UserListItem>
+@model PagedList<UserListItem>
 @{
     ViewData["Title"] = "Users & Roles";
 }
@@ -23,7 +23,7 @@
                             <span class="badge text-bg-info">@r</span>
                         }
                     </td>
-                    <td>@(u.WarehouseName ?? "All warehouses")</td>
+                    <td>@(u.WarehouseNames.Count > 0 ? string.Join(", ", u.WarehouseNames) : "All warehouses")</td>
                     <td>
                         @if (u.IsActive) { <span class="badge text-bg-success">Active</span> }
                         else { <span class="badge text-bg-secondary">Inactive</span> }
@@ -36,4 +36,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

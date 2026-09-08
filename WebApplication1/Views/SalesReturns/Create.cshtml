@@ -1,0 +1,69 @@
+@model SalesReturnCreateViewModel
+@{
+    ViewData["Title"] = $"Return against {Model.InvoiceNumber}";
+}
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <input type="hidden" asp-for="SalesInvoiceId" />
+
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Invoice</label>
+                    <input class="form-control" value="@Model.InvoiceNumber" readonly />
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Date" class="form-label required-asterisk"></label>
+                    <input asp-for="Date" class="form-control" type="date" />
+                </div>
+                <div class="col-md-7 mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <input asp-for="Notes" class="form-control" />
+                </div>
+            </div>
+
+            @if (Model.Items.Count == 0)
+            {
+                <p class="text-muted">Every line on this invoice has already been fully returned.</p>
+            }
+            else
+            {
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Product</th><th>Batch</th>
+                            <th class="text-end">Sold Qty</th><th class="text-end">Unit Price</th>
+                            <th style="width: 15%">Return Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.Items.Count; i++)
+                        {
+                            var line = Model.Items[i];
+                            <tr>
+                                <td>
+                                    @line.ProductName
+                                    <input type="hidden" asp-for="Items[i].SalesInvoiceItemId" />
+                                    <input type="hidden" asp-for="Items[i].ProductName" />
+                                    <input type="hidden" asp-for="Items[i].BatchNumber" />
+                                    <input type="hidden" asp-for="Items[i].UnitPrice" />
+                                    <input type="hidden" asp-for="Items[i].UnitCost" />
+                                    <input type="hidden" asp-for="Items[i].MaxReturnable" />
+                                </td>
+                                <td>@(line.BatchNumber ?? "—")</td>
+                                <td class="text-end">@line.MaxReturnable.ToString("0.##")</td>
+                                <td class="text-end">@line.UnitPrice.ToString("C")</td>
+                                <td><input asp-for="Items[i].ReturnQuantity" type="number" step="0.01" min="0" max="@line.MaxReturnable" class="form-control form-control-sm" value="0" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <button type="submit" class="btn btn-primary">Post Sales Return</button>
+            }
+            <a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@Model.SalesInvoiceId" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>

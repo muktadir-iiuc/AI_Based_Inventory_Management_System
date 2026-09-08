@@ -5,7 +5,7 @@ using WebApplication1.Extensions;
 namespace WebApplication1.Hubs;
 
 /// <summary>
-/// Connections join a group per warehouse-scoped user; Admin/Manager (unscoped) join "all-warehouses"
+/// Connections join a group per assigned warehouse; Admin/Manager (unscoped) join "all-warehouses"
 /// so they see every warehouse's activity. ActivityNotifier picks the right groups when it broadcasts.
 /// </summary>
 [Authorize]
@@ -17,9 +17,18 @@ public class NotificationsHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var warehouseId = Context.User?.GetWarehouseId();
-        var group = warehouseId.HasValue ? WarehouseGroup(warehouseId.Value) : AllWarehousesGroup;
-        await Groups.AddToGroupAsync(Context.ConnectionId, group);
+        var warehouseIds = Context.User?.GetWarehouseIds();
+        if (warehouseIds is null)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, AllWarehousesGroup);
+        }
+        else
+        {
+            foreach (var id in warehouseIds)
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, WarehouseGroup(id));
+            }
+        }
         await base.OnConnectedAsync();
     }
 }

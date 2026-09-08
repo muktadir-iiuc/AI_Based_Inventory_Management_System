@@ -1,0 +1,75 @@
+@model SalesProfitabilityViewModel
+@{
+    ViewData["Title"] = "Sales Profitability";
+}
+
+@if (Model.WarehouseScoped)
+{
+    <div class="alert alert-info py-2">
+        <i class="fas fa-warehouse me-1"></i>
+        Showing sales for your assigned warehouse(s) only.
+    </div>
+}
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Sales</span>
+                <h4>@Model.TotalSales.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Cost</span>
+                <h4>@Model.TotalCost.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Profit</span>
+                <h4 class="@(Model.TotalProfit >= 0 ? "text-success" : "text-danger")">@Model.TotalProfit.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th><th>Invoice</th><th>Product</th><th>Batch</th>
+                    <th class="text-end">Qty</th><th class="text-end">Unit Cost</th><th class="text-end">Unit Price</th>
+                    <th class="text-end">Sales Amount</th><th class="text-end">Cost Amount</th><th class="text-end">Profit</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td>@r.Date.ToString("MMM dd, yyyy")</td>
+                    <td>@r.InvoiceNumber</td>
+                    <td>@r.ProductName</td>
+                    <td>@(r.BatchNumber ?? "—")</td>
+                    <td class="text-end">@r.Quantity.ToString("0.##")</td>
+                    <td class="text-end">@r.UnitCost.ToString("C")</td>
+                    <td class="text-end">@r.UnitPrice.ToString("C")</td>
+                    <td class="text-end">@r.SalesAmount.ToString("C")</td>
+                    <td class="text-end">@r.CostAmount.ToString("C")</td>
+                    <td class="text-end @(r.Profit >= 0 ? "text-success" : "text-danger")">@r.Profit.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Rows.Any())
+            {
+                <tr><td colspan="10" class="text-center text-muted py-3">No sales found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Rows.Paging" />
+</div>

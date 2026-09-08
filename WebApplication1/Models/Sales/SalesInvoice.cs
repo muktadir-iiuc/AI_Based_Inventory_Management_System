@@ -52,6 +52,12 @@ public class SalesInvoiceItem
     [Column(TypeName = "decimal(18,2)")]
     public decimal UnitCost { get; set; }
 
+    // The specific batch this line's stock was drawn from (FIFO). Nullable only because rows
+    // created before the batch model existed have no batch to point to; every new row sets it.
+    // One requested quantity spanning multiple batches produces multiple SalesInvoiceItem rows.
+    public int? BatchId { get; set; }
+    public ProductBatch? Batch { get; set; }
+
     [NotMapped]
     public decimal LineTotal => Quantity * UnitPrice;
 }

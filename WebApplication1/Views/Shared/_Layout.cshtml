@@ -34,11 +34,11 @@
                 <li class="nav-item d-none d-md-block">
                     <a asp-controller="Home" asp-action="Index" class="nav-link">Dashboard</a>
                 </li>
-                @{ var warehouseName = User.FindFirst("WarehouseName")?.Value; }
-                @if (!string.IsNullOrEmpty(warehouseName))
+                @{ var warehouseNames = string.Join(", ", User.FindAll("WarehouseName").Select(c => c.Value)); }
+                @if (!string.IsNullOrEmpty(warehouseNames))
                 {
                     <li class="nav-item d-none d-md-block">
-                        <span class="nav-link"><i class="fas fa-warehouse me-1"></i>@warehouseName</span>
+                        <span class="nav-link"><i class="fas fa-warehouse me-1"></i>@warehouseNames</span>
                     </li>
                 }
             </ul>
@@ -62,8 +62,13 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><span class="dropdown-item-text text-muted small">Roles: @string.Join(", ", User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))</span></li>
-                            <li><span class="dropdown-item-text text-muted small">Warehouse: @(warehouseName ?? "All warehouses")</span></li>
+                            <li><span class="dropdown-item-text text-muted small">Warehouse: @(!string.IsNullOrEmpty(warehouseNames) ? warehouseNames : "All warehouses")</span></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a asp-controller="Account" asp-action="ChangePassword" class="dropdown-item">
+                                    <i class="fas fa-key me-2"></i>Change Password
+                                </a>
+                            </li>
                             <li>
                                 <form asp-controller="Account" asp-action="Logout" method="post">
                                     <button type="submit" class="dropdown-item">
@@ -94,73 +99,93 @@
         </div>
 
         <div class="sidebar-wrapper">
+            @{
+                var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+
+                bool InController(params string[] controllers) =>
+                    controllers.Any(c => string.Equals(c, currentController, StringComparison.OrdinalIgnoreCase));
+
+                bool InAction(string controller, params string[] actions) =>
+                    string.Equals(controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                    actions.Any(a => string.Equals(a, currentAction, StringComparison.OrdinalIgnoreCase));
+
+                var inventoryOpen = InController("Products", "Categories", "Units", "Warehouses", "StockTransfers");
+                var purchaseOpen = InController("PurchaseInvoices", "Suppliers", "PurchaseReturns");
+                var salesOpen = InController("SalesInvoices", "Customers", "SalesReturns");
+                var accountingOpen = InController("Accounting");
+                var reportsOpen = InController("Reports");
+            }
             <nav class="mt-2">
                 <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
 
                     <li class="nav-item">
-                        <a asp-controller="Home" asp-action="Index" class="nav-link">
+                        <a asp-controller="Home" asp-action="Index" class="nav-link @(InController("Home") ? "active" : "")">
                             <i class="nav-icon fas fa-gauge"></i>
                             <p>Dashboard</p>
                         </a>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
+                    <li class="nav-item @(inventoryOpen ? "menu-open" : "")">
+                        <a href="#" class="nav-link @(inventoryOpen ? "active" : "")">
                             <i class="nav-icon fas fa-warehouse"></i>
                             <p>Inventory<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="Products" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-box"></i><p>Products</p></a></li>
-                            <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
-                            <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
-                            <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>
-                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers</p></a></li>
+                            <li class="nav-item"><a asp-controller="Products" asp-action="Index" class="nav-link @(InController("Products") ? "active" : "")"><i class="nav-icon fas fa-box"></i><p>Products</p></a></li>
+                            <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link @(InController("Categories") ? "active" : "")"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
+                            <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link @(InController("Units") ? "active" : "")"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
+                            <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link @(InController("Warehouses") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>
+                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link @(InController("StockTransfers") ? "active" : "")"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers</p></a></li>
                         </ul>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
+                    <li class="nav-item @(purchaseOpen ? "menu-open" : "")">
+                        <a href="#" class="nav-link @(purchaseOpen ? "active" : "")">
                             <i class="nav-icon fas fa-truck-loading"></i>
                             <p>Purchase<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
-                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
+                            <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link @(InController("PurchaseInvoices") ? "active" : "")"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
+                            <li class="nav-item"><a asp-controller="PurchaseReturns" asp-action="Index" class="nav-link @(InController("PurchaseReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Purchase Returns</p></a></li>
+                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link @(InController("Suppliers") ? "active" : "")"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
                         </ul>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
+                    <li class="nav-item @(salesOpen ? "menu-open" : "")">
+                        <a href="#" class="nav-link @(salesOpen ? "active" : "")">
                             <i class="nav-icon fas fa-cash-register"></i>
                             <p>Sales<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
-                            <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
+                            <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link @(InController("SalesInvoices") ? "active" : "")"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
+                            <li class="nav-item"><a asp-controller="SalesReturns" asp-action="Index" class="nav-link @(InController("SalesReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Sales Returns</p></a></li>
+                            <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link @(InController("Customers") ? "active" : "")"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
                         </ul>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
+                    <li class="nav-item @(accountingOpen ? "menu-open" : "")">
+                        <a href="#" class="nav-link @(accountingOpen ? "active" : "")">
                             <i class="nav-icon fas fa-book"></i>
                             <p>Accounting<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="Accounting" asp-action="ChartOfAccounts" class="nav-link"><i class="nav-icon fas fa-sitemap"></i><p>Chart of Accounts</p></a></li>
-                            <li class="nav-item"><a asp-controller="Accounting" asp-action="JournalEntries" class="nav-link"><i class="nav-icon fas fa-book-open"></i><p>Journal Entries</p></a></li>
-                            <li class="nav-item"><a asp-controller="Accounting" asp-action="Payments" class="nav-link"><i class="nav-icon fas fa-money-bill-wave"></i><p>Payments &amp; Receipts</p></a></li>
-                            <li class="nav-item"><a asp-controller="Accounting" asp-action="TrialBalance" class="nav-link"><i class="nav-icon fas fa-balance-scale"></i><p>Trial Balance</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="ChartOfAccounts" class="nav-link @(InAction("Accounting", "ChartOfAccounts", "CreateAccount", "EditAccount", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-sitemap"></i><p>Chart of Accounts</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="JournalEntries" class="nav-link @(InAction("Accounting", "JournalEntries", "CreateJournalEntry", "JournalEntryDetails") ? "active" : "")"><i class="nav-icon fas fa-book-open"></i><p>Journal Entries</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="Payments" class="nav-link @(InAction("Accounting", "Payments", "CreatePayment") ? "active" : "")"><i class="nav-icon fas fa-money-bill-wave"></i><p>Payments &amp; Receipts</p></a></li>
+                            <li class="nav-item"><a asp-controller="Accounting" asp-action="TrialBalance" class="nav-link @(InAction("Accounting", "TrialBalance") ? "active" : "")"><i class="nav-icon fas fa-balance-scale"></i><p>Trial Balance</p></a></li>
                         </ul>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
+                    <li class="nav-item @(reportsOpen ? "menu-open" : "")">
+                        <a href="#" class="nav-link @(reportsOpen ? "active" : "")">
                             <i class="nav-icon fas fa-chart-line"></i>
                             <p>Reports<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="Reports" asp-action="StockValuation" class="nav-link"><i class="nav-icon fas fa-warehouse"></i><p>Stock Valuation</p></a></li>
-                            <li class="nav-item"><a asp-controller="Reports" asp-action="ReorderSuggestions" class="nav-link"><i class="nav-icon fas fa-robot"></i><p>AI Reorder Suggestions</p></a></li>
+                            <li class="nav-item"><a asp-controller="Reports" asp-action="StockValuation" class="nav-link @(InAction("Reports", "StockValuation") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Stock Valuation</p></a></li>
+                            <li class="nav-item"><a asp-controller="Reports" asp-action="ReorderSuggestions" class="nav-link @(InAction("Reports", "ReorderSuggestions") ? "active" : "")"><i class="nav-icon fas fa-robot"></i><p>AI Reorder Suggestions</p></a></li>
+                            <li class="nav-item"><a asp-controller="Reports" asp-action="SalesProfitability" class="nav-link @(InAction("Reports", "SalesProfitability") ? "active" : "")"><i class="nav-icon fas fa-chart-pie"></i><p>Sales Profitability</p></a></li>
                         </ul>
                     </li>
 
@@ -168,19 +193,19 @@
                     {
                         <li class="nav-header">ADMINISTRATION</li>
                         <li class="nav-item">
-                            <a asp-controller="Users" asp-action="Index" class="nav-link">
+                            <a asp-controller="Users" asp-action="Index" class="nav-link @(InController("Users") ? "active" : "")">
                                 <i class="nav-icon fas fa-user-shield"></i>
                                 <p>Users &amp; Roles</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a asp-controller="Permissions" asp-action="Index" class="nav-link">
+                            <a asp-controller="Permissions" asp-action="Index" class="nav-link @(InController("Permissions") ? "active" : "")">
                                 <i class="nav-icon fas fa-shield-halved"></i>
                                 <p>Role Permissions</p>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a asp-controller="CompanySettings" asp-action="Index" class="nav-link">
+                            <a asp-controller="CompanySettings" asp-action="Index" class="nav-link @(InController("CompanySettings") ? "active" : "")">
                                 <i class="nav-icon fas fa-building"></i>
                                 <p>Company Settings</p>
                             </a>

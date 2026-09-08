@@ -22,7 +22,7 @@ public class ForecastService(ApplicationDbContext db) : IForecastService
         public float[] Forecast { get; set; } = [];
     }
 
-    public async Task<List<ReorderSuggestion>> GetReorderSuggestionsAsync(int? warehouseId = null)
+    public async Task<List<ReorderSuggestion>> GetReorderSuggestionsAsync(List<int>? warehouseIds = null)
     {
         var since = DateTime.UtcNow.Date.AddDays(-HistoryDays);
 
@@ -31,11 +31,13 @@ public class ForecastService(ApplicationDbContext db) : IForecastService
             .ToListAsync();
 
         Dictionary<int, decimal> stockByProduct;
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             stockByProduct = await db.ProductWarehouseStocks
-                .Where(s => s.WarehouseId == warehouseId)
-                .ToDictionaryAsync(s => s.ProductId, s => s.Quantity);
+                .Where(s => warehouseIds.Contains(s.WarehouseId))
+                .GroupBy(s => s.ProductId)
+                .Select(g => new { ProductId = g.Key, Quantity = g.Sum(s => s.Quantity) })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
         }
         else
         {
@@ -44,9 +46,9 @@ public class ForecastService(ApplicationDbContext db) : IForecastService
 
         var salesQuery = db.SalesInvoiceItems
             .Where(i => i.SalesInvoice!.Date >= since);
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
-            salesQuery = salesQuery.Where(i => i.SalesInvoice!.WarehouseId == warehouseId);
+            salesQuery = salesQuery.Where(i => warehouseIds.Contains(i.SalesInvoice!.WarehouseId));
         }
 
         var salesByProduct = await salesQuery

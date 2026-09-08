@@ -1,4 +1,4 @@
-@model List<StockTransfer>
+@model PagedList<StockTransfer>
 @inject IAuthorizationService AuthorizationService
 @{
     ViewData["Title"] = "Stock Transfers";
@@ -38,4 +38,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

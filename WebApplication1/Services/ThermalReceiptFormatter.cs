@@ -28,10 +28,21 @@ public static class ThermalReceiptFormatter
             lines.Add(Separator('-'));
         }
 
-        foreach (var item in items)
+        if (items.Count > 0)
         {
+            lines.Add(TwoColumn("ITEM", "AMOUNT"));
+            lines.Add(Separator('-'));
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
             lines.Add(TwoColumn(item.ProductName, item.LineTotal));
             lines.Add($"  {item.Sku}  {item.Quantity} x {item.UnitPrice}".TrimEnd());
+            if (i < items.Count - 1)
+            {
+                lines.Add(string.Empty);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(header.Notes))

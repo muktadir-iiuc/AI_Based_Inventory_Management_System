@@ -1,4 +1,4 @@
-@model List<Category>
+@model PagedList<Category>
 @{
     ViewData["Title"] = "Categories";
 }
@@ -57,4 +57,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

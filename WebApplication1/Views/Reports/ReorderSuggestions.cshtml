@@ -1,7 +1,7 @@
-@model List<ReorderSuggestion>
+@model PagedList<ReorderSuggestion>
 @{
     ViewData["Title"] = "AI Reorder Suggestions";
-    var toReorder = Model.Count(r => r.ShouldReorder);
+    var toReorder = (int)ViewData["ReorderCount"]!;
 }
 
 <div class="alert alert-info">
@@ -9,9 +9,9 @@
     Demand is forecast per product from up to 90 days of sales history using an ML.NET SSA (Singular Spectrum Analysis) time-series
     model, falling back to a 14-day moving average when a product doesn't yet have enough history.
     <strong>@toReorder</strong> product(s) currently need reordering.
-    @if (User.GetWarehouseId().HasValue)
+    @if (User.GetWarehouseIds() is not null)
     {
-        <span>Figures are scoped to your assigned warehouse.</span>
+        <span>Figures are scoped to your assigned warehouse(s).</span>
     }
 </div>
 
@@ -53,4 +53,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

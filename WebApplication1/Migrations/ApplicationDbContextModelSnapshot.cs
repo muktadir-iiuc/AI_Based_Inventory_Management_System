@@ -424,9 +424,6 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<int?>("WarehouseId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -436,8 +433,6 @@ namespace WebApplication1.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex")
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
-
-                    b.HasIndex("WarehouseId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -464,6 +459,21 @@ namespace WebApplication1.Migrations
                         .IsUnique();
 
                     b.ToTable("RolePermissions");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Identity.UserWarehouse", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "WarehouseId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("UserWarehouses");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.Category", b =>
@@ -558,6 +568,76 @@ namespace WebApplication1.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Inventory.ProductBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BatchNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("OriginalQuantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("PurchaseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PurchaseInvoiceItemId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PurchasePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<decimal>("SalePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("PurchaseInvoiceItemId")
+                        .IsUnique()
+                        .HasFilter("[PurchaseInvoiceItemId] IS NOT NULL");
+
+                    b.HasIndex("RemainingQuantity");
+
+                    b.HasIndex("WarehouseId", "ProductId", "PurchaseDate");
+
+                    b.ToTable("ProductBatches");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Inventory.ProductWarehouseStock", b =>
                 {
                     b.Property<int>("Id")
@@ -593,6 +673,9 @@ namespace WebApplication1.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
@@ -612,10 +695,18 @@ namespace WebApplication1.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("UnitSalePrice")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("ProductId");
 
@@ -828,6 +919,9 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("SalePrice")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
 
@@ -838,6 +932,72 @@ namespace WebApplication1.Migrations
                     b.HasIndex("PurchaseInvoiceId");
 
                     b.ToTable("PurchaseInvoiceItems");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseReturn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PurchaseInvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("ReturnNumber")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseReturns");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseReturnItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PurchaseInvoiceItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PurchaseReturnId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseInvoiceItemId");
+
+                    b.HasIndex("PurchaseReturnId");
+
+                    b.ToTable("PurchaseReturnItems");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Purchase.Supplier", b =>
@@ -979,6 +1139,9 @@ namespace WebApplication1.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
@@ -996,11 +1159,82 @@ namespace WebApplication1.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BatchId");
+
                     b.HasIndex("ProductId");
 
                     b.HasIndex("SalesInvoiceId");
 
                     b.ToTable("SalesInvoiceItems");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.SalesReturn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("SalesInvoiceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesReturns");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.SalesReturnItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SalesInvoiceItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SalesReturnId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesInvoiceItemId");
+
+                    b.HasIndex("SalesReturnId");
+
+                    b.ToTable("SalesReturnItems");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1090,12 +1324,21 @@ namespace WebApplication1.Migrations
                     b.Navigation("SalesInvoice");
                 });
 
-            modelBuilder.Entity("WebApplication1.Models.Identity.ApplicationUser", b =>
+            modelBuilder.Entity("WebApplication1.Models.Identity.UserWarehouse", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Identity.ApplicationUser", "User")
+                        .WithMany("UserWarehouses")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("WebApplication1.Models.Inventory.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
 
                     b.Navigation("Warehouse");
                 });
@@ -1119,6 +1362,32 @@ namespace WebApplication1.Migrations
                     b.Navigation("UnitOfMeasure");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Inventory.ProductBatch", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Purchase.PurchaseInvoiceItem", "PurchaseInvoiceItem")
+                        .WithOne("Batch")
+                        .HasForeignKey("WebApplication1.Models.Inventory.ProductBatch", "PurchaseInvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WebApplication1.Models.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("PurchaseInvoiceItem");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Inventory.ProductWarehouseStock", b =>
                 {
                     b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
@@ -1140,6 +1409,11 @@ namespace WebApplication1.Migrations
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.StockTransaction", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Inventory.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
                         .WithMany("StockTransactions")
                         .HasForeignKey("ProductId")
@@ -1151,6 +1425,8 @@ namespace WebApplication1.Migrations
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
 
@@ -1233,6 +1509,36 @@ namespace WebApplication1.Migrations
                     b.Navigation("PurchaseInvoice");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseReturn", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Purchase.PurchaseInvoice", "PurchaseInvoice")
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseInvoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseReturnItem", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Purchase.PurchaseInvoiceItem", "PurchaseInvoiceItem")
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Purchase.PurchaseReturn", "PurchaseReturn")
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseInvoiceItem");
+
+                    b.Navigation("PurchaseReturn");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Sales.SalesInvoice", b =>
                 {
                     b.HasOne("WebApplication1.Models.Sales.Customer", "Customer")
@@ -1254,6 +1560,11 @@ namespace WebApplication1.Migrations
 
             modelBuilder.Entity("WebApplication1.Models.Sales.SalesInvoiceItem", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Inventory.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
                         .WithMany("SalesInvoiceItems")
                         .HasForeignKey("ProductId")
@@ -1266,9 +1577,41 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Batch");
+
                     b.Navigation("Product");
 
                     b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.SalesReturn", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Sales.SalesInvoice", "SalesInvoice")
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.SalesReturnItem", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Sales.SalesInvoiceItem", "SalesInvoiceItem")
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Sales.SalesReturn", "SalesReturn")
+                        .WithMany("Items")
+                        .HasForeignKey("SalesReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoiceItem");
+
+                    b.Navigation("SalesReturn");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Accounting.Account", b =>
@@ -1279,6 +1622,11 @@ namespace WebApplication1.Migrations
             modelBuilder.Entity("WebApplication1.Models.Accounting.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Identity.ApplicationUser", b =>
+                {
+                    b.Navigation("UserWarehouses");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.Category", b =>
@@ -1319,6 +1667,16 @@ namespace WebApplication1.Migrations
                     b.Navigation("Payments");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseInvoiceItem", b =>
+                {
+                    b.Navigation("Batch");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseReturn", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Purchase.Supplier", b =>
                 {
                     b.Navigation("PurchaseInvoices");
@@ -1334,6 +1692,11 @@ namespace WebApplication1.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.SalesReturn", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

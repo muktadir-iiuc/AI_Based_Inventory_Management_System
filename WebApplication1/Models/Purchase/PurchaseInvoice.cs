@@ -54,6 +54,13 @@ public class PurchaseInvoiceItem
     [Column(TypeName = "decimal(18,2)")]
     public decimal UnitPrice { get; set; }
 
+    // The price the resulting batch will sell at — see ProductBatch. Not the same as
+    // Product.SalePrice, which is only a suggested default shown when creating this line.
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal SalePrice { get; set; }
+
+    public ProductBatch? Batch { get; set; }
+
     [NotMapped]
     public decimal LineTotal => Quantity * UnitPrice;
 }

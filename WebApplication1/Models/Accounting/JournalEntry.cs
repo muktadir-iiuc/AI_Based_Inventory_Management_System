@@ -8,7 +8,9 @@ public enum JournalSource
     PurchaseInvoice = 2,
     SalesInvoice = 3,
     Payment = 4,
-    Reversal = 5
+    Reversal = 5,
+    SalesReturn = 6,
+    PurchaseReturn = 7
 }
 
 public class JournalEntry

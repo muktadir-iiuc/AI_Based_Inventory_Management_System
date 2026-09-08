@@ -17,12 +17,13 @@ public class UsersController(
 {
     private static readonly string[] UnrestrictedRoles = [Roles.Admin, Roles.Manager];
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
-        var users = userManager.Users.Include(u => u.Warehouse).OrderBy(u => u.Email).ToList();
-        var items = new List<UserListItem>();
+        var pagedUsers = await PagedList<ApplicationUser>.CreateAsync(
+            userManager.Users.Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email), page);
 
-        foreach (var user in users)
+        var items = new List<UserListItem>();
+        foreach (var user in pagedUsers)
         {
             var roles = await userManager.GetRolesAsync(user);
             items.Add(new UserListItem
@@ -32,11 +33,11 @@ public class UsersController(
                 FullName = user.FullName,
                 IsActive = user.IsActive,
                 Roles = roles.ToList(),
-                WarehouseName = user.Warehouse?.Name
+                WarehouseNames = user.UserWarehouses.Select(uw => uw.Warehouse!.Name).OrderBy(n => n).ToList()
             });
         }
 
-        return View(items);
+        return View(new PagedList<UserListItem>(items, pagedUsers.Paging.TotalCount, pagedUsers.Paging.PageNumber, pagedUsers.Paging.PageSize));
     }
 
     public async Task<IActionResult> Create()
@@ -50,7 +51,8 @@ public class UsersController(
     public async Task<IActionResult> Create(UserCreateViewModel model)
     {
         model.Roles = model.Roles.Distinct().ToList();
-        ValidateRolesAndWarehouse(model.Roles, model.WarehouseId);
+        model.WarehouseIds = model.WarehouseIds.Distinct().ToList();
+        ValidateRolesAndWarehouses(model.Roles, model.WarehouseIds);
 
         if (!ModelState.IsValid)
         {
@@ -64,8 +66,7 @@ public class UsersController(
             Email = model.Email,
             FullName = model.FullName,
             EmailConfirmed = true,
-            IsActive = true,
-            WarehouseId = IsUnrestricted(model.Roles) ? null : model.WarehouseId
+            IsActive = true
         };
 
         var result = await userManager.CreateAsync(user, model.Password);
@@ -80,13 +81,20 @@ public class UsersController(
         }
 
         await userManager.AddToRolesAsync(user, model.Roles);
+
+        if (!IsUnrestricted(model.Roles))
+        {
+            db.UserWarehouses.AddRange(model.WarehouseIds.Select(id => new UserWarehouse { UserId = user.Id, WarehouseId = id }));
+            await db.SaveChangesAsync();
+        }
+
         TempData["Success"] = "User created.";
         return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Edit(string id)
     {
-        var user = await userManager.FindByIdAsync(id);
+        var user = await userManager.Users.Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
 
         var roles = await userManager.GetRolesAsync(user);
@@ -98,7 +106,7 @@ public class UsersController(
             FullName = user.FullName,
             IsActive = user.IsActive,
             Roles = roles.ToList(),
-            WarehouseId = user.WarehouseId
+            WarehouseIds = user.UserWarehouses.Select(uw => uw.WarehouseId).ToList()
         });
     }
 
@@ -109,7 +117,8 @@ public class UsersController(
         if (id != model.Id) return NotFound();
 
         model.Roles = model.Roles.Distinct().ToList();
-        ValidateRolesAndWarehouse(model.Roles, model.WarehouseId);
+        model.WarehouseIds = model.WarehouseIds.Distinct().ToList();
+        ValidateRolesAndWarehouses(model.Roles, model.WarehouseIds);
 
         if (!ModelState.IsValid)
         {
@@ -117,14 +126,13 @@ public class UsersController(
             return View(model);
         }
 
-        var user = await userManager.FindByIdAsync(id);
+        var user = await userManager.Users.Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
 
         user.FullName = model.FullName;
         user.IsActive = model.IsActive;
         user.Email = model.Email;
         user.UserName = model.Email;
-        user.WarehouseId = IsUnrestricted(model.Roles) ? null : model.WarehouseId;
         await userManager.UpdateAsync(user);
 
         var currentRoles = await userManager.GetRolesAsync(user);
@@ -140,13 +148,23 @@ public class UsersController(
             await userManager.AddToRolesAsync(user, toAdd);
         }
 
+        List<int> desiredWarehouseIds = IsUnrestricted(model.Roles) ? [] : model.WarehouseIds;
+        var currentWarehouseIds = user.UserWarehouses.Select(uw => uw.WarehouseId).ToList();
+        var warehousesToRemove = user.UserWarehouses.Where(uw => !desiredWarehouseIds.Contains(uw.WarehouseId)).ToList();
+        var warehousesToAdd = desiredWarehouseIds.Except(currentWarehouseIds)
+            .Select(wid => new UserWarehouse { UserId = user.Id, WarehouseId = wid });
+
+        db.UserWarehouses.RemoveRange(warehousesToRemove);
+        db.UserWarehouses.AddRange(warehousesToAdd);
+        await db.SaveChangesAsync();
+
         TempData["Success"] = "User updated.";
         return RedirectToAction(nameof(Index));
     }
 
     private static bool IsUnrestricted(List<string> roles) => roles.Any(UnrestrictedRoles.Contains);
 
-    private void ValidateRolesAndWarehouse(List<string> roles, int? warehouseId)
+    private void ValidateRolesAndWarehouses(List<string> roles, List<int> warehouseIds)
     {
         if (roles.Count == 0)
         {
@@ -154,9 +172,9 @@ public class UsersController(
             return;
         }
 
-        if (!IsUnrestricted(roles) && warehouseId is null)
+        if (!IsUnrestricted(roles) && warehouseIds.Count == 0)
         {
-            ModelState.AddModelError(nameof(UserCreateViewModel.WarehouseId), "This role combination must be assigned to a warehouse.");
+            ModelState.AddModelError(nameof(UserCreateViewModel.WarehouseIds), "This role combination must be assigned to at least one warehouse.");
         }
     }
 

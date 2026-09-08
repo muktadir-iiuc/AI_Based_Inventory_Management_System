@@ -6,7 +6,8 @@ namespace WebApplication1.Services;
 
 public class StockService(ApplicationDbContext db) : IStockService
 {
-    public async Task ReceiveStockAsync(int productId, int warehouseId, decimal quantity, string reference, string? notes = null)
+    public async Task ReceiveStockAsync(int productId, int warehouseId, decimal quantity, string reference,
+        ProductBatch? batch = null, decimal? unitCost = null, decimal? unitSalePrice = null, string? notes = null)
     {
         var product = await db.Products.FirstAsync(p => p.Id == productId);
         product.CurrentStock += quantity;
@@ -21,11 +22,15 @@ public class StockService(ApplicationDbContext db) : IStockService
             Type = StockTransactionType.In,
             Quantity = quantity,
             Reference = reference,
+            Batch = batch,
+            UnitCost = unitCost,
+            UnitSalePrice = unitSalePrice,
             Notes = notes
         });
     }
 
-    public async Task IssueStockAsync(int productId, int warehouseId, decimal quantity, string reference, string? notes = null)
+    public async Task IssueStockAsync(int productId, int warehouseId, decimal quantity, string reference,
+        ProductBatch? batch = null, decimal? unitCost = null, decimal? unitSalePrice = null, string? notes = null)
     {
         var product = await db.Products.FirstAsync(p => p.Id == productId);
         product.CurrentStock -= quantity;
@@ -40,6 +45,9 @@ public class StockService(ApplicationDbContext db) : IStockService
             Type = StockTransactionType.Out,
             Quantity = quantity,
             Reference = reference,
+            Batch = batch,
+            UnitCost = unitCost,
+            UnitSalePrice = unitSalePrice,
             Notes = notes
         });
     }

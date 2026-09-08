@@ -16,7 +16,7 @@ public class ChatbotController(IChatbotService chatbotService) : Controller
             return BadRequest();
         }
 
-        var answer = await chatbotService.AskAsync(request.Question, User.GetWarehouseId());
+        var answer = await chatbotService.AskAsync(request.Question, User.GetWarehouseIds());
         return Json(answer);
     }
 }

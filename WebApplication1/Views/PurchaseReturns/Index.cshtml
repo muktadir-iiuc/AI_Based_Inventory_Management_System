@@ -1,0 +1,29 @@
+@model PagedList<PurchaseReturn>
+@{
+    ViewData["Title"] = "Purchase Returns";
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead><tr><th>Return #</th><th>Invoice #</th><th>Supplier</th><th>Date</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+            @foreach (var r in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@r.Id">@r.ReturnNumber</a></td>
+                    <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@r.PurchaseInvoiceId">@r.PurchaseInvoice?.InvoiceNumber</a></td>
+                    <td>@r.PurchaseInvoice?.Supplier?.Name</td>
+                    <td>@r.Date.ToString("MMM dd, yyyy")</td>
+                    <td class="text-end">@r.TotalAmount.ToString("C")</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted py-3">No purchase returns found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Paging" />
+</div>

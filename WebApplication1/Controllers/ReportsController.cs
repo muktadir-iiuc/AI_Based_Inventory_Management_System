@@ -9,53 +9,115 @@ namespace WebApplication1.Controllers;
 
 public class ReportsController(ApplicationDbContext db, IForecastService forecastService) : Controller
 {
-    public async Task<IActionResult> StockValuation()
+    public async Task<IActionResult> StockValuation(int page = 1)
     {
-        var warehouseId = User.GetWarehouseId();
-        var vm = new StockValuationViewModel { WarehouseScoped = warehouseId.HasValue };
+        var warehouseIds = User.GetWarehouseIds();
+        var vm = new StockValuationViewModel { WarehouseScoped = warehouseIds is not null };
 
-        if (warehouseId.HasValue)
-        {
-            vm.Rows = await db.ProductWarehouseStocks
-                .Include(s => s.Product).ThenInclude(p => p!.Category)
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive)
-                .OrderBy(s => s.Product!.Category!.Name).ThenBy(s => s.Product!.Name)
-                .Select(s => new StockValuationRow
-                {
-                    ProductId = s.ProductId,
-                    Sku = s.Product!.Sku,
-                    ProductName = s.Product!.Name,
-                    CategoryName = s.Product!.Category!.Name,
-                    Stock = s.Quantity,
-                    CostPrice = s.Product!.CostPrice,
-                    SalePrice = s.Product!.SalePrice
-                }).ToListAsync();
-        }
-        else
-        {
-            vm.Rows = await db.Products
-                .Include(p => p.Category)
-                .Where(p => p.IsActive)
-                .OrderBy(p => p.Category!.Name).ThenBy(p => p.Name)
-                .Select(p => new StockValuationRow
-                {
-                    ProductId = p.Id,
-                    Sku = p.Sku,
-                    ProductName = p.Name,
-                    CategoryName = p.Category!.Name,
-                    Stock = p.CurrentStock,
-                    CostPrice = p.CostPrice,
-                    SalePrice = p.SalePrice
-                }).ToListAsync();
-        }
+        var rows = await BuildStockValuationRowsAsync(warehouseIds);
+
+        vm.TotalCostValue = rows.Sum(r => r.ValueAtCost);
+        vm.TotalSaleValue = rows.Sum(r => r.ValueAtSalePrice);
+        vm.Rows = PagedList<StockValuationRow>.Create(rows, page);
 
         return View(vm);
     }
 
-    public async Task<IActionResult> ReorderSuggestions()
+    // Cost/sale price are now per-batch, not a single Product field, so a product with several
+    // batches at different prices shows a stock-weighted average here — chosen so ValueAtCost
+    // (Stock * CostPrice) still reconstructs the true total batch value exactly, matching §21's
+    // "sum of each batch's remaining qty × its own price".
+    private async Task<List<StockValuationRow>> BuildStockValuationRowsAsync(List<int>? warehouseIds)
     {
-        var warehouseId = User.GetWarehouseId();
-        var suggestions = await forecastService.GetReorderSuggestionsAsync(warehouseId);
-        return View(suggestions);
+        var batchQuery = db.ProductBatches.Where(b => b.IsActive);
+        if (warehouseIds is not null)
+        {
+            batchQuery = batchQuery.Where(b => warehouseIds.Contains(b.WarehouseId));
+        }
+
+        var batchTotals = await batchQuery
+            .GroupBy(b => b.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                Stock = g.Sum(b => b.RemainingQuantity),
+                CostValue = g.Sum(b => b.RemainingQuantity * b.PurchasePrice),
+                SaleValue = g.Sum(b => b.RemainingQuantity * b.SalePrice)
+            })
+            .ToDictionaryAsync(x => x.ProductId);
+
+        var products = await db.Products
+            .Include(p => p.Category)
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Category!.Name).ThenBy(p => p.Name)
+            .ToListAsync();
+
+        return products.Select(p =>
+        {
+            batchTotals.TryGetValue(p.Id, out var t);
+            var stock = t?.Stock ?? 0;
+            return new StockValuationRow
+            {
+                ProductId = p.Id,
+                Sku = p.Sku,
+                ProductName = p.Name,
+                CategoryName = p.Category?.Name,
+                Stock = stock,
+                CostPrice = stock > 0 ? t!.CostValue / stock : 0,
+                SalePrice = stock > 0 ? t!.SaleValue / stock : 0
+            };
+        }).ToList();
+    }
+
+    public async Task<IActionResult> ReorderSuggestions(int page = 1)
+    {
+        var warehouseIds = User.GetWarehouseIds();
+        var suggestions = await forecastService.GetReorderSuggestionsAsync(warehouseIds);
+        ViewData["ReorderCount"] = suggestions.Count(r => r.ShouldReorder);
+        return View(PagedList<ReorderSuggestion>.Create(suggestions, page));
+    }
+
+    // One row per batch allocation actually sold — Unit Cost/Unit Sale Price are the exact
+    // prices frozen on that SalesInvoiceItem at the time of sale (see §7: historical prices
+    // never change because a batch's price changed later), so Profit here is always real.
+    public async Task<IActionResult> SalesProfitability(int page = 1)
+    {
+        var warehouseIds = User.GetWarehouseIds();
+
+        var query = db.SalesInvoiceItems
+            .Include(i => i.SalesInvoice)
+            .Include(i => i.Product)
+            .Include(i => i.Batch)
+            .Where(i => i.SalesInvoice!.Status == Models.Purchase.DocumentStatus.Posted);
+
+        if (warehouseIds is not null)
+        {
+            query = query.Where(i => warehouseIds.Contains(i.SalesInvoice!.WarehouseId));
+        }
+
+        var rows = await query
+            .OrderByDescending(i => i.SalesInvoice!.Date).ThenByDescending(i => i.Id)
+            .Select(i => new SalesProfitabilityRow
+            {
+                Date = i.SalesInvoice!.Date,
+                InvoiceNumber = i.SalesInvoice!.InvoiceNumber,
+                ProductName = i.Product!.Name,
+                BatchNumber = i.Batch != null ? i.Batch.BatchNumber : null,
+                Quantity = i.Quantity,
+                UnitCost = i.UnitCost,
+                UnitPrice = i.UnitPrice
+            })
+            .ToListAsync();
+
+        var vm = new SalesProfitabilityViewModel
+        {
+            WarehouseScoped = warehouseIds is not null,
+            TotalSales = rows.Sum(r => r.SalesAmount),
+            TotalCost = rows.Sum(r => r.CostAmount),
+            TotalProfit = rows.Sum(r => r.Profit),
+            Rows = PagedList<SalesProfitabilityRow>.Create(rows, page)
+        };
+
+        return View(vm);
     }
 }

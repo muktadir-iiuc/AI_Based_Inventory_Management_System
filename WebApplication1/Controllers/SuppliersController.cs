@@ -4,12 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Purchase;
+using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
 public class SuppliersController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> Index(string? search, int page = 1)
     {
         var query = db.Suppliers.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -17,7 +18,7 @@ public class SuppliersController(ApplicationDbContext db) : Controller
             query = query.Where(s => s.Name.Contains(search));
         }
         ViewData["Search"] = search;
-        return View(await query.OrderBy(s => s.Name).ToListAsync());
+        return View(await PagedList<Supplier>.CreateAsync(query.OrderBy(s => s.Name), page));
     }
 
     public async Task<IActionResult> Details(int id)

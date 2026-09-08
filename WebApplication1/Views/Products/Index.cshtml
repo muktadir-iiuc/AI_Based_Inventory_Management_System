@@ -1,4 +1,4 @@
-@model List<Product>
+@model PagedList<Product>
 @{
     ViewData["Title"] = "Products";
     var categoryList = (SelectList)ViewData["CategoryId"]!;
@@ -32,7 +32,8 @@
             <thead>
                 <tr>
                     <th>SKU</th><th>Name</th><th>Category</th><th>Unit</th>
-                    <th class="text-end">Cost</th><th class="text-end">Price</th>
+                    <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Last Cost</th>
+                    <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Default Price</th>
                     <th class="text-end">Stock</th><th></th>
                 </tr>
             </thead>
@@ -71,4 +72,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Paging" />
 </div>

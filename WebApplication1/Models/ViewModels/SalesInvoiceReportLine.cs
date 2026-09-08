@@ -30,6 +30,10 @@ public class SalesInvoiceReportHeader
     public string PaidAmount { get; set; } = string.Empty;
     public string DueAmount { get; set; } = string.Empty;
 
+    // Customer's total outstanding balance across all their sales invoices (this one included),
+    // shown on the thermal receipt below the per-invoice Balance Due.
+    public string CustomerOutstandingDue { get; set; } = string.Empty;
+
     public static readonly byte[] TransparentPixel = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
 }
@@ -51,3 +55,5 @@ public class SalesInvoiceThermalLine
 {
     public string Text { get; set; } = string.Empty;
 }
+
+public record ThermalReceiptPreviewViewModel(int SalesInvoiceId, string InvoiceNumber);

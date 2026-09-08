@@ -14,18 +14,18 @@ namespace WebApplication1.Controllers;
 
 public class StockTransfersController(ApplicationDbContext db, IStockService stockService, IActivityNotifier notifier) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
-        var warehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         var query = db.StockTransfers.Include(t => t.FromWarehouse).Include(t => t.ToWarehouse).AsQueryable();
 
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
-            query = query.Where(t => t.FromWarehouseId == warehouseId || t.ToWarehouseId == warehouseId);
+            query = query.Where(t => warehouseIds.Contains(t.FromWarehouseId) || warehouseIds.Contains(t.ToWarehouseId));
         }
 
-        return View(await query.Include(t => t.Items)
-            .OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
+        return View(await PagedList<StockTransfer>.CreateAsync(
+            query.Include(t => t.Items).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id), page));
     }
 
     public async Task<IActionResult> Details(int id)
@@ -37,6 +37,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (transfer is null) return NotFound();
+        if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
         return View(transfer);
     }
 
@@ -44,11 +45,11 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
     public async Task<IActionResult> Create()
     {
         await PopulateDropdownsAsync();
-        var scopedWarehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
         return View(new StockTransferCreateViewModel
         {
             Items = [new TransferLineInput()],
-            FromWarehouseId = scopedWarehouseId ?? 0
+            FromWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : 0
         });
     }
 
@@ -63,13 +64,6 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             ModelState.AddModelError(string.Empty, "Add at least one product line.");
         }
 
-        // A warehouse-scoped user can only move stock out of their own warehouse.
-        var scopedWarehouseId = User.GetWarehouseId();
-        if (scopedWarehouseId.HasValue)
-        {
-            model.FromWarehouseId = scopedWarehouseId.Value;
-        }
-
         if (model.FromWarehouseId == model.ToWarehouseId)
         {
             ModelState.AddModelError(string.Empty, "The source and destination warehouse must be different.");
@@ -79,9 +73,18 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         {
             ModelState.AddModelError(nameof(model.FromWarehouseId), "Please select a source warehouse.");
         }
+        else if (!User.IsWarehouseAllowed(model.FromWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.FromWarehouseId), "You are not assigned to this warehouse.");
+        }
+
         if (!await db.Warehouses.AnyAsync(w => w.Id == model.ToWarehouseId))
         {
             ModelState.AddModelError(nameof(model.ToWarehouseId), "Please select a destination warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.ToWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.ToWarehouseId), "You are not assigned to this warehouse.");
         }
 
         var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
@@ -132,8 +135,8 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
 
         foreach (var item in transfer.Items)
         {
-            await stockService.IssueStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, transfer.TransferNumber, "Transfer out");
-            await stockService.ReceiveStockAsync(item.ProductId, transfer.ToWarehouseId, item.Quantity, transfer.TransferNumber, "Transfer in");
+            await stockService.IssueStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, transfer.TransferNumber, notes: "Transfer out");
+            await stockService.ReceiveStockAsync(item.ProductId, transfer.ToWarehouseId, item.Quantity, transfer.TransferNumber, notes: "Transfer in");
         }
 
         await db.SaveChangesAsync();
@@ -157,6 +160,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
     {
         var transfer = await db.StockTransfers.Include(t => t.Items).FirstOrDefaultAsync(t => t.Id == id);
         if (transfer is null) return NotFound();
+        if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
 
         if (transfer.Status == DocumentStatus.Cancelled)
         {
@@ -181,11 +185,18 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
 
     private async Task PopulateDropdownsAsync()
     {
-        var scopedWarehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
+        var warehouses = db.Warehouses.Where(w => w.IsActive).AsQueryable();
+        if (warehouseIds is not null)
+        {
+            warehouses = warehouses.Where(w => warehouseIds.Contains(w.Id));
+        }
 
-        ViewData["Warehouses"] = new SelectList(await db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync(), "Id", "Name");
-        ViewData["WarehouseScoped"] = scopedWarehouseId.HasValue;
-        ViewData["ScopedWarehouseId"] = scopedWarehouseId;
+        var singleWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : (int?)null;
+
+        ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name");
+        ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
+        ViewData["ScopedWarehouseId"] = singleWarehouseId;
 
         // Show stock for the scoped/source warehouse in the picker; for unscoped users this
         // reflects whichever warehouse they currently have selected as "From" on the client.

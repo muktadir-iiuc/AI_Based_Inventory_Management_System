@@ -15,51 +15,50 @@ public class HomeController(ApplicationDbContext db) : Controller
     {
         var today = DateTime.UtcNow.Date;
         var trendStart = today.AddDays(-29);
-        var warehouseId = User.GetWarehouseId();
+        var warehouseIds = User.GetWarehouseIds();
 
         var thisMonthStart = new DateTime(today.Year, today.Month, 1);
         var lastMonthStart = thisMonthStart.AddMonths(-1);
 
         var vm = new DashboardViewModel
         {
-            WarehouseScoped = warehouseId.HasValue,
+            WarehouseScoped = warehouseIds is not null,
             TotalProducts = await db.Products.CountAsync(p => p.IsActive),
             TodaySalesTotal = await db.SalesInvoiceItems
-                .Where(i => i.SalesInvoice!.Date.Date == today && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+                .Where(i => i.SalesInvoice!.Date.Date == today && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
                 .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0,
             TodayPurchasesTotal = await db.PurchaseInvoiceItems
-                .Where(i => i.PurchaseInvoice!.Date.Date == today && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId))
+                .Where(i => i.PurchaseInvoice!.Date.Date == today && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId)))
                 .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0,
             RecentSalesInvoices = await db.SalesInvoices.Include(s => s.Customer)
-                .Where(s => !warehouseId.HasValue || s.WarehouseId == warehouseId)
+                .Where(s => warehouseIds == null || warehouseIds.Contains(s.WarehouseId))
                 .OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).Take(5).ToListAsync(),
             RecentPurchaseInvoices = await db.PurchaseInvoices.Include(p => p.Supplier)
-                .Where(p => !warehouseId.HasValue || p.WarehouseId == warehouseId)
+                .Where(p => warehouseIds == null || warehouseIds.Contains(p.WarehouseId))
                 .OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).Take(5).ToListAsync(),
             ActiveCustomerCount = await db.Customers.CountAsync(c => c.IsActive),
             ActiveSupplierCount = await db.Suppliers.CountAsync(s => s.IsActive)
         };
 
-        if (warehouseId.HasValue)
+        if (warehouseIds is not null)
         {
             var lowStock = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel)
+                .Where(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel)
                 .OrderBy(s => s.Quantity)
                 .Take(6)
                 .ToListAsync();
 
             vm.LowStockCount = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
-                .CountAsync(s => s.WarehouseId == warehouseId && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel);
+                .CountAsync(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel);
             vm.OutOfStockCount = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
-                .CountAsync(s => s.WarehouseId == warehouseId && s.Product!.IsActive && s.Quantity <= 0);
+                .CountAsync(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= 0);
             vm.LowStockProducts = lowStock.Select(s => s.Product!).ToList();
-            vm.StockValue = await db.ProductWarehouseStocks
-                .Include(s => s.Product)
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive)
-                .SumAsync(s => (decimal?)(s.Quantity * s.Product!.CostPrice)) ?? 0;
+            vm.StockValue = await db.ProductBatches
+                .Where(b => warehouseIds.Contains(b.WarehouseId) && b.IsActive && b.Product!.IsActive)
+                .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
         }
         else
         {
@@ -69,9 +68,9 @@ public class HomeController(ApplicationDbContext db) : Controller
                 .Where(p => p.IsActive && p.CurrentStock <= p.ReorderLevel)
                 .OrderBy(p => p.CurrentStock)
                 .Take(6).ToListAsync();
-            vm.StockValue = await db.Products
-                .Where(p => p.IsActive)
-                .SumAsync(p => (decimal?)(p.CurrentStock * p.CostPrice)) ?? 0;
+            vm.StockValue = await db.ProductBatches
+                .Where(b => b.IsActive && b.Product!.IsActive)
+                .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
         }
 
         vm.CashBalance = await GetBalanceAsync(SystemAccountCodes.Cash, debitPositive: true);
@@ -79,21 +78,21 @@ public class HomeController(ApplicationDbContext db) : Controller
         vm.AccountsPayableBalance = await GetBalanceAsync(SystemAccountCodes.AccountsPayable, debitPositive: false);
 
         vm.ThisMonthSalesTotal = await db.SalesInvoiceItems
-            .Where(i => i.SalesInvoice!.Date >= thisMonthStart && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.SalesInvoice!.Date >= thisMonthStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
         vm.LastMonthSalesTotal = await db.SalesInvoiceItems
-            .Where(i => i.SalesInvoice!.Date >= lastMonthStart && i.SalesInvoice!.Date < thisMonthStart && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.SalesInvoice!.Date >= lastMonthStart && i.SalesInvoice!.Date < thisMonthStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
         vm.ThisMonthPurchasesTotal = await db.PurchaseInvoiceItems
-            .Where(i => i.PurchaseInvoice!.Date >= thisMonthStart && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.PurchaseInvoice!.Date >= thisMonthStart && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId)))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
         vm.LastMonthPurchasesTotal = await db.PurchaseInvoiceItems
-            .Where(i => i.PurchaseInvoice!.Date >= lastMonthStart && i.PurchaseInvoice!.Date < thisMonthStart && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.PurchaseInvoice!.Date >= lastMonthStart && i.PurchaseInvoice!.Date < thisMonthStart && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId)))
             .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
 
         var trendWindowStart = trendStart;
         vm.TopProducts = await db.SalesInvoiceItems
-            .Where(i => i.SalesInvoice!.Date >= trendWindowStart && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.SalesInvoice!.Date >= trendWindowStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
             .GroupBy(i => new { i.ProductId, i.Product!.Name, i.Product!.Sku })
             .Select(g => new TopProductStat
             {
@@ -107,36 +106,36 @@ public class HomeController(ApplicationDbContext db) : Controller
             .ToListAsync();
 
         vm.TopCustomers = await db.SalesInvoiceItems
-            .Where(i => i.SalesInvoice!.Date >= trendWindowStart && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.SalesInvoice!.Date >= trendWindowStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
             .GroupBy(i => new { i.SalesInvoice!.CustomerId, i.SalesInvoice!.Customer!.Name })
             .Select(g => new NamedValueStat { Name = g.Key.Name, Value = g.Sum(i => i.Quantity * i.UnitPrice) })
             .OrderByDescending(c => c.Value)
             .Take(5)
             .ToListAsync();
 
-        vm.CategoryBreakdown = warehouseId.HasValue
-            ? await db.ProductWarehouseStocks
-                .Where(s => s.WarehouseId == warehouseId && s.Product!.IsActive)
-                .GroupBy(s => s.Product!.Category!.Name)
-                .Select(g => new NamedValueStat { Name = g.Key, Value = g.Sum(s => s.Quantity * s.Product!.CostPrice) })
+        vm.CategoryBreakdown = warehouseIds is not null
+            ? await db.ProductBatches
+                .Where(b => warehouseIds.Contains(b.WarehouseId) && b.IsActive && b.Product!.IsActive)
+                .GroupBy(b => b.Product!.Category!.Name)
+                .Select(g => new NamedValueStat { Name = g.Key, Value = g.Sum(b => b.RemainingQuantity * b.PurchasePrice) })
                 .OrderByDescending(c => c.Value)
                 .Take(6)
                 .ToListAsync()
-            : await db.Products
-                .Where(p => p.IsActive)
-                .GroupBy(p => p.Category!.Name)
-                .Select(g => new NamedValueStat { Name = g.Key, Value = g.Sum(p => p.CurrentStock * p.CostPrice) })
+            : await db.ProductBatches
+                .Where(b => b.IsActive && b.Product!.IsActive)
+                .GroupBy(b => b.Product!.Category!.Name)
+                .Select(g => new NamedValueStat { Name = g.Key, Value = g.Sum(b => b.RemainingQuantity * b.PurchasePrice) })
                 .OrderByDescending(c => c.Value)
                 .Take(6)
                 .ToListAsync();
 
         var salesByDay = await db.SalesInvoiceItems
-            .Where(i => i.SalesInvoice!.Date >= trendStart && (!warehouseId.HasValue || i.SalesInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.SalesInvoice!.Date >= trendStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
             .GroupBy(i => i.SalesInvoice!.Date.Date)
             .Select(g => new { Date = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice) })
             .ToDictionaryAsync(x => x.Date, x => x.Total);
         var purchasesByDay = await db.PurchaseInvoiceItems
-            .Where(i => i.PurchaseInvoice!.Date >= trendStart && (!warehouseId.HasValue || i.PurchaseInvoice!.WarehouseId == warehouseId))
+            .Where(i => i.PurchaseInvoice!.Date >= trendStart && (warehouseIds == null || warehouseIds.Contains(i.PurchaseInvoice!.WarehouseId)))
             .GroupBy(i => i.PurchaseInvoice!.Date.Date)
             .Select(g => new { Date = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice) })
             .ToDictionaryAsync(x => x.Date, x => x.Total);

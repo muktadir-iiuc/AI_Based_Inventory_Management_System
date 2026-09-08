@@ -4,12 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Sales;
+using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
 public class CustomersController(ApplicationDbContext db) : Controller
 {
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> Index(string? search, int page = 1)
     {
         var query = db.Customers.AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
@@ -17,7 +18,7 @@ public class CustomersController(ApplicationDbContext db) : Controller
             query = query.Where(c => c.Name.Contains(search));
         }
         ViewData["Search"] = search;
-        return View(await query.OrderBy(c => c.Name).ToListAsync());
+        return View(await PagedList<Customer>.CreateAsync(query.OrderBy(c => c.Name), page));
     }
 
     public async Task<IActionResult> Details(int id)

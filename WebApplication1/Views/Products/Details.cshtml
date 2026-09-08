@@ -13,8 +13,8 @@
                     <dt class="col-5">Name</dt><dd class="col-7">@Model.Name</dd>
                     <dt class="col-5">Category</dt><dd class="col-7">@Model.Category?.Name</dd>
                     <dt class="col-5">Unit</dt><dd class="col-7">@Model.UnitOfMeasure?.Name (@Model.UnitOfMeasure?.Symbol)</dd>
-                    <dt class="col-5">Cost Price</dt><dd class="col-7">@Model.CostPrice.ToString("C")</dd>
-                    <dt class="col-5">Sale Price</dt><dd class="col-7">@Model.SalePrice.ToString("C")</dd>
+                    <dt class="col-5">Last Cost <small class="text-muted">(default)</small></dt><dd class="col-7">@Model.CostPrice.ToString("C")</dd>
+                    <dt class="col-5">Default Sale Price</dt><dd class="col-7">@Model.SalePrice.ToString("C")</dd>
                     <dt class="col-5">Current Stock</dt><dd class="col-7">@Model.CurrentStock.ToString("0.##") <small class="text-muted">(all warehouses)</small></dd>
                     <dt class="col-5">Reorder Level</dt><dd class="col-7">@Model.ReorderLevel.ToString("0.##")</dd>
                     <dt class="col-5">Status</dt>

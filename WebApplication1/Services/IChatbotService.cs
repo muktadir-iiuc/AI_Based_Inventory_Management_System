@@ -4,5 +4,5 @@ namespace WebApplication1.Services;
 
 public interface IChatbotService
 {
-    Task<ChatbotAnswer> AskAsync(string question, int? warehouseId);
+    Task<ChatbotAnswer> AskAsync(string question, List<int>? warehouseIds);
 }

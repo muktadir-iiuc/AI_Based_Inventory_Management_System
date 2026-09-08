@@ -1,8 +1,8 @@
 @model StockValuationViewModel
 @{
     ViewData["Title"] = "Stock Valuation";
-    var totalCostValue = Model.Rows.Sum(r => r.ValueAtCost);
-    var totalSaleValue = Model.Rows.Sum(r => r.ValueAtSalePrice);
+    var totalCostValue = Model.TotalCostValue;
+    var totalSaleValue = Model.TotalSaleValue;
 }
 
 @if (Model.WarehouseScoped)
@@ -62,4 +62,5 @@
             </tbody>
         </table>
     </div>
+    <partial name="_Pager" model="Model.Rows.Paging" />
 </div>

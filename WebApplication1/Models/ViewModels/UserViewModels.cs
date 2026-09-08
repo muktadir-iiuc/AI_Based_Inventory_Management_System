@@ -9,7 +9,7 @@ public class UserListItem
     public string FullName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public List<string> Roles { get; set; } = [];
-    public string? WarehouseName { get; set; }
+    public List<string> WarehouseNames { get; set; } = [];
 }
 
 public class UserCreateViewModel
@@ -25,7 +25,7 @@ public class UserCreateViewModel
 
     public List<string> Roles { get; set; } = [];
 
-    public int? WarehouseId { get; set; }
+    public List<int> WarehouseIds { get; set; } = [];
 }
 
 public class UserEditViewModel
@@ -42,5 +42,5 @@ public class UserEditViewModel
 
     public List<string> Roles { get; set; } = [];
 
-    public int? WarehouseId { get; set; }
+    public List<int> WarehouseIds { get; set; } = [];
 }
