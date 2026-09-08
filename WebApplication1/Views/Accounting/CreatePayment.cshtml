@@ -136,6 +136,18 @@
                 directionBadge.className = 'badge fs-6 text-bg-danger';
             }
 
+            // Switching direction leaves behind an amount (and possibly an invoice pick) that
+            // belonged to the other invoice type — clear both back to a blank slate rather than
+            // carrying over a value that no longer corresponds to anything selected.
+            document.getElementById('salesInvoiceSelect').value = '';
+            document.getElementById('purchaseInvoiceSelect').value = '';
+            document.getElementById('salesInvoiceInfo').classList.add('d-none');
+            document.getElementById('purchaseInvoiceInfo').classList.add('d-none');
+            amountInput.value = '';
+            amountManuallyEdited = false;
+            amountInput.classList.remove('is-invalid');
+            amountWarning.classList.add('d-none');
+
             // Select2 computes its width from the element's visible container, so a widget
             // initialized while hidden behind d-none ends up 0px wide; rebuild it once shown.
             document.querySelectorAll('.select2-hidden-accessible').forEach(el => {
