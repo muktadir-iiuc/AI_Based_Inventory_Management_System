@@ -5,11 +5,13 @@ using WebApplication1.Data;
 using WebApplication1.Extensions;
 using WebApplication1.Models;
 using WebApplication1.Models.Accounting;
+using WebApplication1.Models.Identity;
 using WebApplication1.Models.ViewModels;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-public class HomeController(ApplicationDbContext db) : Controller
+public class HomeController(ApplicationDbContext db, IProductPriceService priceService) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -39,6 +41,11 @@ public class HomeController(ApplicationDbContext db) : Controller
             ActiveCustomerCount = await db.Customers.CountAsync(c => c.IsActive),
             ActiveSupplierCount = await db.Suppliers.CountAsync(s => s.IsActive)
         };
+
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+        {
+            vm.PendingPriceReviewCount = await priceService.GetPendingMonthlyReviewCountAsync();
+        }
 
         if (warehouseIds is not null)
         {

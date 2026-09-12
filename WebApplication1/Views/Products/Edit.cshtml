@@ -3,6 +3,19 @@
     ViewData["Title"] = "Edit Product";
     var categoryList = (SelectList)ViewData["Categories"]!;
     var unitList = (SelectList)ViewData["Units"]!;
+    var lastPriceChange = ViewData["LastPriceChange"] as ProductPriceHistory;
+}
+
+@if (lastPriceChange is not null)
+{
+    <div class="alert alert-info col-md-8 d-flex justify-content-between align-items-center">
+        <div>
+            <strong>Last Price Change:</strong>
+            @lastPriceChange.OldPrice.ToString("C") &rarr; @lastPriceChange.NewPrice.ToString("C")
+            by @(lastPriceChange.ChangedByUser?.FullName ?? "Unknown") on @lastPriceChange.ChangedAt.ToString("dd-MMM-yyyy hh:mm tt")
+        </div>
+        <a asp-action="PriceHistory" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary">View Price History</a>
+    </div>
 }
 
 <div class="card col-md-8">

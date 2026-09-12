@@ -38,6 +38,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
 
     public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
+    public DbSet<ProductPriceHistory> ProductPriceHistories => Set<ProductPriceHistory>();
 
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
@@ -298,6 +299,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(p => p.SalesInvoice)
             .WithMany(s => s.Payments)
             .HasForeignKey(p => p.SalesInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductPriceHistory>()
+            .HasIndex(h => new { h.ProductId, h.ChangedAt });
+
+        builder.Entity<ProductPriceHistory>()
+            .HasOne(h => h.Product)
+            .WithMany()
+            .HasForeignKey(h => h.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductPriceHistory>()
+            .HasOne(h => h.ChangedByUser)
+            .WithMany()
+            .HasForeignKey(h => h.ChangedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

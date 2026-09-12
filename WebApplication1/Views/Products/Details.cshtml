@@ -26,6 +26,7 @@
             </div>
             <div class="card-footer">
                 <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+                <a asp-action="PriceHistory" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm"><i class="fas fa-clock-rotate-left"></i> Price History</a>
                 @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
                 {
                     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>

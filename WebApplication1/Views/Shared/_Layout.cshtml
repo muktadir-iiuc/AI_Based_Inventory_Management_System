@@ -1,7 +1,12 @@
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ICompanySettingsService CompanySettings
-@{ var company = await CompanySettings.GetAsync(); }
+@inject IProductPriceService ProductPriceService
+@{
+    var company = await CompanySettings.GetAsync();
+    var canReviewPrices = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer);
+    var pendingPriceReviewCount = canReviewPrices ? await ProductPriceService.GetPendingMonthlyReviewCountAsync() : 0;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -133,7 +138,7 @@
                             <p>Inventory<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="Products" asp-action="Index" class="nav-link @(InController("Products") ? "active" : "")"><i class="nav-icon fas fa-box"></i><p>Products</p></a></li>
+                            <li class="nav-item"><a asp-controller="Products" asp-action="Index" class="nav-link @(InController("Products") ? "active" : "")"><i class="nav-icon fas fa-box"></i><p>Products @if (pendingPriceReviewCount > 0) { <span class="badge text-bg-warning ms-1">@pendingPriceReviewCount</span> }</p></a></li>
                             <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link @(InController("Categories") ? "active" : "")"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
                             <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link @(InController("Units") ? "active" : "")"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
                             <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link @(InController("Warehouses") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>

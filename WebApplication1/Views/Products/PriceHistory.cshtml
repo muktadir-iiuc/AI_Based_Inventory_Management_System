@@ -1,0 +1,36 @@
+@model List<ProductPriceHistory>
+@{
+    var product = (Product)ViewData["Product"]!;
+    ViewData["Title"] = $"Price History: {product.Name}";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title mb-0">@product.Name <small class="text-muted">(@product.Sku)</small></h3>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr><th>Date/Time</th><th class="text-end">Old Price</th><th class="text-end">New Price</th><th>Changed By</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var h in Model)
+            {
+                <tr>
+                    <td>@h.ChangedAt.ToString("dd-MMM-yyyy hh:mm tt")</td>
+                    <td class="text-end">@h.OldPrice.ToString("C")</td>
+                    <td class="text-end">@h.NewPrice.ToString("C")</td>
+                    <td>@(h.ChangedByUser?.FullName ?? "Unknown")</td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="4" class="text-center text-muted py-4">No price changes recorded yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <a asp-action="Details" asp-route-id="@product.Id" class="btn btn-secondary btn-sm">Back to product</a>
+    </div>
+</div>

@@ -120,6 +120,20 @@
             </div>
         </div>
     </div>
+    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+    {
+        <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 8">
+            <a asp-controller="Products" asp-action="PendingPriceUpdates" class="text-decoration-none">
+                <div class="info-box shadow-sm @(Model.PendingPriceReviewCount > 0 ? "border border-warning" : "")">
+                    <span class="info-box-icon @(Model.PendingPriceReviewCount > 0 ? "text-bg-warning" : "text-bg-secondary")"><i class="fas fa-tag"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Monthly Price Review Pending</span>
+                        <span class="info-box-number" data-countup="@Model.PendingPriceReviewCount">0</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    }
 </div>
 
 <div class="row">

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -6,14 +7,19 @@ using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.ViewModels;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-public class ProductsController(ApplicationDbContext db) : Controller
+public class ProductsController(
+    ApplicationDbContext db,
+    IProductPriceService priceService,
+    IActivityNotifier notifier,
+    UserManager<ApplicationUser> userManager) : Controller
 {
     public async Task<IActionResult> Index(string? search, int? categoryId)
     {
-        var query = db.Products.Include(p => p.Category).Include(p => p.UnitOfMeasure).AsQueryable();
+        var query = db.Products.Include(p => p.Category).Include(p => p.UnitOfMeasure).AsQueryable().Where(p => p.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -25,7 +31,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
         }
 
         ViewData["Search"] = search;
-        ViewData["CategoryId"] = new SelectList(await db.Categories.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
+        ViewData["CategoryId"] = new SelectList(await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
 
         return View(await query.OrderBy(p => p.Name).ToListAsync());
     }
@@ -77,6 +83,7 @@ public class ProductsController(ApplicationDbContext db) : Controller
         var product = await db.Products.FindAsync(id);
         if (product is null) return NotFound();
         await PopulateDropdownsAsync();
+        ViewData["LastPriceChange"] = await priceService.GetLatestPriceChangeAsync(id);
         return View(product);
     }
 
@@ -97,17 +104,52 @@ public class ProductsController(ApplicationDbContext db) : Controller
         var product = await db.Products.FindAsync(id);
         if (product is null) return NotFound();
 
+        var userId = userManager.GetUserId(User)!;
+        var priceChange = priceService.ApplySalePriceChange(product, model.SalePrice, userId);
+
         product.Name = model.Name;
         product.Description = model.Description;
         product.CategoryId = model.CategoryId;
         product.UnitOfMeasureId = model.UnitOfMeasureId;
         product.CostPrice = model.CostPrice;
-        product.SalePrice = model.SalePrice;
         product.ReorderLevel = model.ReorderLevel;
         product.IsActive = model.IsActive;
         await db.SaveChangesAsync();
+
+        if (priceChange is not null)
+        {
+            var changedByName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown";
+            await notifier.NotifyAsync(
+                "Product Price Updated",
+                $"{product.Name}: {priceChange.OldPrice:C} → {priceChange.NewPrice:C}",
+                "fas fa-tag text-success",
+                []);
+            await priceService.NotifyManagersOfPriceChangeAsync(product, priceChange, changedByName);
+        }
+
         TempData["Success"] = "Product updated.";
         return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize(Roles = Roles.PurchaseManagers)]
+    public async Task<IActionResult> PendingPriceUpdates()
+    {
+        var pending = await priceService.GetPendingMonthlyReviewQuery()
+            .Include(p => p.Category)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        ViewData["MonthLabel"] = DateTime.UtcNow.ToString("MMMM yyyy");
+        return View(pending);
+    }
+
+    public async Task<IActionResult> PriceHistory(int id)
+    {
+        var product = await db.Products.FindAsync(id);
+        if (product is null) return NotFound();
+
+        ViewData["Product"] = product;
+        return View(await priceService.GetPriceHistoryAsync(id));
     }
 
     [HttpPost]

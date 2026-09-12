@@ -6,6 +6,7 @@ public class DashboardViewModel
     public int TotalProducts { get; set; }
     public int LowStockCount { get; set; }
     public int OutOfStockCount { get; set; }
+    public int PendingPriceReviewCount { get; set; }
     public decimal TodaySalesTotal { get; set; }
     public decimal TodayPurchasesTotal { get; set; }
     public decimal CashBalance { get; set; }
