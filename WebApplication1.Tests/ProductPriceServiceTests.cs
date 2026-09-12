@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using WebApplication1.Data;
+using WebApplication1.Models.Common;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Services;
@@ -27,7 +28,9 @@ public class ProductPriceServiceTests
     {
         userManager = MockUserManager();
         emailService = new Mock<IEmailService>();
-        return new ProductPriceService(db, userManager.Object, emailService.Object, NullLogger<ProductPriceService>.Instance);
+        var companySettings = new Mock<ICompanySettingsService>();
+        companySettings.Setup(c => c.GetAsync()).ReturnsAsync(new CompanySetting { CompanyName = "Test Co" });
+        return new ProductPriceService(db, userManager.Object, emailService.Object, companySettings.Object, NullLogger<ProductPriceService>.Instance);
     }
 
     private static Product SeedProduct(ApplicationDbContext db, decimal salePrice = 100m)
@@ -165,17 +168,18 @@ public class ProductPriceServiceTests
         string? capturedSubject = null;
         string? capturedBody = null;
         emailService
-            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .Callback<string, string, string>((_, subject, body) => { capturedSubject = subject; capturedBody = body; })
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+            .Callback<string, string, string, bool>((_, subject, body, _) => { capturedSubject = subject; capturedBody = body; })
             .Returns(Task.CompletedTask);
 
         await service.NotifyManagersOfPriceChangeAsync(product, change, "Mohammad");
 
-        emailService.Verify(e => e.SendAsync("manager1@example.com", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-        emailService.Verify(e => e.SendAsync("manager2@example.com", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        emailService.Verify(e => e.SendAsync("manager1@example.com", It.IsAny<string>(), It.IsAny<string>(), true), Times.Once);
+        emailService.Verify(e => e.SendAsync("manager2@example.com", It.IsAny<string>(), It.IsAny<string>(), true), Times.Once);
         Assert.Contains(product.Name, capturedSubject);
         Assert.Contains("100", capturedBody);
         Assert.Contains("150", capturedBody);
         Assert.Contains("Mohammad", capturedBody);
+        Assert.Contains("increased by 50%", capturedBody);
     }
 }

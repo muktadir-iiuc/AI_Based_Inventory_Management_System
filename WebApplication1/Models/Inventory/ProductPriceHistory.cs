@@ -24,4 +24,11 @@ public class ProductPriceHistory
     public ApplicationUser? ChangedByUser { get; set; }
 
     public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
+
+    [NotMapped]
+    public bool PriceIncreased => NewPrice > OldPrice;
+
+    // Null when OldPrice is 0 (division by zero has no meaningful percentage).
+    [NotMapped]
+    public decimal? PercentChange => OldPrice == 0 ? null : Math.Round(Math.Abs(NewPrice - OldPrice) / OldPrice * 100, 2);
 }

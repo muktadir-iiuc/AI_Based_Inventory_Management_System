@@ -10,7 +10,7 @@ namespace WebApplication1.Services;
 // without mail server credentials configured.
 public class SmtpEmailService(IConfiguration configuration, ILogger<SmtpEmailService> logger) : IEmailService
 {
-    public async Task SendAsync(string toAddress, string subject, string body)
+    public async Task SendAsync(string toAddress, string subject, string body, bool isBodyHtml = false)
     {
         var section = configuration.GetSection("Smtp");
         var host = section["Host"];
@@ -36,7 +36,7 @@ public class SmtpEmailService(IConfiguration configuration, ILogger<SmtpEmailSer
             }
 
             var fromAddress = section["FromAddress"] ?? user ?? "noreply@localhost";
-            using var message = new MailMessage(fromAddress, toAddress, subject, body);
+            using var message = new MailMessage(fromAddress, toAddress, subject, body) { IsBodyHtml = isBodyHtml };
             await client.SendMailAsync(message);
         }
         catch (Exception ex)

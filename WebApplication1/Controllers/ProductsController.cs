@@ -119,10 +119,12 @@ public class ProductsController(
         if (priceChange is not null)
         {
             var changedByName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown";
+            var direction = priceChange.PriceIncreased ? "increased" : "decreased";
+            var icon = priceChange.PriceIncreased ? "fas fa-arrow-trend-up text-success" : "fas fa-arrow-trend-down text-danger";
             await notifier.NotifyAsync(
-                "Product Price Updated",
-                $"{product.Name}: {priceChange.OldPrice:C} → {priceChange.NewPrice:C}",
-                "fas fa-tag text-success",
+                "Sale Price Updated",
+                $"{product.Name} ({product.Sku}) sale price {direction} from {priceChange.OldPrice:C} to {priceChange.NewPrice:C} by {changedByName}.",
+                icon,
                 []);
             await priceService.NotifyManagersOfPriceChangeAsync(product, priceChange, changedByName);
         }
