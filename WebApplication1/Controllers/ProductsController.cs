@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -119,13 +120,8 @@ public class ProductsController(
         if (priceChange is not null)
         {
             var changedByName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown";
-            var direction = priceChange.PriceIncreased ? "increased" : "decreased";
             var icon = priceChange.PriceIncreased ? "fas fa-arrow-trend-up text-success" : "fas fa-arrow-trend-down text-danger";
-            await notifier.NotifyAsync(
-                "Sale Price Updated",
-                $"{product.Name} ({product.Sku}) sale price {direction} from {priceChange.OldPrice:C} to {priceChange.NewPrice:C} by {changedByName}.",
-                icon,
-                []);
+            await notifier.NotifyAsync("Sale Price Updated", BuildPriceChangeToastMessage(product, priceChange, changedByName), icon, []);
             await priceService.NotifyManagersOfPriceChangeAsync(product, priceChange, changedByName);
         }
 
@@ -179,6 +175,41 @@ public class ProductsController(
     {
         ViewData["Categories"] = new SelectList(await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
         ViewData["Units"] = new SelectList(await db.UnitOfMeasures.Where(u => u.IsActive).OrderBy(u => u.Name).ToListAsync(), "Id", "Name");
+    }
+
+    // Rendered as-is inside the live toast and the notification bell dropdown (both trust
+    // server-built HTML for their `message` field — see _Layout.cshtml's handleNotification).
+    // Product/user text is HTML-encoded since Name/Sku/FullName are free-text fields; colors use
+    // opacity/semantic classes rather than fixed shades so it reads correctly on the toast's dark
+    // background and the dropdown's light one from the same markup.
+    private static string BuildPriceChangeToastMessage(Product product, ProductPriceHistory change, string changedByName)
+    {
+        var badgeClass = change.PriceIncreased ? "text-bg-success" : "text-bg-danger";
+        var priceColorClass = change.PriceIncreased ? "text-success" : "text-danger";
+        var badgeText = change.PercentChange is { } percent
+            ? $"{(change.PriceIncreased ? "▲" : "▼")} {percent:0.##}%"
+            : change.PriceIncreased ? "Increased" : "Decreased";
+
+        var name = WebUtility.HtmlEncode(product.Name);
+        var sku = WebUtility.HtmlEncode(product.Sku);
+        var changedBy = WebUtility.HtmlEncode(changedByName);
+
+        return $"""
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="fw-semibold">{name}</span>
+                <span class="opacity-75 small">({sku})</span>
+                <span class="badge {badgeClass} ms-auto">{badgeText}</span>
+            </div>
+            <div>
+                <span class="text-decoration-line-through opacity-75">{change.OldPrice:C}</span>
+                <i class="fas fa-arrow-right-long mx-1 opacity-75"></i>
+                <span class="fw-bold {priceColorClass}">{change.NewPrice:C}</span>
+            </div>
+            <div class="opacity-75 small mt-1">by {changedBy}</div>
+            <a href="/Products/Details/{product.Id}" class="small fw-semibold text-decoration-underline d-inline-block mt-1" style="color:inherit;">
+                View product <i class="fas fa-arrow-up-right-from-square ms-1"></i>
+            </a>
+            """;
     }
 
     // Generates SKUs like "ELE-001": a 3-letter category prefix plus a per-prefix
