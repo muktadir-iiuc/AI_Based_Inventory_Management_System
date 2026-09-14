@@ -6,49 +6,76 @@
     var company = await CompanySettings.GetAsync();
 }
 
-<div class="login-logo">
-    @if (company.LogoImage is not null)
-    {
-        <div class="mb-2"><img src="@Url.Action("Logo", "CompanySettings")" alt="@company.CompanyName" style="max-height:80px; max-width:200px;" /></div>
-    }
-    <a href="#"><b>@company.CompanyName</b></a>
-</div>
-<div class="card">
-    <div class="card-body login-card-body">
-        <p class="login-box-msg">Sign in to manage purchase, sales, accounting and inventory</p>
+<div class="card px-sm-6 px-0">
+    <div class="card-body">
+        <div class="app-brand justify-content-center">
+            <a href="#" class="app-brand-link gap-2">
+                @if (company.LogoImage is not null)
+                {
+                    <img src="@Url.Action("Logo", "CompanySettings")" alt="@company.CompanyName" class="app-brand-logo demo" style="height:32px;width:auto;" />
+                }
+                <span class="app-brand-text demo text-heading fw-bold">@company.CompanyName</span>
+            </a>
+        </div>
+
+        <h4 class="mb-1">Welcome to @company.CompanyName! 👋</h4>
+        <p class="mb-6">Please sign in to your account to manage purchase, sales, accounting and inventory</p>
 
         @if (!string.IsNullOrEmpty(Model.ErrorMessage))
         {
             <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
         }
 
-        <form asp-action="Login" method="post">
+        <form asp-action="Login" method="post" class="mb-6">
             <input type="hidden" asp-for="ReturnUrl" />
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-            <div class="input-group mb-3">
-                <input asp-for="Email" class="form-control" placeholder="Email" autocomplete="username" />
-                <div class="input-group-text"><span class="fas fa-envelope"></span></div>
+            <div class="mb-6 form-control-validation">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" placeholder="Enter your email" autocomplete="username" autofocus />
+                <span asp-validation-for="Email" class="text-danger small"></span>
             </div>
-            <span asp-validation-for="Email" class="text-danger small"></span>
 
-            <div class="input-group mb-3">
-                <input asp-for="Password" class="form-control" placeholder="Password" autocomplete="current-password" />
-                <div class="input-group-text"><span class="fas fa-lock"></span></div>
+            <div class="mb-6 form-password-toggle form-control-validation">
+                <label asp-for="Password" class="form-label"></label>
+                <div class="input-group input-group-merge">
+                    <input asp-for="Password" class="form-control" placeholder="&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;" autocomplete="current-password" />
+                    <span class="input-group-text cursor-pointer"><i class="icon-base bx bx-hide"></i></span>
+                </div>
+                <span asp-validation-for="Password" class="text-danger small"></span>
             </div>
-            <span asp-validation-for="Password" class="text-danger small"></span>
 
-            <div class="row">
-                <div class="col-7">
-                    <div class="form-check">
-                        <input asp-for="RememberMe" class="form-check-input" />
-                        <label asp-for="RememberMe" class="form-check-label">Remember me</label>
-                    </div>
+            <div class="mb-7">
+                <div class="form-check mb-0">
+                    <input asp-for="RememberMe" class="form-check-input" />
+                    <label asp-for="RememberMe" class="form-check-label"></label>
                 </div>
-                <div class="col-5">
-                    <button type="submit" class="btn btn-primary w-100">Sign In</button>
-                </div>
+            </div>
+
+            <div class="mb-6">
+                <button type="submit" class="btn btn-primary d-grid w-100">Sign In</button>
             </div>
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.form-password-toggle .input-group-text').forEach(function (toggle) {
+                toggle.addEventListener('click', function () {
+                    var wrapper = toggle.closest('.form-password-toggle');
+                    var input = wrapper.querySelector('input');
+                    var icon = toggle.querySelector('i');
+                    if (input.getAttribute('type') === 'password') {
+                        input.setAttribute('type', 'text');
+                        icon.classList.replace('bx-hide', 'bx-show');
+                    } else {
+                        input.setAttribute('type', 'password');
+                        icon.classList.replace('bx-show', 'bx-hide');
+                    }
+                });
+            });
+        });
+    </script>
+}

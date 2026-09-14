@@ -1,7 +1,7 @@
 @inject ICompanySettingsService CompanySettings
 @{ var company = await CompanySettings.GetAsync(); }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,17 +10,23 @@
     {
         <link rel="icon" href="@Url.Action("Logo", "CompanySettings")" />
     }
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/lib/fontawesome-free/css/all.min.css" />
-    <link rel="stylesheet" href="~/lib/admin-lte/css/adminlte.min.css" />
+    <link rel="stylesheet" href="~/lib/sneat/css/core.css" />
+    <link rel="stylesheet" href="~/lib/sneat/css/demo.css" />
+    <link rel="stylesheet" href="~/lib/sneat/css/page-auth.css" />
+    <link rel="stylesheet" href="~/lib/sneat/fonts/iconify-icons.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="login-page bg-body-secondary">
-    <div class="login-box">
-        @RenderBody()
+<body>
+    <div class="container-xxl">
+        <div class="authentication-wrapper authentication-basic container-p-y">
+            <div class="authentication-inner">
+                @RenderBody()
+            </div>
+        </div>
     </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/lib/admin-lte/js/adminlte.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
