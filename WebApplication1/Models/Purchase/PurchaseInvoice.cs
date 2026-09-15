@@ -31,8 +31,9 @@ public class PurchaseInvoice
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Only IsCurrent lines count toward the total — see PurchaseInvoiceItem.IsCurrent.
     [NotMapped]
-    public decimal TotalAmount => Items.Sum(i => i.Quantity * i.UnitPrice);
+    public decimal TotalAmount => Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
 
     public ICollection<PurchaseInvoiceItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
@@ -60,6 +61,13 @@ public class PurchaseInvoiceItem
     public decimal SalePrice { get; set; }
 
     public ProductBatch? Batch { get; set; }
+
+    // False once this line has been superseded by an in-place Edit of the invoice. Rows are
+    // never deleted here — ProductBatch and StockTransaction both hold Restrict FKs back to
+    // this row (and its batch), so a superseded line/batch is deactivated in place instead,
+    // preserving the audit trail. Every query that reads Items for totals/business logic must
+    // filter to IsCurrent; only Create ever leaves this at its true default.
+    public bool IsCurrent { get; set; } = true;
 
     [NotMapped]
     public decimal LineTotal => Quantity * UnitPrice;

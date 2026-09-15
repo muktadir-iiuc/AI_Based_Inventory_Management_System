@@ -42,11 +42,11 @@ public class SalesInvoicesController(
             query = query.Where(s => s.CustomerId == customerId);
         }
 
-        ViewData["CustomerId"] = new SelectList(await db.Customers.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", customerId);
-        ViewData["WarehouseId"] = new SelectList(await db.Warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
+        ViewData["CustomerId"] = new SelectList(await db.Customers.Where(c => c.IsActive==true).OrderBy(c => c.Name).ToListAsync(), "Id", "Name", customerId);
+        ViewData["WarehouseId"] = new SelectList(await db.Warehouses.Where(w => w.IsActive == true).OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
         ViewData["WarehouseScoped"] = warehouseIds is not null;
 
-        return View(await query.Include(s => s.Items).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync());
+        return View(await query.Include(s => s.Items.Where(i => i.IsCurrent)).OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
@@ -54,8 +54,8 @@ public class SalesInvoicesController(
         var invoice = await db.SalesInvoices
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
-            .Include(s => s.Items).ThenInclude(i => i.Product)
-            .Include(s => s.Items).ThenInclude(i => i.Batch)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -257,7 +257,7 @@ public class SalesInvoicesController(
         var invoice = await db.SalesInvoices
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
-            .Include(s => s.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.UnitOfMeasure)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product).ThenInclude(p => p!.UnitOfMeasure)
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -340,7 +340,7 @@ public class SalesInvoicesController(
         var invoice = await db.SalesInvoices
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
-            .Include(s => s.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.UnitOfMeasure)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product).ThenInclude(p => p!.UnitOfMeasure)
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -367,6 +367,22 @@ public class SalesInvoicesController(
 
         var company = await companySettings.GetAsync();
 
+        // CreatedBy is a snapshot of the creating user's login name (email), not a display
+        // name — look up the matching account's FullName for the receipt instead of printing
+        // the raw email.
+        var servedBy = invoice.CreatedBy;
+        if (!string.IsNullOrWhiteSpace(servedBy))
+        {
+            var servedByFullName = await db.Users.AsNoTracking()
+                .Where(u => u.UserName == servedBy || u.Email == servedBy)
+                .Select(u => u.FullName)
+                .FirstOrDefaultAsync();
+            if (!string.IsNullOrWhiteSpace(servedByFullName))
+            {
+                servedBy = servedByFullName;
+            }
+        }
+
         var header = new SalesInvoiceReportHeader
         {
             CompanyName = company.CompanyName,
@@ -378,7 +394,7 @@ public class SalesInvoicesController(
             CustomerAddress = invoice.Customer?.Address ?? string.Empty,
             CustomerPhone = invoice.Customer?.Phone ?? string.Empty,
             WarehouseName = invoice.Warehouse?.Name ?? string.Empty,
-            ServedBy = string.IsNullOrWhiteSpace(invoice.CreatedBy) ? "N/A" : invoice.CreatedBy,
+            ServedBy = string.IsNullOrWhiteSpace(servedBy) ? "N/A" : servedBy,
             Notes = invoice.Notes ?? string.Empty,
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
@@ -482,7 +498,7 @@ public class SalesInvoicesController(
     public async Task<IActionResult> Cancel(int id)
     {
         var invoice = await db.SalesInvoices
-            .Include(s => s.Items).ThenInclude(i => i.Batch)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(s => s.Id == id);
         if (invoice is null) return NotFound();
         if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
@@ -519,6 +535,207 @@ public class SalesInvoicesController(
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    [Authorize(Roles = Roles.SalesManagers)]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var invoice = await db.SalesInvoices
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
+
+        var blockedReason = await EditBlockedReasonAsync(invoice);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        await PopulateDropdownsAsync();
+        var model = new SalesInvoiceCreateViewModel
+        {
+            CustomerId = invoice.CustomerId,
+            WarehouseId = invoice.WarehouseId,
+            Date = invoice.Date,
+            Notes = invoice.Notes,
+            // A single requested quantity can be split across several SalesInvoiceItem rows
+            // (one per FIFO batch it drew from) — collapse those back into one editable line
+            // per product; submitting re-runs FIFO fresh regardless of the original split.
+            Items = invoice.Items
+                .GroupBy(i => i.ProductId)
+                .Select(g => new SalesLineInput { ProductId = g.Key, Quantity = (int)g.Sum(i => i.Quantity), UnitPrice = g.First().UnitPrice })
+                .ToList()
+        };
+        ViewData["InvoiceNumber"] = invoice.InvoiceNumber;
+        ViewData["EditNotice"] = "Availability shown below reflects current stock. Submitting this edit first returns this invoice's own quantities before re-allocating, so more may end up available than the live preview suggests for unchanged lines.";
+        return View(model);
+    }
+
+    // Editing keeps the same invoice number and row rather than cancel-and-recreate: the old
+    // lines' batch quantities/stock/accounting are reversed exactly like Cancel, the old lines
+    // are deactivated in place (never deleted — SalesReturnItem holds a Restrict FK back to
+    // them, and it preserves the audit trail), then the new lines run through FIFO and post
+    // fresh, same as Create. Both StockService and AccountingService's reversal helpers track
+    // which rows they've already reversed (IsReversed), so this can safely happen more than
+    // once on the same invoice number without ever double-reversing history.
+    [HttpPost]
+    [Authorize(Roles = Roles.SalesManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, SalesInvoiceCreateViewModel model)
+    {
+        var precheck = await db.SalesInvoices
+            .Include(s => s.Items.Where(i => i.IsCurrent))
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (precheck is null) return NotFound();
+        if (!User.IsWarehouseAllowed(precheck.WarehouseId)) return Forbid();
+
+        var blockedReason = await EditBlockedReasonAsync(precheck);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        model.Items = model.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
+        if (model.Items.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Add at least one product line.");
+        }
+
+        if (model.WarehouseId <= 0 || !await db.Warehouses.AnyAsync(w => w.Id == model.WarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.WarehouseId), "Please select a warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.WarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.WarehouseId), "You are not assigned to this warehouse.");
+        }
+
+        var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await db.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateDropdownsAsync();
+            ViewData["InvoiceNumber"] = precheck.InvoiceNumber;
+            return View(model);
+        }
+
+        // FIFO allocation mutates ProductBatch.RemainingQuantity on tracked entities; see the
+        // identical retry-on-concurrency-conflict reasoning in Create.
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            var invoice = await db.SalesInvoices
+                .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
+                .FirstAsync(s => s.Id == id);
+
+            // Undo this invoice's own effect first — a line being edited down (or left
+            // unchanged) must not be blocked by its own past sale. The FIFO allocation below
+            // sees this restored quantity immediately: EF resolves the same tracked ProductBatch
+            // instances by identity rather than re-reading stale values from the database.
+            foreach (var item in invoice.Items)
+            {
+                if (item.Batch is not null)
+                {
+                    item.Batch.RemainingQuantity += item.Quantity;
+                }
+                item.IsCurrent = false;
+            }
+
+            await stockService.ReverseTransactionsForReferenceAsync(invoice.InvoiceNumber);
+            await accountingService.ReverseJournalEntriesForReferenceAsync(invoice.InvoiceNumber, "Sales invoice edited");
+
+            invoice.CustomerId = model.CustomerId;
+            invoice.WarehouseId = model.WarehouseId;
+            invoice.Date = model.Date;
+            invoice.Notes = model.Notes;
+
+            foreach (var item in model.Items)
+            {
+                List<BatchAllocation> allocations;
+                try
+                {
+                    allocations = await fifoService.AllocateAsync(item.ProductId, model.WarehouseId, item.Quantity);
+                }
+                catch (InsufficientStockException ex)
+                {
+                    ModelState.AddModelError(string.Empty, $"{products[item.ProductId].Name}: {ex.Message}");
+                    continue;
+                }
+
+                foreach (var allocation in allocations)
+                {
+                    var unitPrice = item.UnitPrice is > 0 ? item.UnitPrice.Value : allocation.Batch.SalePrice;
+
+                    invoice.Items.Add(new SalesInvoiceItem
+                    {
+                        ProductId = item.ProductId,
+                        Quantity = allocation.Quantity,
+                        UnitPrice = unitPrice,
+                        UnitCost = allocation.Batch.PurchasePrice,
+                        Batch = allocation.Batch
+                    });
+
+                    await stockService.IssueStockAsync(item.ProductId, model.WarehouseId, allocation.Quantity, invoice.InvoiceNumber,
+                        batch: allocation.Batch, unitCost: allocation.Batch.PurchasePrice, unitSalePrice: unitPrice);
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await PopulateDropdownsAsync();
+                ViewData["InvoiceNumber"] = precheck.InvoiceNumber;
+                return View(model);
+            }
+
+            await accountingService.PostSalesInvoiceAsync(invoice);
+
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < maxAttempts)
+            {
+                foreach (var entry in db.ChangeTracker.Entries().ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+                continue;
+            }
+
+            var warehouseName = (await db.Warehouses.FindAsync(invoice.WarehouseId))?.Name;
+            await notifier.NotifyAsync(
+                "Sales Invoice Edited",
+                $"{invoice.InvoiceNumber} was edited — {invoice.Items.Count(i => i.IsCurrent)} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
+                "fas fa-pen text-info",
+                [invoice.WarehouseId]);
+
+            TempData["Success"] = $"Sales invoice {invoice.InvoiceNumber} updated.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+    }
+
+    // Null when editing is allowed; otherwise the reason to show the user. Shared by both the
+    // Edit GET (so a blocked invoice never even reaches the form) and POST (re-checked in case
+    // something changed between GET and submit).
+    private async Task<string?> EditBlockedReasonAsync(SalesInvoice invoice)
+    {
+        if (invoice.Status != DocumentStatus.Posted)
+        {
+            return "Only a posted invoice can be edited.";
+        }
+
+        var itemIds = invoice.Items.Select(i => i.Id).ToList();
+        var hasReturns = await db.SalesReturnItems.AnyAsync(ri => itemIds.Contains(ri.SalesInvoiceItemId));
+        if (hasReturns)
+        {
+            return "Cannot edit: this invoice already has a return recorded against it. Use a Sales Return instead for further correction.";
+        }
+
+        return null;
+    }
+
     private async Task PopulateDropdownsAsync()
     {
         var warehouseIds = User.GetWarehouseIds();
@@ -528,7 +745,7 @@ public class SalesInvoicesController(
             warehouses = warehouses.Where(w => warehouseIds.Contains(w.Id));
         }
 
-        var warehouseList = await warehouses.OrderBy(w => w.Name).ToListAsync();
+        var warehouseList = await warehouses.Where(w => w.IsActive == true).OrderBy(w => w.Name).ToListAsync();
 
         // A readonly, locked warehouse field only makes sense when the user has exactly one
         // assigned warehouse; with several (or none — unrestricted), they still pick from a
@@ -539,7 +756,7 @@ public class SalesInvoicesController(
         var singleWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : (int?)null;
         var defaultWarehouseId = singleWarehouseId ?? warehouseList.FirstOrDefault()?.Id;
 
-        ViewData["Customers"] = new SelectList(await db.Customers.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
+        ViewData["Customers"] = new SelectList(await db.Customers.Where(c => c.IsActive == true).OrderBy(c => c.Name).ToListAsync(), "Id", "Name");
         ViewData["Warehouses"] = new SelectList(warehouseList, "Id", "Name", defaultWarehouseId);
         ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
         ViewData["DefaultWarehouseId"] = defaultWarehouseId;
@@ -558,13 +775,19 @@ public class SalesInvoicesController(
                     p.Name,
                     CurrentStock = p.WarehouseStocks.Where(s => s.WarehouseId == singleWarehouseId).Select(s => s.Quantity).FirstOrDefault(),
                     p.UnitOfMeasure!.Symbol,
+                    p.CategoryId,
                     Category = p.Category!.Name
                 }).ToListAsync();
         }
         else
         {
             ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol, Category = p.Category!.Name }).ToListAsync();
+                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name }).ToListAsync();
         }
+
+        // Line items pick a category first, then a product filtered to that category — see
+        // Views/SalesInvoices/Create.cshtml.
+        ViewData["Categories"] = await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name }).ToListAsync();
     }
 }

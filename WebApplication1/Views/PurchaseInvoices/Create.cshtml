@@ -10,7 +10,7 @@
     <div asp-validation-summary="All" class="text-danger"></div>
 
     <div class="row g-3">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card mb-3">
                 <div class="card-header">
                     <h3 class="card-title">Invoice Details</h3>
@@ -19,9 +19,14 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label asp-for="SupplierId" class="form-label required-asterisk"></label>
-                            <select asp-for="SupplierId" asp-items="supplierList" class="form-select">
-                                <option value="">-- select supplier --</option>
-                            </select>
+                            <div class="d-flex gap-2">
+                                <select asp-for="SupplierId" asp-items="supplierList" class="form-select">
+                                    <option value="">-- select supplier --</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#quickAddSupplierModal" title="Add a new supplier">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
@@ -59,11 +64,12 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 3%">#</th>
-                                <th style="width: 30%">Product</th>
-                                <th style="width: 12%">Quantity</th>
-                                <th style="width: 13%">Unit Cost</th>
-                                <th style="width: 14%">Sale Price</th>
-                                <th style="width: 18%" class="text-end">Line Total</th>
+                                <th style="width: 16%">Category</th>
+                                <th style="width: 22%">Product</th>
+                                <th style="width: 10%">Quantity</th>
+                                <th style="width: 12%">Unit Cost</th>
+                                <th style="width: 13%">Sale Price</th>
+                                <th style="width: 19%" class="text-end">Line Total</th>
                                 <th style="width: 5%"></th>
                             </tr>
                         </thead>
@@ -79,7 +85,7 @@
             </div>
         </div>
 
-        <div class="col-lg-4">
+        <div class="col-lg-3">
             <div class="card position-sticky" style="top: 1rem;">
                 <div class="card-header">
                     <h3 class="card-title">Summary</h3>
@@ -106,16 +112,69 @@
     </div>
 </form>
 
+<div class="modal fade" id="quickAddSupplierModal" tabindex="-1" aria-labelledby="quickAddSupplierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickAddSupplierModalLabel">Add New Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-danger small mb-2 d-none" id="quickSupplierError"></div>
+                <div class="mb-2">
+                    <label class="form-label required-asterisk">Name</label>
+                    <input type="text" class="form-control" id="quickSupplierName" data-enter-submit />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" class="form-control" id="quickSupplierContact" data-enter-submit />
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="quickSupplierPhone" data-enter-submit />
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="quickSupplierEmail" data-enter-submit />
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Address</label>
+                    <textarea class="form-control" rows="2" id="quickSupplierAddress"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveQuickSupplier">Save Supplier</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
+        const categories = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Categories"]));
         let rowIndex = 0;
 
-        function productOptions(selectedId) {
+        function categoryOptions() {
+            let html = '<option value="">-- select category --</option>';
+            categories.forEach(c => {
+                html += `<option value="${c.Id}">${c.Name}</option>`;
+            });
+            return html;
+        }
+
+        // Only products belonging to the row's currently selected category — this is what
+        // makes the Product dropdown cascade off the Category one.
+        function productOptionsForCategory(categoryId) {
+            if (!categoryId) {
+                return '<option value="">-- select category first --</option>';
+            }
             let html = '<option value="">-- select product --</option>';
-            products.forEach(p => {
-                const sel = (selectedId && selectedId == p.Id) ? 'selected' : '';
-                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}" ${sel}>${p.Sku} - ${p.Name}</option>`;
+            products.filter(p => p.CategoryId == categoryId).forEach(p => {
+                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}">${p.Sku} - ${p.Name}</option>`;
             });
             return html;
         }
@@ -138,9 +197,12 @@
             tr.innerHTML = `
                 <td class="row-number text-muted"></td>
                 <td>
-                    <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions()}</select>
+                    <select class="form-select category-select">${categoryOptions()}</select>
                 </td>
-                <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="1" /></td>
+                <td>
+                    <select name="Items[${rowIndex}].ProductId" class="form-select product-select" disabled>${productOptionsForCategory(null)}</select>
+                </td>
+                <td><input name="Items[${rowIndex}].Quantity" type="number" step="1" min="1" class="form-control qty-input" value="1" /></td>
                 <td><input name="Items[${rowIndex}].UnitPrice" type="number" step="0.01" min="0" class="form-control price-input" value="0" /></td>
                 <td><input name="Items[${rowIndex}].SalePrice" type="number" step="0.01" min="0" class="form-control sale-price-input" value="0" /></td>
                 <td class="text-end line-total fw-semibold">0.00</td>
@@ -151,9 +213,11 @@
             wireRow(tr);
             renumberRows();
             updateEmptyState();
+            return tr;
         }
 
         function wireRow(tr) {
+            const categorySelect = tr.querySelector('.category-select');
             const select = tr.querySelector('.product-select');
             const qty = tr.querySelector('.qty-input');
             const price = tr.querySelector('.price-input');
@@ -166,6 +230,33 @@
                 recalc();
             };
 
+            function refreshProductSelect2() {
+                const $select = jQuery(select);
+                if ($select.hasClass('select2-hidden-accessible')) {
+                    $select.select2('destroy');
+                }
+                // Reinitializing through the shared initSelect2 (rather than calling
+                // .select2() directly here) matters: it also tags the new .select2-selection
+                // element with the .data('select2Target', ...) that site.js's global
+                // open-on-focus and Enter-to-select-then-advance-focus handlers both depend
+                // on — a bare .select2({...}) call skips that tagging, silently breaking both
+                // behaviors for this field every time the category changes.
+                initSelect2(tr);
+            }
+
+            const applyCategorySelection = () => {
+                const categoryId = parseInt(categorySelect.value, 10) || null;
+                select.innerHTML = productOptionsForCategory(categoryId);
+                select.disabled = !categoryId;
+                price.value = 0;
+                salePrice.value = 0;
+                if (typeof jQuery !== 'undefined') {
+                    refreshProductSelect2();
+                }
+                recalc();
+            };
+
+            categorySelect.addEventListener('change', applyCategorySelection);
             select.addEventListener('change', applyProductSelection);
             qty.addEventListener('input', recalc);
             price.addEventListener('input', recalc);
@@ -181,6 +272,7 @@
             // Select2 replaces the native dropdown UI; its own selection events fire more
             // reliably across browsers than the plain 'change' event once it's active.
             if (typeof jQuery !== 'undefined') {
+                jQuery(categorySelect).on('select2:select select2:clear', applyCategorySelection);
                 jQuery(select).on('select2:select select2:clear', applyProductSelection);
             }
         }
@@ -202,8 +294,102 @@
             document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
         }
 
-        document.getElementById('addRow').addEventListener('click', addRow);
+        // Only the explicit "Add product line" click focuses the new row's Category box (and,
+        // via site.js's global open-on-focus handler, opens its dropdown) — the very first
+        // row, added automatically below on page load, deliberately leaves focus alone.
+        document.getElementById('addRow').addEventListener('click', () => {
+            const tr = addRow();
+            const categorySelect = tr.querySelector('.category-select');
+            const selection = jQuery(categorySelect).next('.select2-container').find('.select2-selection')[0];
+            if (selection) {
+                selection.focus();
+            }
+        });
         addRow();
+    </script>
+    <script>
+        (function () {
+            const supplierSelect = document.getElementById('SupplierId');
+            const modalEl = document.getElementById('quickAddSupplierModal');
+            const nameInput = document.getElementById('quickSupplierName');
+            const contactInput = document.getElementById('quickSupplierContact');
+            const phoneInput = document.getElementById('quickSupplierPhone');
+            const emailInput = document.getElementById('quickSupplierEmail');
+            const addressInput = document.getElementById('quickSupplierAddress');
+            const errorEl = document.getElementById('quickSupplierError');
+            const saveBtn = document.getElementById('saveQuickSupplier');
+            const token = document.querySelector('#invoiceForm input[name="__RequestVerificationToken"]').value;
+            const modal = new bootstrap.Modal(modalEl);
+
+            function resetForm() {
+                [nameInput, contactInput, phoneInput, emailInput, addressInput].forEach(el => el.value = '');
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
+
+            function showError(message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('d-none');
+            }
+
+            modalEl.addEventListener('shown.bs.modal', () => nameInput.focus());
+            modalEl.addEventListener('hidden.bs.modal', resetForm);
+
+            async function saveSupplier() {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    showError('Enter a supplier name.');
+                    nameInput.focus();
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                try {
+                    const res = await fetch('@Url.Action("QuickCreate", "Suppliers")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                        body: JSON.stringify({
+                            name: name,
+                            contactPerson: contactInput.value.trim() || null,
+                            phone: phoneInput.value.trim() || null,
+                            email: emailInput.value.trim() || null,
+                            address: addressInput.value.trim() || null
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) {
+                        showError(data.error || 'Could not add this supplier.');
+                        return;
+                    }
+
+                    const opt = document.createElement('option');
+                    opt.value = data.id;
+                    opt.textContent = data.name;
+                    supplierSelect.appendChild(opt);
+                    supplierSelect.value = data.id;
+
+                    const $select = jQuery(supplierSelect);
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                    initSelect2(supplierSelect);
+
+                    modal.hide();
+                } catch {
+                    showError('Unable to reach the server. Please try again.');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            }
+
+            saveBtn.addEventListener('click', saveSupplier);
+            modalEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && e.target.matches('input')) {
+                    e.preventDefault();
+                    saveSupplier();
+                }
+            });
+        })();
     </script>
     <partial name="_ValidationScriptsPartial" />
 }

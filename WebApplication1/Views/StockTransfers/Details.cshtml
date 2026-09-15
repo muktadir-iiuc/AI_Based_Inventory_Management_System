@@ -8,6 +8,9 @@
 @section Toolbar {
     @if (Model.Status == DocumentStatus.Posted && canTransfer)
     {
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-pen"></i> Edit
+        </a>
         <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Cancel this transfer? This will move the stock back to the source warehouse.">
             <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-ban"></i> Cancel Transfer</button>
         </form>

@@ -39,4 +39,8 @@ public class StockTransferItem
 
     [Column(TypeName = "decimal(18,2)")]
     public decimal Quantity { get; set; }
+
+    // False once this line has been superseded by an in-place Edit of the transfer. Every
+    // query that reads Items for display/business logic must filter to IsCurrent.
+    public bool IsCurrent { get; set; } = true;
 }

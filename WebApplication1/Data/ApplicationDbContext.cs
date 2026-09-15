@@ -4,6 +4,7 @@ using WebApplication1.Models.Accounting;
 using WebApplication1.Models.Common;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
+using WebApplication1.Models.PettyCash;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 
@@ -44,6 +45,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<PettyCashName> PettyCashNames => Set<PettyCashName>();
+    public DbSet<PettyCashEntry> PettyCashEntries => Set<PettyCashEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -314,6 +318,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(h => h.ChangedByUser)
             .WithMany()
             .HasForeignKey(h => h.ChangedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PettyCashName>()
+            .HasIndex(n => n.Name).IsUnique();
+
+        builder.Entity<PettyCashEntry>()
+            .HasIndex(e => e.Date);
+
+        builder.Entity<PettyCashEntry>()
+            .HasOne(e => e.PettyCashName)
+            .WithMany(n => n.Entries)
+            .HasForeignKey(e => e.PettyCashNameId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

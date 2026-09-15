@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="@(ViewData["Description"] ?? "বাংলাদেশের রাস্তায় পারফরম্যান্স, নিরাপত্তা ও স্থায়িত্বের জন্য প্রকৌশলে তৈরি নির্ভরযোগ্য টায়ার সমাধান আবিষ্কার করুন।")" />
+    <meta name="theme-color" content="#07111F" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="@ViewData["Title"]" />
+    <meta property="og:description" content="@(ViewData["Description"] ?? "বাংলাদেশের রাস্তায় পারফরম্যান্স, নিরাপত্তা ও স্থায়িত্বের জন্য প্রকৌশলে তৈরি নির্ভরযোগ্য টায়ার সমাধান আবিষ্কার করুন।")" />
+    <meta property="og:site_name" content="Bangladesh Tyre" />
+
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+    <link rel="alternate icon" type="image/x-icon" href="~/favicon.ico" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&amp;family=Poppins:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" />
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <partial name="_Header" />
+
+    <main id="main-content" role="main">
+        @RenderBody()
+    </main>
+
+    <partial name="_Footer" />
+
+    <a id="whatsappFloat" class="whatsapp-float" target="_blank" rel="noopener noreferrer"
+       href="https://wa.me/8801886264671?text=%E0%A6%B9%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%B2%E0%A7%8B%2C%20%E0%A6%86%E0%A6%AE%E0%A6%BF%20%E0%A6%9F%E0%A6%BE%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%B0%20%E0%A6%B8%E0%A6%AE%E0%A7%8D%E0%A6%AA%E0%A6%B0%E0%A7%8D%E0%A6%95%E0%A7%87%20%E0%A6%9C%E0%A6%BE%E0%A6%A8%E0%A6%A4%E0%A7%87%20%E0%A6%9A%E0%A6%BE%E0%A6%87%E0%A5%A4"
+       data-href-bn="https://wa.me/8801886264671?text=%E0%A6%B9%E0%A7%8D%E0%A6%AF%E0%A6%BE%E0%A6%B2%E0%A7%8B%2C%20%E0%A6%86%E0%A6%AE%E0%A6%BF%20%E0%A6%9F%E0%A6%BE%E0%A6%AF%E0%A6%BC%E0%A6%BE%E0%A6%B0%20%E0%A6%B8%E0%A6%AE%E0%A7%8D%E0%A6%AA%E0%A6%B0%E0%A7%8D%E0%A6%95%E0%A7%87%20%E0%A6%9C%E0%A6%BE%E0%A6%A8%E0%A6%A4%E0%A7%87%20%E0%A6%9A%E0%A6%BE%E0%A6%87%E0%A5%A4"
+       data-href-en="https://wa.me/8801886264671?text=Hello%2C%20I%27d%20like%20to%20know%20more%20about%20your%20tyres."
+       aria-label="Chat with us on WhatsApp">
+        <i class="bi bi-whatsapp" aria-hidden="true"></i>
+        <span class="whatsapp-float-label" data-i18n="whatsapp.label">হোয়াটসঅ্যাপে যোগাযোগ করুন</span>
+    </a>
+
+    <button id="backToTop" class="back-to-top" type="button" aria-label="Back to top">
+        <i class="bi bi-arrow-up" aria-hidden="true"></i>
+    </button>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

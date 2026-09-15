@@ -1,0 +1,273 @@
+@model StockTransferCreateViewModel
+@{
+    ViewData["Title"] = $"Edit Stock Transfer {ViewData["TransferNumber"]}";
+    var warehouseList = (SelectList)ViewData["Warehouses"]!;
+    var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
+}
+
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fas fa-circle-info"></i> Editing keeps the transfer number <strong>@ViewData["TransferNumber"]</strong> — saving reverses the old lines' stock effect and re-issues the lines below fresh.
+    <div class="mt-1">"Available in Source" below reflects current stock; submitting this edit first returns this transfer's own quantities to the source warehouse, so more may end up available than shown for unchanged lines.</div>
+</div>
+
+<form asp-action="Edit" method="post" id="transferForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Transfer Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="FromWarehouseId" class="form-label required-asterisk">From Warehouse</label>
+                            @if (warehouseScoped)
+                            {
+                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Value == Model.FromWarehouseId.ToString())?.Text" readonly />
+                                <input type="hidden" asp-for="FromWarehouseId" id="fromWarehouseId" />
+                            }
+                            else
+                            {
+                                <select asp-for="FromWarehouseId" asp-items="warehouseList" id="fromWarehouseId" class="form-select">
+                                    <option value="">-- select source --</option>
+                                </select>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="ToWarehouseId" class="form-label required-asterisk">To Warehouse</label>
+                            <select asp-for="ToWarehouseId" asp-items="warehouseList" id="toWarehouseId" class="form-select">
+                                <option value="">-- select destination --</option>
+                            </select>
+                            <span class="text-danger small d-none" id="sameWarehouseWarning">Source and destination must be different warehouses.</span>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12 mb-0">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <input asp-for="Notes" class="form-control" placeholder="Optional note for this transfer" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Line Items</h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
+                </div>
+                <div class="card-body p-0 table-responsive-card">
+                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 3%">#</th>
+                                <th style="width: 42%">Product</th>
+                                <th style="width: 20%">Quantity to Transfer</th>
+                                <th style="width: 20%">Available in Source</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                    <div id="emptyState" class="text-center text-muted py-4 d-none">
+                        No product lines yet — click "Add product line" to get started.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card position-sticky" style="top: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 text-muted fw-normal">Product lines</dt>
+                        <dd class="col-5 text-end" id="summaryLineCount">0</dd>
+                        <dt class="col-7 text-muted fw-normal">Total quantity</dt>
+                        <dd class="col-5 text-end" id="summaryQty">0</dd>
+                    </dl>
+                    <div class="form-text mt-1">
+                        Each line is checked against the current stock in the source warehouse — a line turns red if the requested quantity exceeds what's available.
+                    </div>
+                    <div class="alert alert-danger py-2 small mt-3 mb-0 d-none" id="shortageWarning">
+                        <i class="fas fa-triangle-exclamation"></i> One or more lines exceed available stock — adjust the quantity before posting.
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a asp-action="Details" asp-route-id="@ViewContext.RouteData.Values["id"]" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
+        const existingLines = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Items));
+        const fromWarehouseEl = document.getElementById('fromWarehouseId');
+        const toWarehouseEl = document.getElementById('toWarehouseId');
+        let rowIndex = 0;
+
+        function stockInFrom(product) {
+            const fromId = parseInt(fromWarehouseEl.value, 10);
+            const entry = (product.Stocks || []).find(s => s.WarehouseId === fromId);
+            return entry ? entry.Quantity : 0;
+        }
+
+        function productOptions(selectedId) {
+            let html = '<option value="">-- select product --</option>';
+            products.forEach(p => {
+                const sel = (selectedId && selectedId == p.Id) ? 'selected' : '';
+                html += `<option value="${p.Id}" ${sel}>${p.Sku} - ${p.Name}</option>`;
+            });
+            return html;
+        }
+
+        function updateEmptyState() {
+            const hasRows = document.querySelectorAll('#itemsBody tr').length > 0;
+            document.getElementById('itemsTable').classList.toggle('d-none', !hasRows);
+            document.getElementById('emptyState').classList.toggle('d-none', hasRows);
+        }
+
+        function renumberRows() {
+            document.querySelectorAll('#itemsBody tr').forEach((tr, i) => {
+                tr.querySelector('.row-number').textContent = i + 1;
+            });
+        }
+
+        // A prefilled row (from the transfer being edited) skips the initial shortage check —
+        // "Available in Source" still reflects this transfer's own not-yet-reversed effect
+        // until the edit is submitted, so checking it now would false-flag an untouched line.
+        function addRow(line) {
+            const tbody = document.getElementById('itemsBody');
+            const tr = document.createElement('tr');
+            const productId = line ? line.ProductId : null;
+            const qty = line ? line.Quantity : 1;
+            tr.innerHTML = `
+                <td class="row-number text-muted"></td>
+                <td>
+                    <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions(productId)}</select>
+                </td>
+                <td><input name="Items[${rowIndex}].Quantity" type="number" step="0.01" min="0.01" class="form-control qty-input" value="${qty}" /></td>
+                <td class="available-cell text-muted">&mdash;</td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+            rowIndex++;
+            wireRow(tr, !!line);
+            renumberRows();
+            updateEmptyState();
+            return tr;
+        }
+
+        function wireRow(tr, skipInitialCheck) {
+            const select = tr.querySelector('.product-select');
+            const qty = tr.querySelector('.qty-input');
+            const available = tr.querySelector('.available-cell');
+
+            function updateAvailable() {
+                const product = products.find(p => p.Id == select.value);
+                const stock = product ? stockInFrom(product) : null;
+                available.textContent = stock === null ? '—' : stock.toFixed(2);
+                checkShortage();
+            }
+
+            function checkShortage() {
+                const product = products.find(p => p.Id == select.value);
+                const stock = product ? stockInFrom(product) : null;
+                const requested = parseFloat(qty.value) || 0;
+                const short = stock !== null && requested > stock;
+                tr.classList.toggle('table-danger', short);
+                available.classList.toggle('text-danger', short);
+                available.classList.toggle('fw-semibold', short);
+                available.classList.toggle('text-muted', !short);
+                recalc();
+            }
+
+            select.addEventListener('change', updateAvailable);
+            qty.addEventListener('input', checkShortage);
+            tr.querySelector('.remove-row').addEventListener('click', () => {
+                tr.remove();
+                renumberRows();
+                updateEmptyState();
+                recalc();
+            });
+
+            initSelect2(tr);
+
+            if (typeof jQuery !== 'undefined') {
+                jQuery(select).on('select2:select select2:clear', updateAvailable);
+            }
+
+            tr.updateAvailable = updateAvailable;
+            if (!skipInitialCheck) {
+                updateAvailable();
+            } else {
+                recalc();
+            }
+        }
+
+        function recalc() {
+            const rows = document.querySelectorAll('#itemsBody tr');
+            let totalQty = 0;
+            let hasShortage = false;
+            rows.forEach(tr => {
+                totalQty += parseFloat(tr.querySelector('.qty-input').value) || 0;
+                if (tr.classList.contains('table-danger')) hasShortage = true;
+            });
+            document.getElementById('summaryLineCount').textContent = rows.length;
+            document.getElementById('summaryQty').textContent = totalQty.toFixed(2).replace(/\.00$/, '');
+            document.getElementById('shortageWarning').classList.toggle('d-none', !hasShortage);
+        }
+
+        function refreshAllRows() {
+            document.querySelectorAll('#itemsBody tr').forEach(tr => {
+                if (typeof tr.updateAvailable === 'function') tr.updateAvailable();
+            });
+        }
+
+        function checkSameWarehouse() {
+            const from = fromWarehouseEl.value;
+            const to = toWarehouseEl.value;
+            const same = !!from && !!to && from === to;
+            document.getElementById('sameWarehouseWarning').classList.toggle('d-none', !same);
+            toWarehouseEl.classList.toggle('is-invalid', same);
+        }
+
+        // Only the explicit "Add product line" click focuses the new row's Product box (and,
+        // via site.js's global open-on-focus handler, opens its dropdown) — rows prefilled
+        // from the transfer being edited, and added automatically below, leave focus alone.
+        document.getElementById('addRow').addEventListener('click', () => {
+            const tr = addRow(null);
+            const productSelect = tr.querySelector('.product-select');
+            const selection = jQuery(productSelect).next('.select2-container').find('.select2-selection')[0];
+            if (selection) {
+                selection.focus();
+            }
+        });
+        if (fromWarehouseEl.tagName === 'SELECT') {
+            fromWarehouseEl.addEventListener('change', () => { refreshAllRows(); checkSameWarehouse(); });
+            if (typeof jQuery !== 'undefined') {
+                jQuery(fromWarehouseEl).on('select2:select select2:clear', () => { refreshAllRows(); checkSameWarehouse(); });
+            }
+        }
+        toWarehouseEl.addEventListener('change', checkSameWarehouse);
+        if (typeof jQuery !== 'undefined') {
+            jQuery(toWarehouseEl).on('select2:select select2:clear', checkSameWarehouse);
+        }
+
+        if (existingLines.length > 0) {
+            existingLines.forEach(line => addRow(line));
+        } else {
+            addRow(null);
+        }
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

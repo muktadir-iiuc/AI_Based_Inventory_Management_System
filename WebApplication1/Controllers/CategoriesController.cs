@@ -12,7 +12,7 @@ public class CategoriesController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index(string? search)
     {
-        var query = db.Categories.AsQueryable();
+        var query = db.Categories.AsQueryable().Where(c => c.IsActive);
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(c => c.Name.Contains(search));

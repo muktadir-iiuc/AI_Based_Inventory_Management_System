@@ -46,8 +46,8 @@ public class PurchaseReturnsController(
     public async Task<IActionResult> Create(int purchaseInvoiceId)
     {
         var invoice = await db.PurchaseInvoices
-            .Include(i => i.Items).ThenInclude(i => i.Product)
-            .Include(i => i.Items).ThenInclude(i => i.Batch)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(i => i.Id == purchaseInvoiceId);
 
         if (invoice is null) return NotFound();
@@ -67,8 +67,8 @@ public class PurchaseReturnsController(
     public async Task<IActionResult> Create(PurchaseReturnCreateViewModel model)
     {
         var invoice = await db.PurchaseInvoices
-            .Include(i => i.Items).ThenInclude(i => i.Product)
-            .Include(i => i.Items).ThenInclude(i => i.Batch)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(i => i.Id == model.PurchaseInvoiceId);
 
         if (invoice is null) return NotFound();

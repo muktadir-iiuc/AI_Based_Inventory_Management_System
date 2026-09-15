@@ -1,0 +1,530 @@
+@{
+    ViewData["Title"] = "Petty Cash";
+    int[] denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+}
+
+<form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Note Calculator</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm align-middle mb-0" id="noteCalcTable">
+                    <thead>
+                        <tr>
+                            <th>Note</th>
+                            <th class="text-center" style="width:2rem;">×</th>
+                            <th style="width:7rem;">Qty</th>
+                            <th class="text-center" style="width:2rem;">=</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in denominations)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@d</td>
+                                <td class="text-center">×</td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm note-qty" data-denomination="@d" min="0" step="1" value="0" />
+                                </td>
+                                <td class="text-center">=</td>
+                                <td class="text-end">
+                                    <span class="note-amount" data-denomination="@d">0.00</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-top">
+                            <th colspan="4">Total</th>
+                            <th class="text-end" id="noteCalcTotal">0.00</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-cash-register text-primary me-2"></i>Petty Cash Entry</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Date</label>
+                        <input type="date" id="entryDate" class="form-control" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Name</label>
+                        <div class="d-flex align-items-stretch gap-1">
+                            <select id="entryName" class="form-select" style="width:100%;"></select>
+                            <button type="button" id="btnAddName" class="btn btn-outline-primary" title="Save the typed name to the list"><i class="fas fa-plus"></i></button>
+                            <button type="button" id="btnDeleteName" class="btn btn-outline-danger" title="Delete the selected name"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Type</label>
+                        <select id="entryType" class="form-select" style="width:100%;">
+                            <option value="0">Cash In (Income)</option>
+                            <option value="1">Cash Out (Expense)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold text-muted small text-uppercase">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">৳</span>
+                            <input type="number" id="entryAmount" class="form-control" placeholder="0.00" min="0" step="0.01" data-enter-submit />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3">
+                    <div class="text-muted small"><i class="fas fa-circle-info me-1"></i>Type the amount and press <kbd>Enter</kbd> to save this entry to the ledger below.</div>
+                    <div id="editingNotice" class="alert alert-warning py-2 px-3 mb-0 d-none d-flex align-items-center gap-3">
+                        <span id="editingNoticeText" class="small"></span>
+                        <button type="button" id="btnCancelEdit" class="btn btn-sm btn-outline-secondary text-nowrap">Cancel Edit</button>
+                    </div>
+                </div>
+                <div class="text-danger small mt-2 d-none" id="entryError"></div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">From</label>
+                        <input type="date" id="filterFrom" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-1">To</label>
+                        <input type="date" id="filterTo" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-auto" style="min-width:12rem;">
+                        <label class="form-label small mb-1">Name</label>
+                        <select id="filterName" class="form-select form-select-sm" style="width:100%;"></select>
+                    </div>
+                    <div class="col-auto" style="min-width:10rem;">
+                        <label class="form-label small mb-1">Type</label>
+                        <select id="filterType" class="form-select form-select-sm" style="width:100%;">
+                            <option value="">All Types</option>
+                            <option value="0">Cash In</option>
+                            <option value="1">Cash Out</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="btnApplyFilter" class="btn btn-primary btn-sm">Apply</button>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="btnResetFilter" class="btn btn-outline-secondary btn-sm">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3 text-center">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Income</div>
+                        <div class="fs-4 fw-bold text-success" id="summaryIncome">0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Expense</div>
+                        <div class="fs-4 fw-bold text-danger" id="summaryExpense">0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body py-2">
+                        <div class="text-muted small">Total Balance</div>
+                        <div class="fs-4 fw-bold text-primary" id="summaryBalance">0.00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>SL</th>
+                                <th>Date</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th class="text-end">Income</th>
+                                <th class="text-end">Expense</th>
+                                <th class="text-end">Balance</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entryTableBody">
+                            <tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const qtyInputs = document.querySelectorAll('.note-qty');
+            const totalEl = document.getElementById('noteCalcTotal');
+
+            function recalculate() {
+                let total = 0;
+                qtyInputs.forEach(function (input) {
+                    const denomination = Number(input.dataset.denomination);
+                    const qty = Math.max(0, Number(input.value) || 0);
+                    const amount = denomination * qty;
+                    total += amount;
+
+                    const amountEl = document.querySelector('.note-amount[data-denomination="' + denomination + '"]');
+                    if (amountEl) {
+                        amountEl.textContent = amount.toFixed(2);
+                    }
+                });
+                totalEl.textContent = total.toFixed(2);
+            }
+
+            qtyInputs.forEach(function (input, index) {
+                input.addEventListener('input', recalculate);
+                input.addEventListener('keydown', function (e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const next = qtyInputs[index + 1];
+                    if (next) {
+                        next.focus();
+                    }
+                });
+                // Select-all-on-focus for this field is handled globally by site.js
+                // (initSelectAllOnFocus), since it applies to every numeric field in the app.
+            });
+            recalculate();
+        })();
+    </script>
+    <script>
+        (function () {
+            const $ = jQuery;
+            const token = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]').value;
+
+            const entryDate = document.getElementById('entryDate');
+            const entryName = document.getElementById('entryName');
+            const entryType = document.getElementById('entryType');
+            const entryAmount = document.getElementById('entryAmount');
+            const entryError = document.getElementById('entryError');
+            const editingNotice = document.getElementById('editingNotice');
+            const editingNoticeText = document.getElementById('editingNoticeText');
+
+            const filterFrom = document.getElementById('filterFrom');
+            const filterTo = document.getElementById('filterTo');
+            const filterName = document.getElementById('filterName');
+            const filterType = document.getElementById('filterType');
+
+            const tableBody = document.getElementById('entryTableBody');
+            const summaryIncome = document.getElementById('summaryIncome');
+            const summaryExpense = document.getElementById('summaryExpense');
+            const summaryBalance = document.getElementById('summaryBalance');
+
+            let names = [];
+            let editingEntryId = null;
+
+            function todayIso() {
+                return new Date().toISOString().slice(0, 10);
+            }
+
+            function money(n) {
+                return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function showError(message) {
+                entryError.textContent = message;
+                entryError.classList.remove('d-none');
+            }
+
+            function clearError() {
+                entryError.classList.add('d-none');
+                entryError.textContent = '';
+            }
+
+            function refreshSelect2(select) {
+                const $select = $(select);
+                if ($select.hasClass('select2-hidden-accessible')) {
+                    $select.select2('destroy');
+                }
+                $select.select2({ width: '100%', tags: select === entryName });
+            }
+
+            function renderNameOptions() {
+                const entrySelected = entryName.value;
+                const filterSelected = filterName.value;
+
+                entryName.innerHTML = '';
+                names.forEach(function (n) {
+                    const opt = document.createElement('option');
+                    opt.value = n.id;
+                    opt.textContent = n.name;
+                    entryName.appendChild(opt);
+                });
+
+                filterName.innerHTML = '<option value="">All Names</option>';
+                names.forEach(function (n) {
+                    const opt = document.createElement('option');
+                    opt.value = n.id;
+                    opt.textContent = n.name;
+                    filterName.appendChild(opt);
+                });
+
+                if (names.some(function (n) { return String(n.id) === entrySelected; })) {
+                    entryName.value = entrySelected;
+                }
+                if (names.some(function (n) { return String(n.id) === filterSelected; })) {
+                    filterName.value = filterSelected;
+                }
+
+                refreshSelect2(entryName);
+                refreshSelect2(filterName);
+            }
+
+            async function loadNames() {
+                const res = await fetch('@Url.Action("Names", "PettyCash")');
+                names = await res.json();
+                renderNameOptions();
+            }
+
+            function isKnownNameId(value) {
+                return names.some(function (n) { return String(n.id) === String(value); });
+            }
+
+            async function postJson(url, body) {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: body === undefined ? undefined : JSON.stringify(body)
+                });
+                return res.json();
+            }
+
+            document.getElementById('btnAddName').addEventListener('click', async function () {
+                const typed = (entryName.value || '').trim();
+                if (!typed) {
+                    showError('Type a name in the Name box first.');
+                    return;
+                }
+                if (isKnownNameId(typed)) {
+                    showError('That name is already selected — type a new name to add one.');
+                    return;
+                }
+
+                clearError();
+                const result = await postJson('@Url.Action("AddName", "PettyCash")', { name: typed });
+                if (!result.ok) {
+                    showError(result.error || 'Could not add that name.');
+                    return;
+                }
+
+                await loadNames();
+                entryName.value = result.id;
+                refreshSelect2(entryName);
+            });
+
+            document.getElementById('btnDeleteName').addEventListener('click', async function () {
+                const selected = entryName.value;
+                if (!selected || !isKnownNameId(selected)) {
+                    showError('Select an existing name to delete.');
+                    return;
+                }
+                if (!confirm('Delete this name from the list? This only works if it has no petty cash entries.')) {
+                    return;
+                }
+
+                clearError();
+                const result = await postJson('@Url.Action("DeleteName", "PettyCash")?id=' + encodeURIComponent(selected));
+                if (!result.ok) {
+                    showError(result.error || 'Could not delete that name.');
+                    return;
+                }
+
+                await loadNames();
+            });
+
+            function renderRows(rows) {
+                if (!rows.length) {
+                    tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No petty cash entries found.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = rows.map(function (r) {
+                    const typeBadge = r.type === 0
+                        ? '<span class="fw-semibold text-success">Cash In</span>'
+                        : '<span class="fw-semibold text-danger">Cash Out</span>';
+                    return '<tr>' +
+                        '<td>' + r.sl + '</td>' +
+                        '<td>' + r.date + '</td>' +
+                        '<td>' + escapeHtml(r.name) + '</td>' +
+                        '<td>' + typeBadge + '</td>' +
+                        '<td class="text-end">' + (r.income !== null ? money(r.income) : '-') + '</td>' +
+                        '<td class="text-end">' + (r.expense !== null ? money(r.expense) : '-') + '</td>' +
+                        '<td class="text-end">' + money(r.balance) + '</td>' +
+                        '<td class="text-center">' +
+                            '<button type="button" class="btn btn-sm btn-success btn-edit-entry" data-id="' + r.id + '" data-date="' + r.date + '" data-name-id="' + r.nameId + '" data-type="' + r.type + '" data-amount="' + (r.income !== null ? r.income : r.expense) + '">Edit</button> ' +
+                            '<button type="button" class="btn btn-sm btn-danger btn-del-entry" data-id="' + r.id + '">Del</button>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                tableBody.querySelectorAll('.btn-edit-entry').forEach(function (btn) {
+                    btn.addEventListener('click', function () { startEdit(btn.dataset); });
+                });
+                tableBody.querySelectorAll('.btn-del-entry').forEach(function (btn) {
+                    btn.addEventListener('click', function () { deleteEntry(btn.dataset.id); });
+                });
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            async function loadEntries() {
+                const params = new URLSearchParams();
+                if (filterFrom.value) params.set('from', filterFrom.value);
+                if (filterTo.value) params.set('to', filterTo.value);
+                if (filterName.value) params.set('nameId', filterName.value);
+                if (filterType.value !== '') params.set('type', filterType.value);
+
+                const res = await fetch('@Url.Action("Entries", "PettyCash")?' + params.toString());
+                const data = await res.json();
+
+                renderRows(data.rows);
+                summaryIncome.textContent = money(data.totalIncome);
+                summaryExpense.textContent = money(data.totalExpense);
+                summaryBalance.textContent = money(data.totalBalance);
+            }
+
+            function startEdit(data) {
+                clearError();
+                editingEntryId = data.id;
+                entryDate.value = data.date;
+                entryName.value = data.nameId;
+                refreshSelect2(entryName);
+                entryType.value = data.type;
+                refreshSelect2(entryType);
+                entryAmount.value = data.amount;
+
+                editingNoticeText.textContent = 'Editing entry #' + data.id + ' — change the fields above and press Enter in Amount to update.';
+                editingNotice.classList.remove('d-none');
+                entryAmount.focus();
+                entryAmount.select();
+            }
+
+            function stopEdit() {
+                editingEntryId = null;
+                editingNotice.classList.add('d-none');
+                entryDate.value = todayIso();
+                entryType.value = '0';
+                refreshSelect2(entryType);
+                entryAmount.value = '';
+            }
+
+            document.getElementById('btnCancelEdit').addEventListener('click', stopEdit);
+
+            async function submitEntry() {
+                clearError();
+
+                const nameValue = entryName.value;
+                if (!nameValue || !isKnownNameId(nameValue)) {
+                    showError('Select a saved name (click "+ Add" first if it\'s new).');
+                    return;
+                }
+
+                const payload = {
+                    date: entryDate.value,
+                    nameId: parseInt(nameValue, 10),
+                    type: parseInt(entryType.value, 10),
+                    amount: parseFloat(entryAmount.value)
+                };
+
+                if (!payload.date) {
+                    showError('Select a date.');
+                    return;
+                }
+                if (!payload.amount || payload.amount <= 0) {
+                    showError('Enter an amount greater than zero.');
+                    return;
+                }
+
+                const url = editingEntryId
+                    ? '@Url.Action("UpdateEntry", "PettyCash")?id=' + editingEntryId
+                    : '@Url.Action("AddEntry", "PettyCash")';
+                const result = await postJson(url, payload);
+                if (!result.ok) {
+                    showError(result.error || 'Could not save this entry.');
+                    return;
+                }
+
+                stopEdit();
+                await loadEntries();
+            }
+
+            entryAmount.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                submitEntry();
+            });
+
+            async function deleteEntry(id) {
+                if (!confirm('Delete this petty cash entry?')) return;
+                const result = await postJson('@Url.Action("DeleteEntry", "PettyCash")?id=' + encodeURIComponent(id));
+                if (!result.ok) {
+                    alert(result.error || 'Could not delete this entry.');
+                    return;
+                }
+                if (editingEntryId === id) {
+                    stopEdit();
+                }
+                await loadEntries();
+            }
+
+            document.getElementById('btnApplyFilter').addEventListener('click', loadEntries);
+            document.getElementById('btnResetFilter').addEventListener('click', function () {
+                filterFrom.value = '';
+                filterTo.value = '';
+                filterName.value = '';
+                filterType.value = '';
+                refreshSelect2(filterName);
+                refreshSelect2(filterType);
+                loadEntries();
+            });
+
+            entryDate.value = todayIso();
+
+            (async function init() {
+                await loadNames();
+                refreshSelect2(entryType);
+                refreshSelect2(filterType);
+                await loadEntries();
+            })();
+        })();
+    </script>
+}

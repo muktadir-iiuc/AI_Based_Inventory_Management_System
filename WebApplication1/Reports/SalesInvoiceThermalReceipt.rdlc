@@ -50,7 +50,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.24in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellCompanyName"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyName.Value</Value><Style><FontSize>12pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellCompanyName"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyName.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>12pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -66,7 +66,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.16in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellCompanyAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyAddress.Value</Value><Style><FontSize>8pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellCompanyAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyAddress.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -82,7 +82,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.16in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellCompanyPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyPhone.Value</Value><Style><FontSize>8pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellCompanyPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyPhone.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -95,13 +95,13 @@
 
           <Line Name="LineDivider1">
             <Top>0.56in</Top><Left>0in</Left><Height>0in</Height><Width>3in</Width>
-            <Style><Border><Color>#0d3b66</Color><Style>Solid</Style><Width>1.25pt</Width></Border></Style>
+            <Style><Border><Color>#000000</Color><Style>Solid</Style><Width>1.5pt</Width></Border></Style>
           </Line>
 
           <Textbox Name="TxtTitle">
             <CanGrow>true</CanGrow>
             <Top>0.62in</Top><Left>0in</Left><Height>0.2in</Height><Width>3in</Width>
-            <Paragraphs><Paragraph><TextRuns><TextRun><Value>SALES RECEIPT</Value><Style><FontSize>10.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>SALES RECEIPT</Value><Style><FontFamily>Arial</FontFamily><FontSize>10.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
             <Style><Border><Style>None</Style></Border></Style>
           </Textbox>
 
@@ -110,7 +110,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.18in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellInvoiceNumber"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Invoice #: </Value><Style><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize></Style></TextRun><TextRun><Value>=Fields!InvoiceNumber.Value</Value><Style><FontSize>8.5pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellInvoiceNumber"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Invoice #: </Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun><TextRun><Value>=Fields!InvoiceNumber.Value</Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -126,7 +126,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.18in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellDate"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Date: </Value><Style><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize></Style></TextRun><TextRun><Value>=Fields!InvoiceDate.Value</Value><Style><FontSize>8.5pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellDate"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Date: </Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun><TextRun><Value>=Fields!InvoiceDate.Value</Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -142,7 +142,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.18in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellCustomer"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Customer: </Value><Style><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize></Style></TextRun><TextRun><Value>=Fields!CustomerName.Value</Value><Style><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellCustomer"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Customer: </Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun><TextRun><Value>=Fields!CustomerName.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>8.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -158,7 +158,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.18in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellWarehouse"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Warehouse: </Value><Style><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize></Style></TextRun><TextRun><Value>=Fields!WarehouseName.Value</Value><Style><FontSize>8.5pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellWarehouse"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Warehouse: </Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun><TextRun><Value>=Fields!WarehouseName.Value</Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -174,7 +174,7 @@
               <TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>
               <TablixRows><TablixRow><Height>0.18in</Height><TablixCells>
                 <TablixCell><CellContents>
-                  <Textbox Name="CellServedBy"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Served By: </Value><Style><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize></Style></TextRun><TextRun><Value>=Fields!ServedBy.Value</Value><Style><FontSize>8.5pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  <Textbox Name="CellServedBy"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Served By: </Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun><TextRun><Value>=Fields!ServedBy.Value</Value><Style><FontFamily>Arial</FontFamily><FontWeight>Bold</FontWeight><FontSize>8.5pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                 </CellContents></TablixCell>
               </TablixCells></TablixRow></TablixRows>
             </TablixBody>
@@ -187,7 +187,7 @@
 
           <Line Name="LineDivider2">
             <Top>1.72in</Top><Left>0in</Left><Height>0in</Height><Width>3in</Width>
-            <Style><Border><Color>#999999</Color><Style>Dashed</Style><Width>0.75pt</Width></Border></Style>
+            <Style><Border><Color>#000000</Color><Style>Dashed</Style><Width>1pt</Width></Border></Style>
           </Line>
 
           <Tablix Name="TablixReceipt">
@@ -206,7 +206,7 @@
                             <TextRuns>
                               <TextRun>
                                 <Value>=Fields!Text.Value</Value>
-                                <Style><FontFamily>Courier New</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style>
+                                <Style><FontFamily>Consolas</FontFamily><FontSize>8pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style>
                               </TextRun>
                             </TextRuns>
                           </Paragraph>
@@ -236,12 +236,12 @@
 
           <Line Name="LineDivider3">
             <Top>__DIVIDER3_TOP__in</Top><Left>0in</Left><Height>0in</Height><Width>3in</Width>
-            <Style><Border><Color>#0d3b66</Color><Style>Solid</Style><Width>1pt</Width></Border></Style>
+            <Style><Border><Color>#000000</Color><Style>Solid</Style><Width>1.5pt</Width></Border></Style>
           </Line>
 
           <Line Name="LineDividerCustomerDue">
             <Top>__CUSTOMER_DUE_DIVIDER_TOP__in</Top><Left>0in</Left><Height>0in</Height><Width>3in</Width>
-            <Style><Border><Color>#999999</Color><Style>Dashed</Style><Width>0.75pt</Width></Border></Style>
+            <Style><Border><Color>#000000</Color><Style>Dashed</Style><Width>1pt</Width></Border></Style>
           </Line>
 
           <Tablix Name="TablixTotals">
@@ -255,10 +255,10 @@
                   <Height>0.2in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellTotalCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellTotalCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellTotalValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!TotalAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellTotalValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!TotalAmount.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                   </TablixCells>
                 </TablixRow>
@@ -266,10 +266,10 @@
                   <Height>0.2in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellPaidCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Paid</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellPaidCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Paid</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellPaidValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!PaidAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellPaidValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!PaidAmount.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                   </TablixCells>
                 </TablixRow>
@@ -277,10 +277,10 @@
                   <Height>0.26in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance Due</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance Due</Value><Style><FontFamily>Arial</FontFamily><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DueAmount.Value</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                      <Textbox Name="CellDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DueAmount.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                   </TablixCells>
                 </TablixRow>
@@ -288,10 +288,10 @@
                   <Height>0.24in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellCustomerDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Outstanding</Value><Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
+                      <Textbox Name="CellCustomerDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Outstanding</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellCustomerDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CustomerOutstandingDue.Value</Value><Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
+                      <Textbox Name="CellCustomerDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CustomerOutstandingDue.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
                     </CellContents></TablixCell>
                   </TablixCells>
                 </TablixRow>
@@ -321,20 +321,20 @@
 
           <Line Name="LineDivider4">
             <Top>__DIVIDER4_TOP__in</Top><Left>0in</Left><Height>0in</Height><Width>3in</Width>
-            <Style><Border><Color>#0d3b66</Color><Style>Solid</Style><Width>1pt</Width></Border></Style>
+            <Style><Border><Color>#000000</Color><Style>Solid</Style><Width>1.5pt</Width></Border></Style>
           </Line>
 
           <Textbox Name="TxtThankYou">
             <CanGrow>true</CanGrow>
             <Top>__FOOTER_TOP__in</Top><Left>0in</Left><Height>0.22in</Height><Width>3in</Width>
-            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Thank You For Your Business!</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Thank You For Your Business!</Value><Style><FontFamily>Arial</FontFamily><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
             <Style><Border><Style>None</Style></Border></Style>
           </Textbox>
 
           <Textbox Name="TxtFooterNote">
             <CanGrow>true</CanGrow>
             <Top>__FOOTER_NOTE_TOP__in</Top><Left>0in</Left><Height>0.16in</Height><Width>3in</Width>
-            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Please keep this receipt for any returns or exchanges.</Value><Style><FontSize>7.5pt</FontSize><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Please keep this receipt for any returns or exchanges.</Value><Style><FontFamily>Arial</FontFamily><FontSize>7.5pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
             <Style><Border><Style>None</Style></Border></Style>
           </Textbox>
 

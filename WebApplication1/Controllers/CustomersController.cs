@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,46 @@ public class CustomersController(ApplicationDbContext db) : Controller
         await db.SaveChangesAsync();
         TempData["Success"] = "Customer created.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // Lets the Sales Invoice Create page add a missing customer inline, without losing
+    // whatever line items the user has already entered by navigating away to the full
+    // Customers/Create page. Same role gate as that page (Create/Edit/Delete above).
+    [HttpPost]
+    [Authorize(Roles = Roles.SalesManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickCreate([FromBody] CustomerQuickCreateRequest? request)
+    {
+        if (request is null || !ModelState.IsValid)
+        {
+            var error = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault();
+            return Json(new { ok = false, error = string.IsNullOrWhiteSpace(error) ? "Invalid customer details." : error });
+        }
+
+        var name = request.Name.Trim();
+        if (await db.Customers.AnyAsync(c => c.Name == name))
+        {
+            return Json(new { ok = false, error = "A customer with this name already exists." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Email) && !new EmailAddressAttribute().IsValid(request.Email))
+        {
+            return Json(new { ok = false, error = "Enter a valid email address, or leave it blank." });
+        }
+
+        var customer = new Customer
+        {
+            Name = name,
+            ContactPerson = string.IsNullOrWhiteSpace(request.ContactPerson) ? null : request.ContactPerson.Trim(),
+            Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim(),
+            Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
+            Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim(),
+            CreatedBy = User.Identity?.Name
+        };
+        db.Customers.Add(customer);
+        await db.SaveChangesAsync();
+
+        return Json(new { ok = true, id = customer.Id, name = customer.Name });
     }
 
     [Authorize(Roles = Roles.SalesManagers)]

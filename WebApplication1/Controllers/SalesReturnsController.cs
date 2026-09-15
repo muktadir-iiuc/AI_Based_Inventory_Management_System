@@ -47,8 +47,8 @@ public class SalesReturnsController(
     public async Task<IActionResult> Create(int salesInvoiceId)
     {
         var invoice = await db.SalesInvoices
-            .Include(i => i.Items).ThenInclude(i => i.Product)
-            .Include(i => i.Items).ThenInclude(i => i.Batch)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(i => i.Id == salesInvoiceId);
 
         if (invoice is null) return NotFound();
@@ -69,8 +69,8 @@ public class SalesReturnsController(
     public async Task<IActionResult> Create(SalesReturnCreateViewModel model)
     {
         var invoice = await db.SalesInvoices
-            .Include(i => i.Items).ThenInclude(i => i.Product)
-            .Include(i => i.Items).ThenInclude(i => i.Batch)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(i => i.Items.Where(x => x.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(i => i.Id == model.SalesInvoiceId);
 
         if (invoice is null) return NotFound();

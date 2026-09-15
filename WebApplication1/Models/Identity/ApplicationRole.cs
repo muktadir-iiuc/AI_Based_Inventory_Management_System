@@ -25,6 +25,7 @@ public static class Roles
         Admin, Manager, PurchaseOfficer, SalesOfficer, Accountant, Viewer
     ];
 
+    public const string AdminManagers = $"{Admin},{Manager}";
     public const string InventoryManagers = $"{Admin},{Manager},{PurchaseOfficer},{SalesOfficer}";
     public const string PurchaseManagers = $"{Admin},{Manager},{PurchaseOfficer}";
     public const string SalesManagers = $"{Admin},{Manager},{SalesOfficer}";

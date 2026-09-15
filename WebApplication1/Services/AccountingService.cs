@@ -11,17 +11,25 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
     private async Task<Account> GetAccountAsync(string code) =>
         await db.Accounts.FirstAsync(a => a.Code == code);
 
+    // Counts pending (not-yet-saved) JournalEntry rows too, not just what's already in the
+    // database — an in-place Edit calls this twice in the same unsaved unit of work (once to
+    // reverse the old entry, once to post the new one), and without counting the pending
+    // reversal, the second call would compute the same number as the first and collide on
+    // JournalEntries' unique EntryNumber index at SaveChangesAsync.
     private async Task<string> NextEntryNumberAsync()
     {
-        var count = await db.JournalEntries.CountAsync();
-        return $"JE-{count + 1:D6}";
+        var savedCount = await db.JournalEntries.CountAsync();
+        var pendingCount = db.ChangeTracker.Entries<JournalEntry>().Count(e => e.State == EntityState.Added);
+        return $"JE-{savedCount + pendingCount + 1:D6}";
     }
 
     public async Task<JournalEntry> PostPurchaseInvoiceAsync(PurchaseInvoice invoice)
     {
         var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
         var payable = await GetAccountAsync(SystemAccountCodes.AccountsPayable);
-        var total = invoice.Items.Sum(i => i.Quantity * i.UnitPrice);
+        // Superseded lines (from an in-place Edit) stay in Items for audit purposes but must
+        // never contribute to the posted total — see PurchaseInvoiceItem.IsCurrent.
+        var total = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
 
         var entry = new JournalEntry
         {
@@ -48,8 +56,10 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
         var cogs = await GetAccountAsync(SystemAccountCodes.CostOfGoodsSold);
         var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
 
-        var saleTotal = invoice.Items.Sum(i => i.Quantity * i.UnitPrice);
-        var costTotal = invoice.Items.Sum(i => i.Quantity * i.UnitCost);
+        // Superseded lines (from an in-place Edit) stay in Items for audit purposes but must
+        // never contribute to the posted total — see SalesInvoiceItem.IsCurrent.
+        var saleTotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
+        var costTotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitCost);
 
         var entry = new JournalEntry
         {
@@ -175,9 +185,13 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
 
     public async Task ReverseJournalEntriesForReferenceAsync(string sourceReference, string reason)
     {
+        // !IsReversed matters when the same reference is reposted in place (an Edit) rather than
+        // only ever cancelled once — without it, a later reversal would match the original entry
+        // again even though it was already reversed (reversal entries are always Source=Reversal,
+        // so they're excluded on their own; it's the originals that need the extra flag).
         var entries = await db.JournalEntries
             .Include(e => e.Lines)
-            .Where(e => e.SourceReference == sourceReference && e.Source != JournalSource.Reversal)
+            .Where(e => e.SourceReference == sourceReference && e.Source != JournalSource.Reversal && !e.IsReversed)
             .ToListAsync();
 
         foreach (var original in entries)
@@ -199,6 +213,7 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
             };
 
             db.JournalEntries.Add(reversal);
+            original.IsReversed = true;
         }
     }
 

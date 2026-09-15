@@ -41,7 +41,7 @@ public class PurchaseInvoicesController(
         ViewData["WarehouseId"] = new SelectList(await db.Warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", warehouseId);
         ViewData["WarehouseScoped"] = warehouseIds is not null;
 
-        return View(await query.Include(p => p.Items).OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
+        return View(await query.Include(p => p.Items.Where(i => i.IsCurrent)).OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
@@ -49,7 +49,7 @@ public class PurchaseInvoicesController(
         var invoice = await db.PurchaseInvoices
             .Include(p => p.Supplier)
             .Include(p => p.Warehouse)
-            .Include(p => p.Items).ThenInclude(i => i.Product)
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
             .Include(p => p.Payments)
             .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -166,7 +166,7 @@ public class PurchaseInvoicesController(
     public async Task<IActionResult> Cancel(int id)
     {
         var invoice = await db.PurchaseInvoices
-            .Include(p => p.Items).ThenInclude(i => i.Batch)
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
             .FirstOrDefaultAsync(p => p.Id == id);
         if (invoice is null) return NotFound();
         if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
@@ -177,7 +177,7 @@ public class PurchaseInvoicesController(
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        var soldBatch = invoice.Items.Select(i => i.Batch).FirstOrDefault(b => b is not null && b.RemainingQuantity < b.OriginalQuantity);
+        var soldBatch = FindSoldBatch(invoice);
         if (soldBatch is not null)
         {
             TempData["Error"] = $"Cannot cancel: batch {soldBatch.BatchNumber} already has {soldBatch.SoldQuantity:0.##} unit(s) sold.";
@@ -209,6 +209,175 @@ public class PurchaseInvoicesController(
         return RedirectToAction(nameof(Details), new { id });
     }
 
+    [Authorize(Roles = Roles.PurchaseManagers)]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var invoice = await db.PurchaseInvoices
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
+
+        var blockedReason = EditBlockedReason(invoice);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        await PopulateDropdownsAsync();
+        var model = new PurchaseInvoiceCreateViewModel
+        {
+            SupplierId = invoice.SupplierId,
+            WarehouseId = invoice.WarehouseId,
+            Date = invoice.Date,
+            Notes = invoice.Notes,
+            Items = invoice.Items.Select(i => new PurchaseLineInput
+            {
+                ProductId = i.ProductId,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                SalePrice = i.SalePrice
+            }).ToList()
+        };
+        ViewData["InvoiceNumber"] = invoice.InvoiceNumber;
+        return View(model);
+    }
+
+    // Editing keeps the same invoice number and row rather than cancel-and-recreate: the old
+    // lines' stock/accounting effect is reversed exactly like Cancel, the old lines and their
+    // batches are deactivated in place (never deleted — ProductBatch and StockTransaction both
+    // hold Restrict FKs back to them, and it preserves the audit trail), then the new lines are
+    // posted fresh, same as Create. Both StockService and AccountingService's reversal helpers
+    // track which rows they've already reversed (IsReversed), so this can safely happen more
+    // than once on the same invoice number without ever double-reversing history.
+    [HttpPost]
+    [Authorize(Roles = Roles.PurchaseManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, PurchaseInvoiceCreateViewModel model)
+    {
+        var invoice = await db.PurchaseInvoices
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
+
+        var blockedReason = EditBlockedReason(invoice);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        model.Items = model.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
+        if (model.Items.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Add at least one product line.");
+        }
+
+        if (model.WarehouseId <= 0 || !await db.Warehouses.AnyAsync(w => w.Id == model.WarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.WarehouseId), "Please select a warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.WarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.WarehouseId), "You are not assigned to this warehouse.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateDropdownsAsync();
+            ViewData["InvoiceNumber"] = invoice.InvoiceNumber;
+            return View(model);
+        }
+
+        foreach (var item in invoice.Items)
+        {
+            if (item.Batch is not null)
+            {
+                item.Batch.RemainingQuantity = 0;
+                item.Batch.IsActive = false;
+            }
+            item.IsCurrent = false;
+        }
+
+        await stockService.ReverseTransactionsForReferenceAsync(invoice.InvoiceNumber);
+        await accountingService.ReverseJournalEntriesForReferenceAsync(invoice.InvoiceNumber, "Purchase invoice edited");
+
+        invoice.SupplierId = model.SupplierId;
+        invoice.WarehouseId = model.WarehouseId;
+        invoice.Date = model.Date;
+        invoice.Notes = model.Notes;
+
+        foreach (var item in model.Items)
+        {
+            invoice.Items.Add(new PurchaseInvoiceItem
+            {
+                ProductId = item.ProductId,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                SalePrice = item.SalePrice
+            });
+        }
+
+        var batchCount = await db.ProductBatches.CountAsync();
+        foreach (var newItem in invoice.Items.Where(i => i.IsCurrent))
+        {
+            batchCount++;
+            var batch = new ProductBatch
+            {
+                ProductId = newItem.ProductId,
+                WarehouseId = invoice.WarehouseId,
+                PurchaseInvoiceItem = newItem,
+                BatchNumber = $"BATCH-{batchCount:D6}",
+                PurchaseDate = invoice.Date,
+                PurchasePrice = newItem.UnitPrice,
+                SalePrice = newItem.SalePrice,
+                OriginalQuantity = newItem.Quantity,
+                RemainingQuantity = newItem.Quantity
+            };
+            db.ProductBatches.Add(batch);
+
+            await stockService.ReceiveStockAsync(newItem.ProductId, invoice.WarehouseId, newItem.Quantity, invoice.InvoiceNumber,
+                batch: batch, unitCost: newItem.UnitPrice, unitSalePrice: newItem.SalePrice);
+        }
+
+        await accountingService.PostPurchaseInvoiceAsync(invoice);
+        await db.SaveChangesAsync();
+
+        var warehouseName = (await db.Warehouses.FindAsync(invoice.WarehouseId))?.Name;
+        await notifier.NotifyAsync(
+            "Purchase Invoice Edited",
+            $"{invoice.InvoiceNumber} was edited — {invoice.Items.Count(i => i.IsCurrent)} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
+            "fas fa-pen text-info",
+            [invoice.WarehouseId]);
+
+        TempData["Success"] = $"Purchase invoice {invoice.InvoiceNumber} updated.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    private static ProductBatch? FindSoldBatch(PurchaseInvoice invoice) =>
+        invoice.Items.Select(i => i.Batch).FirstOrDefault(b => b is not null && b.RemainingQuantity < b.OriginalQuantity);
+
+    // Null when editing is allowed; otherwise the reason to show the user. Shared by both the
+    // Edit GET (so a blocked invoice never even reaches the form) and POST (re-checked in case
+    // something changed between GET and submit).
+    private static string? EditBlockedReason(PurchaseInvoice invoice)
+    {
+        if (invoice.Status != DocumentStatus.Posted)
+        {
+            return "Only a posted invoice can be edited.";
+        }
+
+        var soldBatch = FindSoldBatch(invoice);
+        if (soldBatch is not null)
+        {
+            return $"Cannot edit: batch {soldBatch.BatchNumber} already has {soldBatch.SoldQuantity:0.##} unit(s) sold. Use a Purchase Return instead to correct this invoice.";
+        }
+
+        return null;
+    }
+
     private async Task PopulateDropdownsAsync()
     {
         var warehouseIds = User.GetWarehouseIds();
@@ -237,7 +406,7 @@ public class PurchaseInvoicesController(
             .ToDictionaryAsync(x => x.ProductId, x => x.SalePrice);
 
         var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-            .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice, p.SalePrice, p.UnitOfMeasure!.Symbol }).ToListAsync();
+            .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice, p.SalePrice, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name }).ToListAsync();
 
         ViewData["Products"] = products.Select(p => new
         {
@@ -246,7 +415,14 @@ public class PurchaseInvoicesController(
             p.Name,
             p.CostPrice,
             SuggestedSalePrice = latestBatchSalePrices.GetValueOrDefault(p.Id, p.SalePrice),
-            p.Symbol
+            p.Symbol,
+            p.CategoryId,
+            p.Category
         }).ToList();
+
+        // Line items pick a category first, then a product filtered to that category — see
+        // Views/PurchaseInvoices/Create.cshtml.
+        ViewData["Categories"] = await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name }).ToListAsync();
     }
 }

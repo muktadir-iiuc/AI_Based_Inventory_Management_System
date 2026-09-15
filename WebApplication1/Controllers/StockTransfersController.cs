@@ -24,7 +24,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             query = query.Where(t => warehouseIds.Contains(t.FromWarehouseId) || warehouseIds.Contains(t.ToWarehouseId));
         }
 
-        return View(await query.Include(t => t.Items).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
+        return View(await query.Include(t => t.Items.Where(i => i.IsCurrent)).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
@@ -32,7 +32,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         var transfer = await db.StockTransfers
             .Include(t => t.FromWarehouse)
             .Include(t => t.ToWarehouse)
-            .Include(t => t.Items).ThenInclude(i => i.Product)
+            .Include(t => t.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (transfer is null) return NotFound();
@@ -157,7 +157,7 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancel(int id)
     {
-        var transfer = await db.StockTransfers.Include(t => t.Items).FirstOrDefaultAsync(t => t.Id == id);
+        var transfer = await db.StockTransfers.Include(t => t.Items.Where(i => i.IsCurrent)).FirstOrDefaultAsync(t => t.Id == id);
         if (transfer is null) return NotFound();
         if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
 
@@ -180,6 +180,192 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
 
         TempData["Success"] = $"Stock transfer {transfer.TransferNumber} cancelled and reversed.";
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [Authorize(Policy = Permissions.StockTransfer)]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var transfer = await db.StockTransfers
+            .Include(t => t.Items.Where(i => i.IsCurrent))
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (transfer is null) return NotFound();
+        if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
+
+        var blockedReason = await EditBlockedReasonAsync(transfer);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        await PopulateDropdownsAsync();
+        var model = new StockTransferCreateViewModel
+        {
+            FromWarehouseId = transfer.FromWarehouseId,
+            ToWarehouseId = transfer.ToWarehouseId,
+            Date = transfer.Date,
+            Notes = transfer.Notes,
+            Items = transfer.Items.Select(i => new TransferLineInput { ProductId = i.ProductId, Quantity = i.Quantity }).ToList()
+        };
+        ViewData["TransferNumber"] = transfer.TransferNumber;
+        return View(model);
+    }
+
+    // Editing keeps the same transfer number and row rather than cancel-and-recreate: the old
+    // lines' stock effect is reversed exactly like Cancel, the old lines are deactivated in
+    // place, then the new lines are issued/received fresh, same as Create. StockService's
+    // reversal helper tracks which rows it has already reversed (IsReversed), so this can
+    // safely happen more than once on the same transfer number without double-reversing.
+    [HttpPost]
+    [Authorize(Policy = Permissions.StockTransfer)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, StockTransferCreateViewModel model)
+    {
+        var transfer = await db.StockTransfers
+            .Include(t => t.Items.Where(i => i.IsCurrent))
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (transfer is null) return NotFound();
+        if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
+
+        var blockedReason = await EditBlockedReasonAsync(transfer);
+        if (blockedReason is not null)
+        {
+            TempData["Error"] = blockedReason;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        model.Items = model.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
+        if (model.Items.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Add at least one product line.");
+        }
+
+        if (model.FromWarehouseId == model.ToWarehouseId)
+        {
+            ModelState.AddModelError(string.Empty, "The source and destination warehouse must be different.");
+        }
+
+        if (!await db.Warehouses.AnyAsync(w => w.Id == model.FromWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.FromWarehouseId), "Please select a source warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.FromWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.FromWarehouseId), "You are not assigned to this warehouse.");
+        }
+
+        if (!await db.Warehouses.AnyAsync(w => w.Id == model.ToWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.ToWarehouseId), "Please select a destination warehouse.");
+        }
+        else if (!User.IsWarehouseAllowed(model.ToWarehouseId))
+        {
+            ModelState.AddModelError(nameof(model.ToWarehouseId), "You are not assigned to this warehouse.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateDropdownsAsync();
+            ViewData["TransferNumber"] = transfer.TransferNumber;
+            return View(model);
+        }
+
+        // Reverse this transfer's own stock effect first — the availability check just below
+        // sees the restored quantity immediately (EF resolves the same tracked
+        // ProductWarehouseStock instances by identity rather than re-reading stale DB values).
+        foreach (var item in transfer.Items)
+        {
+            item.IsCurrent = false;
+        }
+        await stockService.ReverseTransactionsForReferenceAsync(transfer.TransferNumber);
+
+        var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await db.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+        var fromStocks = await db.ProductWarehouseStocks
+            .Where(s => s.WarehouseId == model.FromWarehouseId && productIds.Contains(s.ProductId))
+            .ToDictionaryAsync(s => s.ProductId, s => s.Quantity);
+
+        foreach (var item in model.Items)
+        {
+            if (!products.TryGetValue(item.ProductId, out var product))
+            {
+                continue;
+            }
+
+            var available = fromStocks.GetValueOrDefault(item.ProductId, 0);
+            if (item.Quantity > available)
+            {
+                ModelState.AddModelError(string.Empty,
+                    $"Insufficient stock for {product.Name} in the source warehouse: available {available:0.##}, requested {item.Quantity:0.##}.");
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            // Nothing has been saved yet — not calling SaveChangesAsync leaves the database
+            // untouched, so simply re-showing the form is enough to discard the in-memory undo.
+            await PopulateDropdownsAsync();
+            ViewData["TransferNumber"] = transfer.TransferNumber;
+            return View(model);
+        }
+
+        transfer.FromWarehouseId = model.FromWarehouseId;
+        transfer.ToWarehouseId = model.ToWarehouseId;
+        transfer.Date = model.Date;
+        transfer.Notes = model.Notes;
+
+        foreach (var item in model.Items)
+        {
+            transfer.Items.Add(new StockTransferItem { ProductId = item.ProductId, Quantity = item.Quantity });
+        }
+
+        foreach (var newItem in transfer.Items.Where(i => i.IsCurrent))
+        {
+            await stockService.IssueStockAsync(newItem.ProductId, transfer.FromWarehouseId, newItem.Quantity, transfer.TransferNumber, notes: "Transfer out");
+            await stockService.ReceiveStockAsync(newItem.ProductId, transfer.ToWarehouseId, newItem.Quantity, transfer.TransferNumber, notes: "Transfer in");
+        }
+
+        await db.SaveChangesAsync();
+
+        var fromName = (await db.Warehouses.FindAsync(transfer.FromWarehouseId))?.Name;
+        var toName = (await db.Warehouses.FindAsync(transfer.ToWarehouseId))?.Name;
+        await notifier.NotifyAsync(
+            "Stock Transfer Edited",
+            $"{transfer.TransferNumber} was edited — {transfer.Items.Count(i => i.IsCurrent)} line(s) moved from {fromName} to {toName}.",
+            "fas fa-pen text-info",
+            [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+
+        TempData["Success"] = $"Stock transfer {transfer.TransferNumber} updated.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    // Null when editing is allowed; otherwise the reason to show the user. Shared by both the
+    // Edit GET (so a blocked transfer never even reaches the form) and POST (re-checked in case
+    // something changed between GET and submit). Reversing this transfer means pulling its
+    // quantity back out of the destination warehouse — blocked if that stock (or some of it)
+    // has already moved on from there (sold, or transferred onward again).
+    private async Task<string?> EditBlockedReasonAsync(StockTransfer transfer)
+    {
+        if (transfer.Status != DocumentStatus.Posted)
+        {
+            return "Only a posted transfer can be edited.";
+        }
+
+        var productIds = transfer.Items.Select(i => i.ProductId).Distinct().ToList();
+        var destStocks = await db.ProductWarehouseStocks
+            .Where(s => s.WarehouseId == transfer.ToWarehouseId && productIds.Contains(s.ProductId))
+            .ToDictionaryAsync(s => s.ProductId, s => s.Quantity);
+
+        foreach (var item in transfer.Items)
+        {
+            if (destStocks.GetValueOrDefault(item.ProductId, 0) < item.Quantity)
+            {
+                var productName = await db.Products.Where(p => p.Id == item.ProductId).Select(p => p.Name).FirstOrDefaultAsync();
+                return $"Cannot edit: {productName} has already moved out of the destination warehouse. Create a new transfer instead to correct this.";
+            }
+        }
+
+        return null;
     }
 
     private async Task PopulateDropdownsAsync()

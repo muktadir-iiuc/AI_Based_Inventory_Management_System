@@ -26,3 +26,4 @@ Thumbs.db
 
 ## Secrets
 WebApplication1/appsettings.json
+/WebApplication1/Data/DbInitializer.cs

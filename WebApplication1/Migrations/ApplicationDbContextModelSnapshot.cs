@@ -194,6 +194,9 @@ namespace WebApplication1.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<bool>("IsReversed")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Source")
                         .HasColumnType("int");
 
@@ -712,6 +715,9 @@ namespace WebApplication1.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsReversed")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
@@ -800,6 +806,9 @@ namespace WebApplication1.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
@@ -890,6 +899,74 @@ namespace WebApplication1.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PettyCashNameId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("PettyCashNameId");
+
+                    b.ToTable("PettyCashEntries");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashName", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("PettyCashNames");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseInvoice", b =>
                 {
                     b.Property<int>("Id")
@@ -942,6 +1019,9 @@ namespace WebApplication1.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
@@ -1174,6 +1254,9 @@ namespace WebApplication1.Migrations
 
                     b.Property<int?>("BatchId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
@@ -1523,6 +1606,17 @@ namespace WebApplication1.Migrations
                     b.Navigation("StockTransfer");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashEntry", b =>
+                {
+                    b.HasOne("WebApplication1.Models.PettyCash.PettyCashName", "PettyCashName")
+                        .WithMany("Entries")
+                        .HasForeignKey("PettyCashNameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PettyCashName");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseInvoice", b =>
                 {
                     b.HasOne("WebApplication1.Models.Purchase.Supplier", "Supplier")
@@ -1710,6 +1804,11 @@ namespace WebApplication1.Migrations
             modelBuilder.Entity("WebApplication1.Models.Inventory.Warehouse", b =>
                 {
                     b.Navigation("Stocks");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashName", b =>
+                {
+                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseInvoice", b =>

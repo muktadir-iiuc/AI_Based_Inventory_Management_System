@@ -309,7 +309,7 @@ namespace WebApplication1.Migrations
 
                 DECLARE @nextBatchSeq INT = (SELECT ISNULL(MAX(CAST(SUBSTRING(BatchNumber, 7, 6) AS INT)), 0) + 1 FROM ProductBatches);
 
-                DECLARE @eventType CHAR(1), @refId INT, @productId INT, @fromWh INT, @toWh INT, @needQty DECIMAL(18,2);
+                DECLARE @eventType CHAR(1), @refId INT, @productId INT, @fromWh INT, @toWh INT, @needQty DECIMAL(18,2), @eventDate DATETIME2;
                 DECLARE @firstBatchId INT, @batchId INT, @batchRemaining DECIMAL(18,2), @take DECIMAL(18,2);
                 DECLARE @batchPurchasePrice DECIMAL(18,2), @batchSalePrice DECIMAL(18,2), @batchPurchaseDate DATETIME2, @newBatchId INT;
 
@@ -326,7 +326,7 @@ namespace WebApplication1.Migrations
                     ORDER BY 7, 1, 2;
 
                 OPEN event_cursor;
-                FETCH NEXT FROM event_cursor INTO @eventType, @refId, @productId, @fromWh, @toWh, @needQty;
+                FETCH NEXT FROM event_cursor INTO @eventType, @refId, @productId, @fromWh, @toWh, @needQty, @eventDate;
 
                 WHILE @@FETCH_STATUS = 0
                 BEGIN
@@ -367,7 +367,7 @@ namespace WebApplication1.Migrations
                     IF @eventType = 'S' AND @firstBatchId IS NOT NULL
                         UPDATE SalesInvoiceItems SET BatchId = @firstBatchId WHERE Id = @refId;
 
-                    FETCH NEXT FROM event_cursor INTO @eventType, @refId, @productId, @fromWh, @toWh, @needQty;
+                    FETCH NEXT FROM event_cursor INTO @eventType, @refId, @productId, @fromWh, @toWh, @needQty, @eventDate;
                 END
 
                 CLOSE event_cursor;

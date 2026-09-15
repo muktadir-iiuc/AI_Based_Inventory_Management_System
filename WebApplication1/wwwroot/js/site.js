@@ -9,8 +9,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     initSelect2(document);
     initEnterKeyNavigation(document);
+    initSelectAllOnFocus(document);
     initDataTables(document);
 });
+
+// Selects all text in a numeric field as soon as it gets focus — by click, Tab, or a script
+// moving focus there — so typing immediately overwrites the value instead of inserting at
+// whatever cursor position the click landed on. Delegated on `document` via the bubbling
+// 'focusin' event (plain 'focus' doesn't bubble) so it automatically covers number fields
+// added to the DOM later — a new invoice line, a new note-calculator row — with no per-page
+// wiring needed.
+function initSelectAllOnFocus(root) {
+    root.addEventListener('focusin', function (e) {
+        var target = e.target;
+        if (!target.matches || !target.matches('input[type=number]')) {
+            return;
+        }
+
+        // Deferred a tick so the click that triggered focus doesn't collapse the selection
+        // right back down to a cursor position afterward.
+        setTimeout(function () {
+            if (document.activeElement === target) {
+                target.select();
+            }
+        }, 0);
+    });
+}
 
 // Turns every table.data-table into a sortable, per-column-filterable grid via DataTables.
 // These pages used to paginate server-side (20 rows/page via PagedList + _Pager); with
@@ -147,9 +171,20 @@ function initEnterKeyNavigation(root) {
         'textarea:not([disabled]), ' +
         '.select2-selection[tabindex]';
 
+    // Set when Enter is pressed while a Select2 dropdown is open, so the select2:select
+    // handler below knows the resulting selection (if any) was keyboard-driven and should
+    // advance focus. Select2's own "select" event doesn't carry the triggering key itself in
+    // this build — it only includes originalEvent for a mouse-click selection, not a keyboard
+    // one (verified against the vendored select2.min.js: the keyboard path's internal
+    // "results:select" handler calls trigger("select", {data}) with no originalEvent at all)
+    // — so this has to be tracked here instead of read off the select2:select event.
+    var enterKeySelectPending = false;
+
     // Enter on a plain field, or on a closed Select2 box, moves to the next field.
     // Enter while a Select2 dropdown is open (searching/highlighting a result) is left
-    // alone so Select2 can pick the highlighted option as usual.
+    // alone so Select2 can pick the highlighted option as usual. A field marked
+    // data-enter-submit is left alone too, so a page can wire its own Enter handler
+    // (e.g. "press Enter to add this row") instead of just tabbing to the next field.
     // Bound on the capture phase so it runs, and can stopPropagation, before Select2's
     // own bubble-phase keydown handler (which would otherwise just reopen the dropdown).
     root.addEventListener('keydown', function (e) {
@@ -162,10 +197,18 @@ function initEnterKeyNavigation(root) {
         if (!$target.is('input, select, textarea, .select2-selection')) {
             return;
         }
-        if ($target.is('textarea, [type=button], [type=submit], [type=reset]')) {
+        if ($target.is('textarea, [type=button], [type=submit], [type=reset], [data-enter-submit]')) {
             return;
         }
         if ($target.closest('.select2-dropdown, .select2-search__field').length) {
+            enterKeySelectPending = true;
+            // Self-expires shortly after: if Enter had no effect at all (e.g. no results
+            // matched the search), neither select2:select nor select2:closing fires to clear
+            // it, and it must not sit around waiting to misattribute some later, unrelated
+            // selection (e.g. a plain mouse click in a different dropdown) as Enter-driven.
+            setTimeout(function () {
+                enterKeySelectPending = false;
+            }, 300);
             return;
         }
         if ($target.closest('.select2-container').hasClass('select2-container--open')) {
@@ -185,6 +228,11 @@ function initEnterKeyNavigation(root) {
         setTimeout(function () {
             $select.removeData('justClosedSelect2');
         }, 250);
+
+        // Covers Enter on a result that was already selected (Select2 just closes, with no
+        // select2:select at all) and Escape/click-away (closes with nothing selected) — both
+        // must not leave a stale pending flag for some later, unrelated selection to pick up.
+        enterKeySelectPending = false;
     });
 
     $root.on('focus', '.select2-selection', function () {
@@ -199,6 +247,25 @@ function initEnterKeyNavigation(root) {
         setTimeout(function () {
             if ($selection.is(':focus') && !$container.hasClass('select2-container--open')) {
                 $select.select2('open');
+            }
+        }, 0);
+    });
+
+    // Picking a result with Enter (as opposed to a mouse click) selects it and closes the
+    // dropdown, but leaves focus sitting on the Select2 box itself — the keydown handler
+    // above deliberately left that Enter keypress alone so Select2 could handle it, so
+    // nothing has moved focus onward yet. Finish the job here: once Select2 settles focus
+    // back onto its own selection element, carry on to the next field, same as Enter does
+    // everywhere else in the form.
+    $root.on('select2:select', function () {
+        if (!enterKeySelectPending) {
+            return;
+        }
+        enterKeySelectPending = false;
+        setTimeout(function () {
+            var current = document.activeElement;
+            if (current) {
+                focusNextField(current, $root, FIELD_SELECTOR);
             }
         }, 0);
     });

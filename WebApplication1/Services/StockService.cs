@@ -54,8 +54,12 @@ public class StockService(ApplicationDbContext db) : IStockService
 
     public async Task ReverseTransactionsForReferenceAsync(string reference)
     {
+        // !IsReversed matters when the same reference is reposted in place (an Edit) rather than
+        // only ever cancelled once — without it, a later reversal would match these rows again
+        // (the reversal rows themselves live under a different "REVERSAL-{reference}" tag, so
+        // they're never at risk of being re-matched; it's only the originals that need marking).
         var transactions = await db.StockTransactions
-            .Where(t => t.Reference == reference)
+            .Where(t => t.Reference == reference && !t.IsReversed)
             .ToListAsync();
 
         foreach (var t in transactions)
@@ -76,6 +80,8 @@ public class StockService(ApplicationDbContext db) : IStockService
                 Reference = $"REVERSAL-{reference}",
                 Notes = $"Reversal of {reference}"
             });
+
+            t.IsReversed = true;
         }
     }
 

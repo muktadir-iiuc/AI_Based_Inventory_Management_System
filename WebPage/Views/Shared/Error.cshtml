@@ -1,0 +1,15 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error | Bangladesh Tyre";
+}
+<div class="container" style="padding: 160px 24px 100px;">
+    <h1 class="section-title" style="color:#dc2626;">Something Went Wrong</h1>
+    <p class="section-lead">An error occurred while processing your request.</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p><strong>Request ID:</strong> <code>@Model.RequestId</code></p>
+    }
+
+    <p><a href="/" class="btn btn-primary-dark">Return Home</a></p>
+</div>

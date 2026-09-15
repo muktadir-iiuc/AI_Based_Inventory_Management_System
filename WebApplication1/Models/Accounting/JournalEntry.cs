@@ -30,6 +30,12 @@ public class JournalEntry
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Set once this entry has been reversed (by Cancel, or by an in-place Edit that reposts
+    // under the same SourceReference) so a later reversal for the same reference never
+    // matches it again — without this, editing then later cancelling/re-editing the same
+    // document would reverse the original entry a second time.
+    public bool IsReversed { get; set; }
+
     [NotMapped]
     public decimal TotalDebit => Lines.Sum(l => l.Debit);
 

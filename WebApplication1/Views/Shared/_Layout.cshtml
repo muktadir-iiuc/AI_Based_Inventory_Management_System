@@ -195,8 +195,15 @@
                         </ul>
                     </li>
 
-                    @if (User.IsInRole(Roles.Admin))
+                    @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager))
                     {
+                        <li class="nav-item">
+                            <a asp-controller="PettyCash" asp-action="Index" class="nav-link @(InController("PettyCash") ? "active" : "")">
+                                <i class="nav-icon fas fa-coins"></i>
+                                <p>Petty Cash</p>
+                            </a>
+                        </li>
+
                         <li class="nav-header">ADMINISTRATION</li>
                         <li class="nav-item">
                             <a asp-controller="Users" asp-action="Index" class="nav-link @(InController("Users") ? "active" : "")">

@@ -1,0 +1,523 @@
+@model SalesInvoiceCreateViewModel
+@{
+    ViewData["Title"] = $"Edit Sales Invoice {ViewData["InvoiceNumber"]}";
+    var customerList = (SelectList)ViewData["Customers"]!;
+    var warehouseList = (SelectList)ViewData["Warehouses"]!;
+    var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
+}
+
+<div class="alert alert-info py-2 small mb-3">
+    <i class="fas fa-circle-info"></i> Editing keeps the invoice number <strong>@ViewData["InvoiceNumber"]</strong> — saving reverses the old lines' stock/accounting effect and re-runs FIFO for the lines below fresh.
+    @if (ViewData["EditNotice"] is string notice)
+    {
+        <div class="mt-1">@notice</div>
+    }
+</div>
+
+<form asp-action="Edit" method="post" id="invoiceForm">
+    <div asp-validation-summary="All" class="text-danger"></div>
+
+    <div class="row g-3">
+        <div class="col-lg-9">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Invoice Details</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="CustomerId" class="form-label required-asterisk"></label>
+                            <div class="d-flex gap-2">
+                                <select asp-for="CustomerId" asp-items="customerList" class="form-select">
+                                    <option value="">-- select customer --</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#quickAddCustomerModal" title="Add a new customer">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
+                            @if (warehouseScoped)
+                            {
+                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Selected)?.Text" readonly />
+                                <input type="hidden" asp-for="WarehouseId" id="warehouseId" />
+                            }
+                            else
+                            {
+                                <select asp-for="WarehouseId" asp-items="warehouseList" class="form-select" id="warehouseId">
+                                    <option value="">-- select warehouse --</option>
+                                </select>
+                            }
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Date" class="form-label required-asterisk"></label>
+                            <input asp-for="Date" class="form-control" type="date" />
+                        </div>
+                        <div class="col-12 mb-0">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <input asp-for="Notes" class="form-control" placeholder="Optional note for this invoice" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h3 class="card-title mb-0">Line Items</h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
+                </div>
+                <div class="card-body p-0 table-responsive-card">
+                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 3%">#</th>
+                                <th style="width: 28%">Product</th>
+                                <th style="width: 14%">Category</th>
+                                <th style="width: 12%">Quantity</th>
+                                <th style="width: 14%" class="text-end">Unit Price</th>
+                                <th style="width: 17%" class="text-end">Line Total</th>
+                                <th style="width: 5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                    <div id="emptyState" class="text-center text-muted py-4 d-none">
+                        No product lines yet — click "Add product line" to get started.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card position-sticky">
+                <div class="card-header">
+                    <h3 class="card-title">Summary</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 text-muted fw-normal">Product lines</dt>
+                        <dd class="col-5 text-end" id="summaryLineCount">0</dd>
+                        <dt class="col-7 text-muted fw-normal">Total quantity</dt>
+                        <dd class="col-5 text-end" id="summaryQty">0</dd>
+                    </dl>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Grand Total</span>
+                        <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
+                    </div>
+                    <div class="form-text mt-1">
+                        Unit price is suggested automatically from the FIFO batch once you change a product or quantity — edit it if this sale is priced differently.
+                    </div>
+                </div>
+                <div class="card-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a asp-action="Details" asp-route-id="@ViewContext.RouteData.Values["id"]" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="modal fade" id="quickAddCustomerModal" tabindex="-1" aria-labelledby="quickAddCustomerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickAddCustomerModalLabel">Add New Customer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-danger small mb-2 d-none" id="quickCustomerError"></div>
+                <div class="mb-2">
+                    <label class="form-label required-asterisk">Name</label>
+                    <input type="text" class="form-control" id="quickCustomerName" data-enter-submit />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" class="form-control" id="quickCustomerContact" data-enter-submit />
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="quickCustomerPhone" data-enter-submit />
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="quickCustomerEmail" data-enter-submit />
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Address</label>
+                    <textarea class="form-control" rows="2" id="quickCustomerAddress"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveQuickCustomer">Save Customer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
+        const previewUrl = '@Url.Action("PreviewAllocation")';
+        const existingLines = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Items));
+        let rowIndex = 0;
+
+        function currentWarehouseId() {
+            const el = document.getElementById('warehouseId');
+            return el ? parseInt(el.value, 10) || 0 : 0;
+        }
+
+        function productOptions(selectedId) {
+            let html = '<option value="">-- select product --</option>';
+            products.forEach(p => {
+                const sel = (selectedId && selectedId == p.Id) ? 'selected' : '';
+                html += `<option value="${p.Id}" data-stock="${p.CurrentStock}" data-symbol="${p.Symbol}" data-category="${p.Category || ''}" ${sel}>${p.Sku} - ${p.Name} (stock: ${p.CurrentStock})</option>`;
+            });
+            return html;
+        }
+
+        function updateEmptyState() {
+            const hasRows = document.querySelectorAll('#itemsBody tr:not(.allocation-row)').length > 0;
+            document.getElementById('itemsTable').classList.toggle('d-none', !hasRows);
+            document.getElementById('emptyState').classList.toggle('d-none', hasRows);
+        }
+
+        function renumberRows() {
+            document.querySelectorAll('#itemsBody tr.item-row').forEach((tr, i) => {
+                tr.querySelector('.row-number').textContent = i + 1;
+            });
+        }
+
+        // Prefilled rows (from the invoice being edited) start with their original product,
+        // quantity and price already in place and do NOT auto-fire the live FIFO preview —
+        // that preview checks *current* stock, which still reflects this invoice's own past
+        // sale until the edit is actually submitted, so it would wrongly warn "insufficient
+        // stock" for a line the user hasn't touched. The preview only kicks in once the user
+        // changes something on a row (see wireRow), at which point checking live stock is
+        // exactly what should happen.
+        function addRow(line) {
+            const tbody = document.getElementById('itemsBody');
+            const tr = document.createElement('tr');
+            tr.className = 'item-row';
+            const productId = line ? line.ProductId : null;
+            const qty = line ? line.Quantity : 1;
+            const price = line ? line.UnitPrice : null;
+            tr.innerHTML = `
+                <td class="row-number text-muted"></td>
+                <td>
+                    <select name="Items[${rowIndex}].ProductId" class="form-select product-select">${productOptions(productId)}</select>
+                </td>
+                <td class="category-cell text-muted">&mdash;</td>
+                <td><input name="Items[${rowIndex}].Quantity" type="number" step="1" min="1" inputmode="numeric" class="form-control qty-input" value="${qty}" /></td>
+                <td><input name="Items[${rowIndex}].UnitPrice" type="number" step="0.01" min="0" class="form-control form-control-sm text-end unit-price-input" placeholder="&mdash;" value="${price ?? ''}" /></td>
+                <td class="text-end line-total fw-semibold">0.00</td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+
+            const allocationTr = document.createElement('tr');
+            allocationTr.className = 'allocation-row d-none';
+            allocationTr.innerHTML = `
+                <td colspan="7" class="bg-body-tertiary p-2">
+                    <div class="small text-muted mb-1">FIFO batch allocation</div>
+                    <table class="table table-sm mb-0 allocation-table">
+                        <thead><tr><th>Batch</th><th class="text-end">Available</th><th class="text-end">Allocated</th><th class="text-end">Purchase Price</th><th class="text-end">Sale Price</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </td>
+            `;
+            tbody.appendChild(allocationTr);
+
+            if (line) {
+                const opt = tr.querySelector('.product-select').selectedOptions[0];
+                const category = opt && opt.value ? opt.dataset.category : '';
+                const categoryCell = tr.querySelector('.category-cell');
+                categoryCell.textContent = category || '—';
+                categoryCell.classList.toggle('text-muted', !category);
+            }
+
+            rowIndex++;
+            wireRow(tr, allocationTr, !!line);
+            renumberRows();
+            updateEmptyState();
+            if (line) {
+                updateLineTotalFor(tr);
+            }
+            return tr;
+        }
+
+        function updateLineTotalFor(tr) {
+            const quantity = parseInt(tr.querySelector('.qty-input').value, 10) || 0;
+            const price = parseFloat(tr.querySelector('.unit-price-input').value) || 0;
+            tr.querySelector('.line-total').textContent = (quantity * price).toFixed(2);
+            recalc();
+        }
+
+        function wireRow(tr, allocationTr, skipInitialPreview) {
+            const select = tr.querySelector('.product-select');
+            const qty = tr.querySelector('.qty-input');
+            const priceInput = tr.querySelector('.unit-price-input');
+            const totalCell = tr.querySelector('.line-total');
+            const categoryCell = tr.querySelector('.category-cell');
+            const allocationBody = allocationTr.querySelector('tbody');
+
+            let debounceHandle = null;
+            let priceManuallyEdited = skipInitialPreview; // prefilled price is already the real, known price
+
+            function updateLineTotal() {
+                updateLineTotalFor(tr);
+            }
+
+            function enforceIntegerQuantity() {
+                const digitsOnly = qty.value.replace(/[^\d]/g, '');
+                if (digitsOnly !== qty.value) {
+                    qty.value = digitsOnly;
+                }
+            }
+
+            function updateCategory() {
+                const category = select.selectedOptions[0]?.dataset.category;
+                categoryCell.textContent = category || '—';
+                categoryCell.classList.toggle('text-muted', !category);
+            }
+
+            function clearAllocation(message, isError) {
+                priceInput.value = '';
+                priceInput.disabled = !!isError;
+                priceInput.classList.toggle('is-invalid', !!isError);
+                priceInput.title = isError ? (message || '') : '';
+                totalCell.textContent = '0.00';
+                allocationTr.classList.add('d-none');
+                allocationBody.innerHTML = '';
+                recalc();
+            }
+
+            function showLoading() {
+                priceInput.classList.remove('is-invalid');
+                priceInput.disabled = true;
+                priceInput.placeholder = '…';
+            }
+
+            async function refreshAllocation() {
+                const productId = parseInt(select.value, 10) || 0;
+                const quantity = parseInt(qty.value, 10) || 0;
+                const warehouseId = currentWarehouseId();
+
+                if (!productId || !quantity || !warehouseId) {
+                    clearAllocation();
+                    return;
+                }
+
+                showLoading();
+
+                const url = `${previewUrl}?productId=${productId}&warehouseId=${warehouseId}&quantity=${quantity}`;
+                let data;
+                try {
+                    const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    data = await response.json();
+                } catch {
+                    clearAllocation('Unable to check stock', true);
+                    return;
+                }
+
+                if (!data.ok) {
+                    clearAllocation(data.error || 'Insufficient stock', true);
+                    return;
+                }
+
+                priceInput.disabled = false;
+                priceInput.placeholder = '0.00';
+                if (!priceManuallyEdited) {
+                    priceInput.value = data.unitPrice.toFixed(2);
+                }
+                updateLineTotal();
+
+                allocationBody.innerHTML = data.lines.map(l => `
+                    <tr>
+                        <td>${l.BatchNumber}</td>
+                        <td class="text-end">${Number(l.Available).toFixed(2)}</td>
+                        <td class="text-end">${Number(l.Allocated).toFixed(2)}</td>
+                        <td class="text-end">${Number(l.PurchasePrice).toFixed(2)}</td>
+                        <td class="text-end">${Number(l.SalePrice).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+                allocationTr.classList.toggle('d-none', data.lines.length <= 1);
+            }
+
+            function debouncedRefresh() {
+                clearTimeout(debounceHandle);
+                debounceHandle = setTimeout(refreshAllocation, 300);
+            }
+
+            select.addEventListener('change', () => {
+                priceManuallyEdited = false;
+                updateCategory();
+                debouncedRefresh();
+            });
+            qty.addEventListener('input', () => {
+                enforceIntegerQuantity();
+                debouncedRefresh();
+            });
+            priceInput.addEventListener('input', () => {
+                priceManuallyEdited = true;
+                updateLineTotal();
+            });
+            tr.querySelector('.remove-row').addEventListener('click', () => {
+                tr.remove();
+                allocationTr.remove();
+                renumberRows();
+                updateEmptyState();
+                recalc();
+            });
+
+            initSelect2(tr);
+
+            if (typeof jQuery !== 'undefined') {
+                jQuery(select).on('select2:select select2:clear', () => {
+                    priceManuallyEdited = false;
+                    updateCategory();
+                    debouncedRefresh();
+                });
+            }
+
+            // Only wire the "refresh on demand" hook for later warehouse changes — the initial
+            // prefilled row deliberately skips calling it now (see addRow's comment above).
+            tr.refreshAllocation = refreshAllocation;
+        }
+
+        function recalc() {
+            let grand = 0;
+            let totalQty = 0;
+            const rows = document.querySelectorAll('#itemsBody tr.item-row');
+            rows.forEach(tr => {
+                grand += parseFloat(tr.querySelector('.line-total').textContent) || 0;
+                totalQty += parseInt(tr.querySelector('.qty-input').value, 10) || 0;
+            });
+            document.getElementById('grandTotal').textContent = grand.toFixed(2);
+            document.getElementById('summaryLineCount').textContent = rows.length;
+            document.getElementById('summaryQty').textContent = totalQty;
+        }
+
+        function refreshAllRows() {
+            document.querySelectorAll('#itemsBody tr.item-row').forEach(tr => {
+                if (typeof tr.refreshAllocation === 'function') {
+                    tr.refreshAllocation();
+                }
+            });
+        }
+
+        // Only the explicit "Add product line" click focuses the new row's Product box (and,
+        // via site.js's global open-on-focus handler, opens its dropdown) — rows prefilled
+        // from the invoice being edited, and added automatically below, leave focus alone.
+        document.getElementById('addRow').addEventListener('click', () => {
+            const tr = addRow(null);
+            const productSelect = tr.querySelector('.product-select');
+            const selection = jQuery(productSelect).next('.select2-container').find('.select2-selection')[0];
+            if (selection) {
+                selection.focus();
+            }
+        });
+        const warehouseEl = document.getElementById('warehouseId');
+        if (warehouseEl && warehouseEl.tagName === 'SELECT') {
+            // A warehouse change on Edit *does* need a live re-check (unlike the initial
+            // prefill), since the old lines' stock hasn't been given back to a *different*
+            // warehouse than the one they were sold from.
+            warehouseEl.addEventListener('change', refreshAllRows);
+        }
+
+        if (existingLines.length > 0) {
+            existingLines.forEach(line => addRow(line));
+        } else {
+            addRow(null);
+        }
+    </script>
+    <script>
+        (function () {
+            const customerSelect = document.getElementById('CustomerId');
+            const modalEl = document.getElementById('quickAddCustomerModal');
+            const nameInput = document.getElementById('quickCustomerName');
+            const contactInput = document.getElementById('quickCustomerContact');
+            const phoneInput = document.getElementById('quickCustomerPhone');
+            const emailInput = document.getElementById('quickCustomerEmail');
+            const addressInput = document.getElementById('quickCustomerAddress');
+            const errorEl = document.getElementById('quickCustomerError');
+            const saveBtn = document.getElementById('saveQuickCustomer');
+            const token = document.querySelector('#invoiceForm input[name="__RequestVerificationToken"]').value;
+            const modal = new bootstrap.Modal(modalEl);
+
+            function resetForm() {
+                [nameInput, contactInput, phoneInput, emailInput, addressInput].forEach(el => el.value = '');
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
+
+            function showError(message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('d-none');
+            }
+
+            modalEl.addEventListener('shown.bs.modal', () => nameInput.focus());
+            modalEl.addEventListener('hidden.bs.modal', resetForm);
+
+            async function saveCustomer() {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    showError('Enter a customer name.');
+                    nameInput.focus();
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                try {
+                    const res = await fetch('@Url.Action("QuickCreate", "Customers")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                        body: JSON.stringify({
+                            name: name,
+                            contactPerson: contactInput.value.trim() || null,
+                            phone: phoneInput.value.trim() || null,
+                            email: emailInput.value.trim() || null,
+                            address: addressInput.value.trim() || null
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) {
+                        showError(data.error || 'Could not add this customer.');
+                        return;
+                    }
+
+                    const opt = document.createElement('option');
+                    opt.value = data.id;
+                    opt.textContent = data.name;
+                    customerSelect.appendChild(opt);
+                    customerSelect.value = data.id;
+
+                    const $select = jQuery(customerSelect);
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                    initSelect2(customerSelect);
+
+                    modal.hide();
+                } catch {
+                    showError('Unable to reach the server. Please try again.');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            }
+
+            saveBtn.addEventListener('click', saveCustomer);
+            modalEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && e.target.matches('input')) {
+                    e.preventDefault();
+                    saveCustomer();
+                }
+            });
+        })();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

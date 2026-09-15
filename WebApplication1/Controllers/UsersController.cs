@@ -9,7 +9,7 @@ using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
-[Authorize(Roles = Roles.Admin)]
+[Authorize(Roles = Roles.AdminManagers)]
 public class UsersController(
     UserManager<ApplicationUser> userManager,
     RoleManager<ApplicationRole> roleManager,

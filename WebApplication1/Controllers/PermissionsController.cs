@@ -6,11 +6,11 @@ using WebApplication1.Models.Identity;
 
 namespace WebApplication1.Controllers;
 
-[Authorize(Roles = Roles.Admin)]
+[Authorize(Roles = Roles.AdminManagers)]
 public class PermissionsController(ApplicationDbContext db) : Controller
 {
-    // Admin is excluded: it implicitly has every permission and is never shown as grantable.
-    private static readonly string[] GrantableRoles = Roles.All.Where(r => r != Roles.Admin).ToArray();
+    // Admin and Manager are excluded: both implicitly have every permission and are never shown as grantable.
+    private static readonly string[] GrantableRoles = Roles.All.Where(r => r != Roles.Admin && r != Roles.Manager).ToArray();
 
     public async Task<IActionResult> Index()
     {

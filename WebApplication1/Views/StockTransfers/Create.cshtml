@@ -152,6 +152,7 @@
             wireRow(tr);
             renumberRows();
             updateEmptyState();
+            return tr;
         }
 
         function wireRow(tr) {
@@ -226,7 +227,17 @@
             toWarehouseEl.classList.toggle('is-invalid', same);
         }
 
-        document.getElementById('addRow').addEventListener('click', addRow);
+        // Only the explicit "Add product line" click focuses the new row's Product box (and,
+        // via site.js's global open-on-focus handler, opens its dropdown) — the very first
+        // row, added automatically below on page load, deliberately leaves focus alone.
+        document.getElementById('addRow').addEventListener('click', () => {
+            const tr = addRow();
+            const productSelect = tr.querySelector('.product-select');
+            const selection = jQuery(productSelect).next('.select2-container').find('.select2-selection')[0];
+            if (selection) {
+                selection.focus();
+            }
+        });
         if (fromWarehouseEl.tagName === 'SELECT') {
             fromWarehouseEl.addEventListener('change', () => { refreshAllRows(); checkSameWarehouse(); });
             if (typeof jQuery !== 'undefined') {

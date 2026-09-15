@@ -12,7 +12,7 @@ public class WarehousesController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index()
     {
-        return View(await db.Warehouses.OrderBy(w => w.Name).ToListAsync());
+        return View(await db.Warehouses.Where(w => w.IsActive).OrderBy(w => w.Name).ToListAsync());
     }
 
     [Authorize(Roles = $"{Roles.Admin},{Roles.Manager}")]

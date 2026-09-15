@@ -39,4 +39,9 @@ public class StockTransaction
 
     [Column(TypeName = "decimal(18,2)")]
     public decimal? UnitSalePrice { get; set; }
+
+    // Set once this transaction has been reversed (by Cancel, or by an in-place Edit that
+    // reposts under the same Reference) so a later reversal for the same reference never
+    // matches it again — see JournalEntry.IsReversed for the identical reasoning.
+    public bool IsReversed { get; set; }
 }

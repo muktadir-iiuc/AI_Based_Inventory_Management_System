@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.Extensions;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.ViewModels;
@@ -34,19 +35,48 @@ public class ProductsController(
         ViewData["Search"] = search;
         ViewData["CategoryId"] = new SelectList(await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
 
-        return View(await query.OrderBy(p => p.Name).ToListAsync());
+        var products = await query.OrderBy(p => p.Name).ToListAsync();
+
+        // Product.CurrentStock is a denormalized total across every warehouse — a warehouse-scoped
+        // user must never see that (it would leak other warehouses' quantities), so for restricted
+        // users the list/reorder-warning both use a per-user total limited to their own warehouse(s).
+        var warehouseIds = User.GetWarehouseIds();
+        if (warehouseIds is not null)
+        {
+            var productIds = products.Select(p => p.Id).ToList();
+            ViewData["ScopedStock"] = await db.ProductWarehouseStocks
+                .Where(s => productIds.Contains(s.ProductId) && warehouseIds.Contains(s.WarehouseId))
+                .GroupBy(s => s.ProductId)
+                .Select(g => new { g.Key, Total = g.Sum(s => s.Quantity) })
+                .ToDictionaryAsync(x => x.Key, x => x.Total);
+        }
+
+        return View(products);
     }
 
     public async Task<IActionResult> Details(int id)
     {
+        var warehouseIds = User.GetWarehouseIds();
+
         var product = await db.Products
             .Include(p => p.Category)
             .Include(p => p.UnitOfMeasure)
-            .Include(p => p.StockTransactions.OrderByDescending(t => t.Date).Take(20)).ThenInclude(t => t.Warehouse)
-            .Include(p => p.WarehouseStocks.Where(s => s.Quantity != 0)).ThenInclude(s => s.Warehouse)
+            .Include(p => p.StockTransactions
+                .Where(t => warehouseIds == null || warehouseIds.Contains(t.WarehouseId))
+                .OrderByDescending(t => t.Date).Take(20))
+                .ThenInclude(t => t.Warehouse)
+            .Include(p => p.WarehouseStocks
+                .Where(s => s.Quantity != 0 && (warehouseIds == null || warehouseIds.Contains(s.WarehouseId))))
+                .ThenInclude(s => s.Warehouse)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (product is null) return NotFound();
+
+        if (warehouseIds is not null)
+        {
+            ViewData["ScopedStock"] = product.WarehouseStocks.Sum(s => s.Quantity);
+        }
+
         return View(product);
     }
 

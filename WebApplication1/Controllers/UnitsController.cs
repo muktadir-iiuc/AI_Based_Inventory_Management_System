@@ -12,7 +12,7 @@ public class UnitsController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index()
     {
-        return View(await db.UnitOfMeasures.OrderBy(u => u.Name).ToListAsync());
+        return View(await db.UnitOfMeasures.Where(u => u.IsActive).OrderBy(u => u.Name).ToListAsync());
     }
 
     [Authorize(Roles = Roles.PurchaseManagers)]

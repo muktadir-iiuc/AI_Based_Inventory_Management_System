@@ -23,7 +23,13 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+var mvcBuilder = builder.Services.AddControllersWithViews();
+if (builder.Environment.IsDevelopment())
+{
+    // Lets .cshtml edits take effect on the next request instead of requiring a full
+    // rebuild + app restart — views are precompiled into the assembly otherwise.
+    mvcBuilder.AddRazorRuntimeCompilation();
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -52,6 +58,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddMemoryCache();
 builder.Services.AddSignalR();
+
+// Lets [ValidateAntiForgeryToken] accept the token via this header on JSON fetch() calls
+// (the chatbot widget and Petty Cash page both send it this way) instead of only form fields.
+builder.Services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
 
 builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddScoped<IStockService, StockService>();

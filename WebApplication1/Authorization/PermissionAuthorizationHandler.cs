@@ -10,7 +10,7 @@ public class PermissionAuthorizationHandler(ApplicationDbContext db) : Authoriza
 {
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        if (context.User.IsInRole(Roles.Admin))
+        if (context.User.IsInRole(Roles.Admin) || context.User.IsInRole(Roles.Manager))
         {
             context.Succeed(requirement);
             return;
