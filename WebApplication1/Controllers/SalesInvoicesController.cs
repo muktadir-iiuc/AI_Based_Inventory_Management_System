@@ -230,12 +230,26 @@ public class SalesInvoicesController(
                 }
             }
 
+            // The discount is entered as an amount or a percent; it is validated against the real
+            // subtotal (after FIFO has settled each line's price), just before the invoice is saved.
+            var subtotal = invoice.Items.Sum(i => i.Quantity * i.UnitPrice);
+            var discount = DiscountAllocator.ToAmount(model.DiscountType, model.DiscountValue, subtotal);
+            if (model.DiscountType == DiscountType.Percent && model.DiscountValue > 100)
+            {
+                ModelState.AddModelError(nameof(model.DiscountValue), "A percentage discount cannot be more than 100%.");
+            }
+            else if (discount > subtotal)
+            {
+                ModelState.AddModelError(nameof(model.DiscountValue), $"The discount ({discount:C}) cannot be more than the invoice subtotal ({subtotal:C}).");
+            }
+
             if (!ModelState.IsValid)
             {
                 await PopulateDropdownsAsync();
                 return View(model);
             }
 
+            DiscountAllocator.Allocate(invoice.Items.ToList(), discount);
             db.SalesInvoices.Add(invoice);
             await accountingService.PostSalesInvoiceAsync(invoice);
 
@@ -306,6 +320,8 @@ public class SalesInvoicesController(
             CustomerPhone = invoice.Customer?.Phone ?? string.Empty,
             WarehouseName = invoice.Warehouse?.Name ?? string.Empty,
             Notes = invoice.Notes ?? string.Empty,
+            SubtotalAmount = invoice.SubTotal.ToString("N2"),
+            DiscountAmount = invoice.DiscountAmount.ToString("N2"),
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
             DueAmount = dueAmount.ToString("N2")
@@ -378,9 +394,9 @@ public class SalesInvoicesController(
         // Accounts Receivable directly and never creates a refund Payment.
         var customerOutstandingDue = await db.SalesInvoices
             .Where(s => s.CustomerId == invoice.CustomerId && s.Status == DocumentStatus.Posted)
-            .Select(s => s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice)
+            .Select(s => s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare)
                          - s.Payments.Sum(p => p.Amount)
-                         - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice)))
+                         - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice - ri.DiscountShare)))
             .SumAsync()
             // Plus whatever is left of the customer's opening balance (see Customer.OpeningBalance).
             + await db.Customers.Where(c => c.Id == invoice.CustomerId).Select(c => c.OpeningBalance).FirstAsync()
@@ -418,6 +434,8 @@ public class SalesInvoicesController(
             WarehouseName = invoice.Warehouse?.Name ?? string.Empty,
             ServedBy = string.IsNullOrWhiteSpace(servedBy) ? "N/A" : servedBy,
             Notes = invoice.Notes ?? string.Empty,
+            SubtotalAmount = invoice.SubTotal.ToString("N2"),
+            DiscountAmount = invoice.DiscountAmount.ToString("N2"),
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
             DueAmount = dueAmount.ToString("N2"),
@@ -577,6 +595,8 @@ public class SalesInvoicesController(
         var model = new SalesInvoiceCreateViewModel
         {
             CustomerId = invoice.CustomerId,
+            DiscountType = DiscountType.Amount,
+            DiscountValue = invoice.DiscountAmount,
             WarehouseId = invoice.WarehouseId,
             Date = invoice.Date,
             Notes = invoice.Notes,
@@ -704,6 +724,19 @@ public class SalesInvoicesController(
                 }
             }
 
+            // The discount is entered as an amount or a percent; it is validated against the real
+            // subtotal (after FIFO has settled each line's price), just before the invoice is saved.
+            var subtotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
+            var discount = DiscountAllocator.ToAmount(model.DiscountType, model.DiscountValue, subtotal);
+            if (model.DiscountType == DiscountType.Percent && model.DiscountValue > 100)
+            {
+                ModelState.AddModelError(nameof(model.DiscountValue), "A percentage discount cannot be more than 100%.");
+            }
+            else if (discount > subtotal)
+            {
+                ModelState.AddModelError(nameof(model.DiscountValue), $"The discount ({discount:C}) cannot be more than the invoice subtotal ({subtotal:C}).");
+            }
+
             if (!ModelState.IsValid)
             {
                 await PopulateDropdownsAsync();
@@ -711,6 +744,7 @@ public class SalesInvoicesController(
                 return View(model);
             }
 
+            DiscountAllocator.Allocate(invoice.Items.Where(i => i.IsCurrent).ToList(), discount);
             await accountingService.PostSalesInvoiceAsync(invoice);
 
             try

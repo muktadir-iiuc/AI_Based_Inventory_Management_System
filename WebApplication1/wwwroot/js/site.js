@@ -338,7 +338,7 @@ function initPartyDue(options) {
         options.afterEl.className = 'col-5 text-end fw-semibold ' + after.cls;
     }
 
-    function render(id, amount) {
+    function render(id, amount, totalPaid) {
         var el = options.dueEl;
         el.textContent = '';
         el.className = 'small mt-1';
@@ -360,6 +360,12 @@ function initPartyDue(options) {
         el.appendChild(label);
         el.appendChild(document.createTextNode(' · '));
         el.appendChild(link);
+        if (options.paidLabel) {
+            var paid = document.createElement('div');
+            paid.className = 'text-muted';
+            paid.textContent = options.paidLabel + ': ' + money(totalPaid);
+            el.appendChild(paid);
+        }
     }
 
     function hide() {
@@ -390,7 +396,7 @@ function initPartyDue(options) {
                 }
                 balance = Number(data.balance) || 0;
                 settled = Number(data.settled) || 0;
-                render(id, balance);
+                render(id, balance, Number(data.totalPaid) || 0);
                 renderSummary();
             })
             .catch(function () {

@@ -13,7 +13,7 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-public class CustomersController(ApplicationDbContext db, IAccountingService accountingService) : Controller
+public class CustomersController(ApplicationDbContext db, IAccountingService accountingService, IWebHostEnvironment env, ICompanySettingsService companySettings) : Controller
 {
     // Customer.OutstandingDue sums whatever SalesInvoices collection is loaded on the entity
     // (Items, Payments and Returns all required — see Customer.OutstandingDue), so a
@@ -61,7 +61,7 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
     // out into dated rows instead of a single total. Warehouse scoping follows the same rule
     // as Index/Details: every document is filtered by the warehouse of the invoice it belongs
     // to, so a restricted user never sees amounts from warehouses they aren't assigned to.
-    public async Task<IActionResult> Ledger(int? partyId, DateTime? from, DateTime? to)
+    private async Task<PartyLedgerViewModel?> BuildLedgerAsync(int? partyId, DateTime? from, DateTime? to)
     {
         var warehouseIds = User.GetWarehouseIds();
 
@@ -81,11 +81,11 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
         if (partyId is null or 0)
         {
             vm.Summary = await BuildReceivablesSummaryAsync(warehouseIds);
-            return View("PartyLedger", vm);
+            return vm;
         }
 
         var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == partyId);
-        if (customer is null) return NotFound();
+        if (customer is null) return null;
 
         vm.PartyName = customer.Name;
         vm.PartyPhone = customer.Phone;
@@ -170,7 +170,25 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
         }));
 
         vm.Build(rows);
-        return View("PartyLedger", vm);
+        return vm;
+    }
+
+    public async Task<IActionResult> Ledger(int? partyId, DateTime? from, DateTime? to)
+    {
+        var vm = await BuildLedgerAsync(partyId, from, to);
+        return vm is null ? NotFound() : View("PartyLedger", vm);
+    }
+
+    // The same ledger (same rows, same running balance, same warehouse scoping) as an A4 PDF in
+    // the Sales Invoice report's style, opened inline so it can be printed or saved from the viewer.
+    public async Task<IActionResult> LedgerPdf(int partyId, DateTime? from, DateTime? to)
+    {
+        var vm = await BuildLedgerAsync(partyId, from, to);
+        if (vm is null || vm.PartyId is not > 0) return NotFound();
+
+        var company = await companySettings.GetAsync();
+        var pdf = PartyLedgerReportBuilder.Render(vm, company, env.ContentRootPath);
+        return File(pdf, "application/pdf");
     }
 
     // The customer's current balance for the Sales Invoice Create page — exactly the Customer
@@ -192,9 +210,17 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
             var own = db.SalesInvoices.Where(i => i.Id == excludeInvoiceId && i.CustomerId == id && i.Status == DocumentStatus.Posted
                                                   && (warehouseIds == null || warehouseIds.Contains(i.WarehouseId)));
             settled = await db.Payments.Where(p => own.Any(i => i.Id == p.SalesInvoiceId)).SumAsync(p => (decimal?)p.Amount) ?? 0;
-            settled += await db.SalesReturnItems.Where(r => own.Any(i => i.Id == r.SalesReturn!.SalesInvoiceId)).SumAsync(r => (decimal?)(r.Quantity * r.UnitPrice)) ?? 0;
+            settled += await db.SalesReturnItems.Where(r => own.Any(i => i.Id == r.SalesReturn!.SalesInvoiceId)).SumAsync(r => (decimal?)(r.Quantity * r.UnitPrice - r.DiscountShare)) ?? 0;
         }
-        return Json(new { ok = true, id = row.Id, name = row.Name, balance = row.Balance, settled });
+
+        // Everything received from this customer to date: invoice payments (in the caller's
+        // warehouse scope, like the balance) plus payments against the opening balance.
+        var totalPaid = await db.Payments
+            .Where(p => (p.SalesInvoiceId != null && p.SalesInvoice!.CustomerId == id && p.SalesInvoice.Status == DocumentStatus.Posted
+                         && (warehouseIds == null || warehouseIds.Contains(p.SalesInvoice.WarehouseId)))
+                        || (p.SalesInvoiceId == null && p.CustomerId == id))
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+        return Json(new { ok = true, id = row.Id, name = row.Name, balance = row.Balance, settled, totalPaid });
     }
 
     // Closing receivable per customer for the ledger landing page. Three grouped queries
@@ -208,7 +234,7 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
             .Where(i => customerId == null || i.SalesInvoice!.CustomerId == customerId)
             .Where(i => warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId))
             .GroupBy(i => i.SalesInvoice!.CustomerId)
-            .Select(g => new { CustomerId = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice) })
+            .Select(g => new { CustomerId = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare) })
             .ToDictionaryAsync(x => x.CustomerId, x => x.Total);
 
         var paid = await db.Payments
@@ -226,7 +252,7 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
             .Where(i => customerId == null || i.SalesReturn!.SalesInvoice!.CustomerId == customerId)
             .Where(i => warehouseIds == null || warehouseIds.Contains(i.SalesReturn!.SalesInvoice!.WarehouseId))
             .GroupBy(i => i.SalesReturn!.SalesInvoice!.CustomerId)
-            .Select(g => new { CustomerId = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice) })
+            .Select(g => new { CustomerId = g.Key, Total = g.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare) })
             .ToDictionaryAsync(x => x.CustomerId, x => x.Total);
 
         // Opening balances and the payments against them aren't warehouse-scoped — see Ledger.

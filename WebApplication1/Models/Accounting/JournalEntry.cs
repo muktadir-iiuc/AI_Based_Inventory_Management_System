@@ -11,7 +11,8 @@ public enum JournalSource
     Reversal = 5,
     SalesReturn = 6,
     PurchaseReturn = 7,
-    OpeningBalance = 8
+    OpeningBalance = 8,
+    StockAdjustment = 9
 }
 
 public class JournalEntry

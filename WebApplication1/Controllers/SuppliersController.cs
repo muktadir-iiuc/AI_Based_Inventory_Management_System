@@ -12,7 +12,7 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-public class SuppliersController(ApplicationDbContext db, IAccountingService accountingService) : Controller
+public class SuppliersController(ApplicationDbContext db, IAccountingService accountingService, IWebHostEnvironment env, ICompanySettingsService companySettings) : Controller
 {
     public async Task<IActionResult> Index(string? search)
     {
@@ -45,7 +45,7 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
     // while payments made and purchase returns DEBIT it, so the closing balance is what we still
     // owe. Warehouse scoping follows the same rule as Details: every document is filtered by the
     // warehouse of the invoice it belongs to.
-    public async Task<IActionResult> Ledger(int? partyId, DateTime? from, DateTime? to)
+    private async Task<PartyLedgerViewModel?> BuildLedgerAsync(int? partyId, DateTime? from, DateTime? to)
     {
         var warehouseIds = User.GetWarehouseIds();
 
@@ -65,11 +65,11 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
         if (partyId is null or 0)
         {
             vm.Summary = await BuildPayablesSummaryAsync(warehouseIds);
-            return View("PartyLedger", vm);
+            return vm;
         }
 
         var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == partyId);
-        if (supplier is null) return NotFound();
+        if (supplier is null) return null;
 
         vm.PartyName = supplier.Name;
         vm.PartyPhone = supplier.Phone;
@@ -155,7 +155,25 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
         }));
 
         vm.Build(rows);
-        return View("PartyLedger", vm);
+        return vm;
+    }
+
+    public async Task<IActionResult> Ledger(int? partyId, DateTime? from, DateTime? to)
+    {
+        var vm = await BuildLedgerAsync(partyId, from, to);
+        return vm is null ? NotFound() : View("PartyLedger", vm);
+    }
+
+    // The same ledger (same rows, same running balance, same warehouse scoping) as an A4 PDF in
+    // the Sales Invoice report's style, opened inline so it can be printed or saved from the viewer.
+    public async Task<IActionResult> LedgerPdf(int partyId, DateTime? from, DateTime? to)
+    {
+        var vm = await BuildLedgerAsync(partyId, from, to);
+        if (vm is null || vm.PartyId is not > 0) return NotFound();
+
+        var company = await companySettings.GetAsync();
+        var pdf = PartyLedgerReportBuilder.Render(vm, company, env.ContentRootPath);
+        return File(pdf, "application/pdf");
     }
 
     // The supplier's current balance for the Purchase Invoice Create page — exactly the
@@ -179,7 +197,15 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
             settled = await db.Payments.Where(p => own.Any(i => i.Id == p.PurchaseInvoiceId)).SumAsync(p => (decimal?)p.Amount) ?? 0;
             settled += await db.PurchaseReturnItems.Where(r => own.Any(i => i.Id == r.PurchaseReturn!.PurchaseInvoiceId)).SumAsync(r => (decimal?)(r.Quantity * r.UnitCost)) ?? 0;
         }
-        return Json(new { ok = true, id = row.Id, name = row.Name, balance = row.Balance, settled });
+
+        // Everything paid to this supplier to date: invoice payments (in the caller's
+        // warehouse scope, like the balance) plus payments against the opening balance.
+        var totalPaid = await db.Payments
+            .Where(p => (p.PurchaseInvoiceId != null && p.PurchaseInvoice!.SupplierId == id && p.PurchaseInvoice.Status == DocumentStatus.Posted
+                         && (warehouseIds == null || warehouseIds.Contains(p.PurchaseInvoice.WarehouseId)))
+                        || (p.PurchaseInvoiceId == null && p.SupplierId == id))
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+        return Json(new { ok = true, id = row.Id, name = row.Name, balance = row.Balance, settled, totalPaid });
     }
 
     // Closing payable per supplier for the ledger landing page: invoiced - paid - returned,

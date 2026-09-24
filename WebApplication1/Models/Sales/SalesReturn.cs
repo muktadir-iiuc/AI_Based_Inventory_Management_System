@@ -18,8 +18,9 @@ public class SalesReturn
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // What the customer is credited: the returned goods' price less their share of the invoice discount.
     [NotMapped]
-    public decimal TotalAmount => Items.Sum(i => i.Quantity * i.UnitPrice);
+    public decimal TotalAmount => Items.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare);
 
     public ICollection<SalesReturnItem> Items { get; set; } = [];
 }
@@ -47,6 +48,15 @@ public class SalesReturnItem
     [Column(TypeName = "decimal(18,2)")]
     public decimal UnitCost { get; set; }
 
+    // The part of the original invoice discount that belonged to the returned quantity, so the
+    // customer is credited only what they actually paid for these goods. On the last return of a
+    // line it is whatever remains of that line's share, so the shares always add up exactly.
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal DiscountShare { get; set; }
+
     [NotMapped]
     public decimal LineTotal => Quantity * UnitPrice;
+
+    [NotMapped]
+    public decimal NetTotal => Quantity * UnitPrice - DiscountShare;
 }

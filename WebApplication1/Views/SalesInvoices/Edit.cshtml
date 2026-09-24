@@ -103,6 +103,26 @@
                         <dd class="col-5 text-end" id="summaryQty">0</dd>
                     </dl>
                     <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Subtotal</span>
+                        <span id="subTotal">0.00</span>
+                    </div>
+                    <div class="mb-2">
+                        <label for="discountValue" class="form-label small text-muted mb-1">Discount</label>
+                        <div class="input-group input-group-sm">
+                            <select asp-for="DiscountType" id="discountType" class="form-control form-control-sm" style="max-width: 6.5rem;" aria-label="Discount type">
+                                <option value="Amount">Amount</option>
+                                <option value="Percent">Percent %</option>
+                            </select>
+                            <input asp-for="DiscountValue" id="discountValue" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" />
+                        </div>
+                        <span asp-validation-for="DiscountValue" class="text-danger small"></span>
+                        <div class="d-flex justify-content-between small mt-1">
+                            <span class="text-muted">Discount given</span>
+                            <span class="text-danger" id="discountPreview">0.00</span>
+                        </div>
+                    </div>
+                    <hr class="my-2" />
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-bold">Grand Total</span>
                         <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
@@ -407,10 +427,21 @@
                 grand += parseFloat(tr.querySelector('.line-total').textContent) || 0;
                 totalQty += parseInt(tr.querySelector('.qty-input').value, 10) || 0;
             });
-            document.getElementById('grandTotal').textContent = grand.toFixed(2);
+            // Discount on the invoice total: a fixed amount or a percent of the subtotal, never more
+            // than the subtotal. The server recomputes it from the real FIFO prices when saving.
+            const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
+            const isPercent = document.getElementById('discountType').value === 'Percent';
+            let discount = isPercent ? grand * discountValue / 100 : discountValue;
+            discount = Math.min(Math.max(discount, 0), grand);
+            document.getElementById('subTotal').textContent = grand.toFixed(2);
+            document.getElementById('discountPreview').textContent = discount > 0 ? '-' + discount.toFixed(2) : '0.00';
+            document.getElementById('grandTotal').textContent = (grand - discount).toFixed(2);
             document.getElementById('summaryLineCount').textContent = rows.length;
             document.getElementById('summaryQty').textContent = totalQty;
         }
+
+        document.getElementById('discountValue').addEventListener('input', recalc);
+        document.getElementById('discountType').addEventListener('change', recalc);
 
         function refreshAllRows() {
             document.querySelectorAll('#itemsBody tr.item-row').forEach(tr => {
@@ -543,7 +574,8 @@
             afterEl: document.getElementById('customerDueAfter'),
             grandTotalEl: document.getElementById('grandTotal'),
             currency: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol)),
-            advanceLabel: 'Advance received'
+            advanceLabel: 'Advance received',
+            paidLabel: 'Total received'
         });
     </script>
     <partial name="_ValidationScriptsPartial" />

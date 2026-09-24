@@ -145,3 +145,38 @@ public class PartyLedgerViewModel
         ClosingBalance = kept.Count > 0 ? kept[^1].RunningBalance : opening;
     }
 }
+
+// Flat, pre-formatted shapes for the A4 ledger report (see PartyLedgerReportBuilder) — every
+// value is already its final display string, like SalesInvoiceReportHeader/Line.
+public class PartyLedgerReportHeader
+{
+    public string CompanyName { get; set; } = string.Empty;
+    public string CompanyAddress { get; set; } = string.Empty;
+    public string CompanyPhone { get; set; } = string.Empty;
+    public byte[] CompanyLogo { get; set; } = SalesInvoiceReportHeader.TransparentPixel;
+    public string CompanyLogoMimeType { get; set; } = "image/png";
+    public string ReportTitle { get; set; } = string.Empty;
+    public string PartyLabel { get; set; } = string.Empty;
+    public string PartyName { get; set; } = string.Empty;
+    public string PartyAddress { get; set; } = string.Empty;
+    public string PartyPhone { get; set; } = string.Empty;
+    public string Period { get; set; } = string.Empty;
+    public string PrintedOn { get; set; } = string.Empty;
+    public string ScopeNote { get; set; } = string.Empty;
+    public string OpeningBalance { get; set; } = string.Empty;
+    public string TotalDebit { get; set; } = string.Empty;
+    public string TotalCredit { get; set; } = string.Empty;
+    public string ClosingLabel { get; set; } = string.Empty;
+    public string ClosingBalance { get; set; } = string.Empty;
+}
+
+public class PartyLedgerReportLine
+{
+    public string Date { get; set; } = string.Empty;
+    public string DocType { get; set; } = string.Empty;
+    public string DocNumber { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Debit { get; set; } = string.Empty;
+    public string Credit { get; set; } = string.Empty;
+    public string Balance { get; set; } = string.Empty;
+}

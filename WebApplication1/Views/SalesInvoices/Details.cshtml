@@ -40,6 +40,11 @@
                         else { <span class="badge text-bg-secondary">Cancelled</span> }
                     </dd>
                     <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
+                    @if (Model.DiscountAmount > 0)
+                    {
+                        <dt class="col-5">Subtotal</dt><dd class="col-7">@Model.SubTotal.ToString("C")</dd>
+                        <dt class="col-5">Discount</dt><dd class="col-7 text-danger">-@Model.DiscountAmount.ToString("C")</dd>
+                    }
                     <dt class="col-5">Total</dt><dd class="col-7 fw-bold">@Model.TotalAmount.ToString("C")</dd>
                     <dt class="col-5">Received</dt><dd class="col-7">@Model.Payments.Sum(p => p.Amount).ToString("C")</dd>
                 </dl>

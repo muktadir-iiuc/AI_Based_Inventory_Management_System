@@ -31,7 +31,21 @@ public class SalesInvoiceCreateViewModel
 
     public string? Notes { get; set; }
 
+    // Discount on the invoice total, entered either as a fixed amount or as a percentage of the
+    // subtotal. The server converts it to a currency amount once the lines' real (FIFO) prices
+    // are known; only the resulting amount is ever stored.
+    public DiscountType DiscountType { get; set; } = DiscountType.Amount;
+
+    [Range(0, double.MaxValue, ErrorMessage = "Discount cannot be negative.")]
+    public decimal DiscountValue { get; set; }
+
     public List<SalesLineInput> Items { get; set; } = [];
+}
+
+public enum DiscountType
+{
+    Amount = 1,
+    Percent = 2
 }
 
 public class PurchaseLineInput

@@ -34,7 +34,10 @@ public class SalesProfitabilityRow
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
     public decimal UnitPrice { get; set; }
-    public decimal SalesAmount => Quantity * UnitPrice;
+
+    // This line's share of the invoice discount; Sales Amount is what was actually charged.
+    public decimal Discount { get; set; }
+    public decimal SalesAmount => Quantity * UnitPrice - Discount;
     public decimal CostAmount => Quantity * UnitCost;
     public decimal Profit => SalesAmount - CostAmount;
 }

@@ -1,12 +1,15 @@
 @model StockTransfer
-@inject IAuthorizationService AuthorizationService
 @{
     ViewData["Title"] = $"Stock Transfer {Model.TransferNumber}";
-    var canTransfer = (await AuthorizationService.AuthorizeAsync(User, Permissions.StockTransfer)).Succeeded;
+    var isApprover = ViewData["IsApprover"] is true;
+    var isRequester = ViewData["IsRequester"] is true;
+    var available = (Dictionary<int, decimal>)ViewData["Available"]!;
+    var isPending = Model.ApprovalStatus == StockTransferApprovalStatus.Pending;
+    var isPosted = Model.ApprovalStatus == StockTransferApprovalStatus.Approved && Model.Status == DocumentStatus.Posted;
 }
 
 @section Toolbar {
-    @if (Model.Status == DocumentStatus.Posted && canTransfer)
+    @if (isPosted && isApprover)
     {
         <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm">
             <i class="fas fa-pen"></i> Edit
@@ -29,34 +32,119 @@
                     <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
                     <dt class="col-5">Status</dt>
                     <dd class="col-7">
-                        @if (Model.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
-                        else { <span class="badge text-bg-secondary">Cancelled</span> }
+                        @switch (Model.DisplayStatus)
+                        {
+                            case "Pending": <span class="badge text-bg-warning"><i class="fas fa-hourglass-half"></i> Pending approval</span> break;
+                            case "Posted": <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span> break;
+                            case "Rejected": <span class="badge text-bg-danger"><i class="fas fa-circle-xmark"></i> Rejected</span> break;
+                            case "Withdrawn": <span class="badge text-bg-secondary"><i class="fas fa-rotate-left"></i> Withdrawn</span> break;
+                            default: <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span> break;
+                        }
                     </dd>
+                    <dt class="col-5">Requested by</dt><dd class="col-7">@Model.CreatedBy</dd>
+                    <dt class="col-5">Requested</dt><dd class="col-7">@Model.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                    @if (Model.ReviewedAt.HasValue)
+                    {
+                        <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Withdrawn ? "Withdrawn by" : "Reviewed by")</dt><dd class="col-7">@Model.ReviewedBy</dd>
+                        <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Withdrawn ? "Withdrawn" : "Reviewed")</dt><dd class="col-7">@Model.ReviewedAt.Value.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.ReviewNote))
+                    {
+                        <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Rejected ? "Rejection reason" : "Review note")</dt><dd class="col-7">@Model.ReviewNote</dd>
+                    }
                     <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
                 </dl>
             </div>
             <div class="card-footer">
                 <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+                @if (isPending && isRequester)
+                {
+                    <form asp-action="Withdraw" asp-route-id="@Model.Id" method="post" class="d-inline confirm-delete" data-confirm-message="Withdraw this transfer request?">
+                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-rotate-left"></i> Withdraw request</button>
+                    </form>
+                }
             </div>
         </div>
+
+        @if (isPending && isApprover)
+        {
+            <div class="card mt-3 border-warning">
+                <div class="card-header"><h3 class="card-title">Decision</h3></div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        Approving moves the stock right away (taken from the oldest batches at the source, at their own cost).
+                        Rejecting moves nothing.
+                    </p>
+                    <label for="reviewNote" class="form-label small text-muted">Note <span class="text-muted">(required to reject)</span></label>
+                    <textarea id="reviewNote" class="form-control form-control-sm mb-3" rows="3" maxlength="500" placeholder="Optional when approving"></textarea>
+                    <div class="d-grid gap-2">
+                        <form asp-action="Approve" asp-route-id="@Model.Id" method="post" id="approveForm">
+                            <input type="hidden" name="reviewNote" class="note-mirror" />
+                            <button type="submit" class="btn btn-success w-100"><i class="fas fa-check"></i> Approve</button>
+                        </form>
+                        <form asp-action="Reject" asp-route-id="@Model.Id" method="post" id="rejectForm">
+                            <input type="hidden" name="reviewNote" class="note-mirror" />
+                            <button type="submit" class="btn btn-outline-danger w-100"><i class="fas fa-xmark"></i> Reject</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
     <div class="col-md-8">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Line Items</h3></div>
             <div class="card-body p-0 table-responsive-card">
                 <table class="table table-striped mb-0">
-                    <thead><tr><th>Product</th><th class="text-end">Qty</th></tr></thead>
+                    <thead><tr><th>Product</th><th class="text-end">Qty</th>@if (isPending) { <th class="text-end">Available at Source Now</th> }</tr></thead>
                     <tbody>
                     @foreach (var item in Model.Items)
                     {
-                        <tr>
+                        var stock = available.GetValueOrDefault(item.ProductId);
+                        var short_ = isPending && item.Quantity > stock;
+                        <tr class="@(short_ ? "table-danger" : "")">
                             <td>@item.Product?.Name <small class="text-muted">(@item.Product?.Sku)</small></td>
                             <td class="text-end">@item.Quantity.ToString("0.##")</td>
+                            @if (isPending) { <td class="text-end @(short_ ? "fw-semibold text-danger" : "")">@stock.ToString("0.##")</td> }
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
+            @if (isPending && Model.Items.Any(i => i.Quantity > available.GetValueOrDefault(i.ProductId)))
+            {
+                <div class="card-footer">
+                    <div class="text-danger small"><i class="fas fa-triangle-exclamation"></i> Some lines now exceed the source stock, so this request can no longer be approved as filed — reject it.</div>
+                </div>
+            }
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var note = document.getElementById('reviewNote');
+            if (!note) return;
+            // The two decision buttons are separate forms; mirror the shared note into each on submit.
+            function mirror() {
+                document.querySelectorAll('.note-mirror').forEach(function (el) { el.value = note.value; });
+            }
+            document.getElementById('approveForm').addEventListener('submit', function (e) {
+                mirror();
+                if (!confirm('Approve this transfer? Stock will be moved immediately.')) e.preventDefault();
+            });
+            document.getElementById('rejectForm').addEventListener('submit', function (e) {
+                mirror();
+                if (!note.value.trim()) {
+                    e.preventDefault();
+                    note.classList.add('is-invalid');
+                    note.focus();
+                    return;
+                }
+                if (!confirm('Reject this request? No stock will be moved.')) e.preventDefault();
+            });
+            note.addEventListener('input', function () { note.classList.remove('is-invalid'); });
+        })();
+    </script>
+}

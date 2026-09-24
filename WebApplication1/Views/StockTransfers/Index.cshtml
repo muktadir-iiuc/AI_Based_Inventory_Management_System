@@ -1,9 +1,11 @@
 @model List<StockTransfer>
-@inject IAuthorizationService AuthorizationService
 @{
     ViewData["Title"] = "Stock Transfers";
-    var canTransfer = (await AuthorizationService.AuthorizeAsync(User, Permissions.StockTransfer)).Succeeded;
-    var postedCount = Model.Count(t => t.Status == DocumentStatus.Posted);
+    var canTransfer = ViewData["CanRequest"] is true;
+    var isApprover = ViewData["IsApprover"] is true;
+    var status = ViewData["Status"] as StockTransferApprovalStatus?;
+    var pendingCount = (int)ViewData["PendingCount"]!;
+    var postedCount = Model.Count(t => t.DisplayStatus == "Posted");
     var totalLines = Model.Sum(t => t.Items.Count);
 }
 
@@ -12,6 +14,14 @@
     {
         <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Transfer</a>
     }
+}
+
+@if (isApprover && pendingCount > 0 && status != StockTransferApprovalStatus.Pending)
+{
+    <div class="alert alert-warning py-2 d-flex align-items-center justify-content-between">
+        <span><i class="fas fa-hourglass-half me-1"></i> <strong>@pendingCount</strong> transfer request(s) waiting for your approval.</span>
+        <a asp-action="Index" asp-route-status="@StockTransferApprovalStatus.Pending" class="btn btn-sm btn-warning">Review pending</a>
+    </div>
 }
 
 <div class="row g-3 mb-3">
@@ -42,6 +52,23 @@
 </div>
 
 <div class="card">
+    <div class="card-header">
+        <ul class="nav nav-pills">
+            <li class="nav-item"><a class="nav-link py-1 @(status is null ? "active" : "")" asp-action="Index">All</a></li>
+            @foreach (var s in Enum.GetValues<StockTransferApprovalStatus>())
+            {
+                <li class="nav-item">
+                    <a class="nav-link py-1 @(status == s ? "active" : "")" asp-action="Index" asp-route-status="@s">
+                        @s
+                        @if (s == StockTransferApprovalStatus.Pending && pendingCount > 0)
+                        {
+                            <span class="badge text-bg-warning ms-1">@pendingCount</span>
+                        }
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
     <div class="card-body p-0 table-responsive-card">
         <table class="table table-striped table-hover mb-0 data-table" id="transferTable">
             <thead><tr><th>Transfer #</th><th data-filter="select">From</th><th data-filter="select">To</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th class="text-end">Lines</th></tr></thead>
@@ -54,13 +81,13 @@
                     <td>@t.ToWarehouse?.Name</td>
                     <td data-date="@t.Date.ToString("yyyy-MM-dd")">@t.Date.ToString("MMM dd, yyyy")</td>
                     <td class="status-cell">
-                        @if (t.Status == DocumentStatus.Posted)
+                        @switch (t.DisplayStatus)
                         {
-                            <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>
+                            case "Pending": <span class="badge text-bg-warning"><i class="fas fa-hourglass-half"></i> Pending</span> break;
+                            case "Posted": <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span> break;
+                            case "Rejected": <span class="badge text-bg-danger"><i class="fas fa-circle-xmark"></i> Rejected</span> break;
+                            case "Withdrawn": <span class="badge text-bg-secondary"><i class="fas fa-rotate-left"></i> Withdrawn</span> break;
+                            default: <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span> break;
                         }
                     </td>
                     <td class="text-end lines-cell">@t.Items.Count</td>
@@ -90,9 +117,13 @@
             });
 
             function statusBadge(status) {
-                return status === 'Posted'
-                    ? '<span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>'
-                    : '<span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>';
+                switch (status) {
+                    case 'Pending': return '<span class="badge text-bg-warning"><i class="fas fa-hourglass-half"></i> Pending</span>';
+                    case 'Posted': return '<span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>';
+                    case 'Rejected': return '<span class="badge text-bg-danger"><i class="fas fa-circle-xmark"></i> Rejected</span>';
+                    case 'Withdrawn': return '<span class="badge text-bg-secondary"><i class="fas fa-rotate-left"></i> Withdrawn</span>';
+                    default: return '<span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>';
+                }
             }
 
             function getDt() {

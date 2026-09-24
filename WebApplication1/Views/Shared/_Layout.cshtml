@@ -2,10 +2,21 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ICompanySettingsService CompanySettings
 @inject IProductPriceService ProductPriceService
+@inject WebApplication1.Data.ApplicationDbContext LayoutDb
 @{
     var company = await CompanySettings.GetAsync();
     var canReviewPrices = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer);
     var pendingPriceReviewCount = canReviewPrices ? await ProductPriceService.GetPendingMonthlyReviewCountAsync() : 0;
+    // Stock Adjustments: requested by Sales/Purchase, approved by Admin/Manager. Only approvers
+    // get the "waiting for you" badge; requesters just see the menu entry.
+    var canReviewAdjustments = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
+    var canSeeAdjustments = canReviewAdjustments || User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.PurchaseOfficer);
+    var pendingTransferCount = canReviewAdjustments
+        ? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.StockTransfers, t => t.ApprovalStatus == WebApplication1.Models.Inventory.StockTransferApprovalStatus.Pending)
+        : 0;
+    var pendingAdjustmentCount = canReviewAdjustments
+        ? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.StockAdjustments, a => a.Status == WebApplication1.Models.Inventory.StockAdjustmentStatus.Pending)
+        : 0;
 }
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
@@ -158,7 +169,7 @@
                     string.Equals(controller, currentController, StringComparison.OrdinalIgnoreCase) &&
                     actions.Any(a => string.Equals(a, currentAction, StringComparison.OrdinalIgnoreCase));
 
-                var inventoryOpen = InController("Products", "Categories", "Units", "Warehouses", "StockTransfers");
+                var inventoryOpen = InController("Products", "Categories", "Units", "Warehouses", "StockTransfers", "StockAdjustments");
                 var purchaseOpen = InController("PurchaseInvoices", "Suppliers", "PurchaseReturns");
                 var salesOpen = InController("SalesInvoices", "Customers", "SalesReturns");
                 var accountingOpen = InController("Accounting");
@@ -184,7 +195,11 @@
                             <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link @(InController("Categories") ? "active" : "")"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
                             <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link @(InController("Units") ? "active" : "")"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
                             <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link @(InController("Warehouses") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>
-                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link @(InController("StockTransfers") ? "active" : "")"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers</p></a></li>
+                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link @(InController("StockTransfers") ? "active" : "")"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers @if (pendingTransferCount > 0) { <span class="badge text-bg-warning ms-1">@pendingTransferCount</span> }</p></a></li>
+                            @if (canSeeAdjustments)
+                            {
+                                <li class="nav-item"><a asp-controller="StockAdjustments" asp-action="Index" class="nav-link @(InController("StockAdjustments") ? "active" : "")"><i class="nav-icon fas fa-scale-balanced"></i><p>Stock Adjustments @if (pendingAdjustmentCount > 0) { <span class="badge text-bg-warning ms-1">@pendingAdjustmentCount</span> }</p></a></li>
+                            }
                         </ul>
                     </li>
 

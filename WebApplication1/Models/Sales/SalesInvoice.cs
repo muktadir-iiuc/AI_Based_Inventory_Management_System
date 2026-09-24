@@ -26,9 +26,19 @@ public class SalesInvoice
     public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // Only IsCurrent lines count toward the total — see SalesInvoiceItem.IsCurrent.
+    // Only IsCurrent lines count toward the totals — see SalesInvoiceItem.IsCurrent.
+    // SubTotal is before the invoice discount; TotalAmount is what the customer actually owes
+    // (subtotal minus the discount) and is what every ledger/due/receipt figure is built on.
     [NotMapped]
-    public decimal TotalAmount => Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
+    public decimal SubTotal => Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
+
+    // The whole-invoice discount, stored as each line's DiscountShare (which always add up to it)
+    // so that any sum over invoice lines is automatically net of the discount.
+    [NotMapped]
+    public decimal DiscountAmount => Items.Where(i => i.IsCurrent).Sum(i => i.DiscountShare);
+
+    [NotMapped]
+    public decimal TotalAmount => SubTotal - DiscountAmount;
 
     public ICollection<SalesInvoiceItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
@@ -69,6 +79,16 @@ public class SalesInvoiceItem
     // that reads Items for totals/business logic must filter to IsCurrent.
     public bool IsCurrent { get; set; } = true;
 
+    // This line's share of the invoice-level discount (see DiscountAllocator). The shares of an
+    // invoice's current lines add up to exactly the discount given, and are fixed at posting time.
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal DiscountShare { get; set; }
+
+    // Before discount.
     [NotMapped]
     public decimal LineTotal => Quantity * UnitPrice;
+
+    // After this line's share of the discount — what the customer pays for it.
+    [NotMapped]
+    public decimal NetTotal => Quantity * UnitPrice - DiscountShare;
 }

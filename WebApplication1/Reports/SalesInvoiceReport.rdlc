@@ -25,6 +25,8 @@
         <Field Name="CustomerPhone"><DataField>CustomerPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="WarehouseName"><DataField>WarehouseName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Notes"><DataField>Notes</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="SubtotalAmount"><DataField>SubtotalAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="DiscountAmount"><DataField>DiscountAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="TotalAmount"><DataField>TotalAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="PaidAmount"><DataField>PaidAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="DueAmount"><DataField>DueAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
@@ -389,6 +391,28 @@
                   <Height>0.22in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
+                      <Textbox Name="CellSubtotalCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Subtotal</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellSubtotalValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!SubtotalAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDiscountCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Discount</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDiscountValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DiscountAmount.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
                       <Textbox Name="CellTotalCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Amount</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
@@ -429,6 +453,8 @@
                     <TablixMember />
                     <TablixMember />
                     <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
                   </TablixMembers>
                 </TablixMember>
               </TablixMembers>
@@ -436,7 +462,7 @@
             <DataSetName>InvoiceHeader</DataSetName>
             <Top>3.21in</Top>
             <Left>4.6in</Left>
-            <Height>0.7in</Height>
+            <Height>1.14in</Height>
             <Width>3.1in</Width>
             <Style><Border><Style>None</Style></Border></Style>
           </Tablix>

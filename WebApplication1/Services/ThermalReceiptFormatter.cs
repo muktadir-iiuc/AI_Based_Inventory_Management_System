@@ -45,6 +45,15 @@ public static class ThermalReceiptFormatter
             }
         }
 
+        // The native TOTAL row below shows the net amount; when a discount was given, show how it
+        // got there. (Plain lines here — the RDLC's fixed totals block can't grow a conditional row.)
+        if (items.Count > 0 && decimal.TryParse(header.DiscountAmount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.CurrentCulture, out var discount) && discount > 0)
+        {
+            lines.Add(Separator('-'));
+            lines.Add(TwoColumn("Subtotal", header.SubtotalAmount));
+            lines.Add(TwoColumn("Discount", "-" + header.DiscountAmount));
+        }
+
         if (!string.IsNullOrWhiteSpace(header.Notes))
         {
             lines.Add(Separator('-'));

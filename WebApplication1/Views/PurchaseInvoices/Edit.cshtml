@@ -644,7 +644,8 @@
             afterEl: document.getElementById('supplierDueAfter'),
             grandTotalEl: document.getElementById('grandTotal'),
             currency: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol)),
-            advanceLabel: 'Advance paid'
+            advanceLabel: 'Advance paid',
+            paidLabel: 'Total paid'
         });
     </script>
     <partial name="_ValidationScriptsPartial" />

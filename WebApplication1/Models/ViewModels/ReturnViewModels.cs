@@ -24,6 +24,9 @@ public class SalesReturnLineInput
     public decimal UnitPrice { get; set; }
     public decimal UnitCost { get; set; }
 
+    // Credit per returned unit after the invoice discount's share (display only).
+    public decimal CreditPerUnit { get; set; }
+
     [Range(0, double.MaxValue)]
     public decimal ReturnQuantity { get; set; }
 }

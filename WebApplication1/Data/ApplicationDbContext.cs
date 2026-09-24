@@ -23,6 +23,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ProductWarehouseStock> ProductWarehouseStocks => Set<ProductWarehouseStock>();
     public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+    public DbSet<StockAdjustmentItem> StockAdjustmentItems => Set<StockAdjustmentItem>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
 
@@ -165,6 +167,27 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<StockTransferItem>()
+            .HasOne(i => i.Product)
+            .WithMany()
+            .HasForeignKey(i => i.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StockAdjustment>()
+            .HasIndex(a => a.AdjustmentNumber).IsUnique();
+
+        builder.Entity<StockAdjustment>()
+            .HasOne(a => a.Warehouse)
+            .WithMany()
+            .HasForeignKey(a => a.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StockAdjustmentItem>()
+            .HasOne(i => i.StockAdjustment)
+            .WithMany(a => a.Items)
+            .HasForeignKey(i => i.StockAdjustmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<StockAdjustmentItem>()
             .HasOne(i => i.Product)
             .WithMany()
             .HasForeignKey(i => i.ProductId)

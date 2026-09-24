@@ -12,9 +12,12 @@
 @section Toolbar {
     @if (Model.PartyId is > 0)
     {
-        <button type="button" class="btn btn-outline-secondary btn-sm no-print" id="btnPrintLedger">
+        <a asp-controller="@(Model.IsCustomer ? "Customers" : "Suppliers")" asp-action="LedgerPdf"
+           asp-route-partyId="@Model.PartyId" asp-route-from="@Model.From?.ToString("yyyy-MM-dd")" asp-route-to="@Model.To?.ToString("yyyy-MM-dd")"
+           target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm no-print" id="btnPrintLedger"
+           title="Open the A4 ledger report to print or save">
             <i class="fas fa-print"></i> Print
-        </button>
+        </a>
     }
 }
 
@@ -246,13 +249,3 @@ else
     </style>
 }
 
-@section Scripts {
-    <script>
-        (function () {
-            var btn = document.getElementById('btnPrintLedger');
-            if (btn) {
-                btn.addEventListener('click', function () { window.print(); });
-            }
-        })();
-    </script>
-}

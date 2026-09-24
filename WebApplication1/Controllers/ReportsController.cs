@@ -155,7 +155,8 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
                 BatchNumber = i.Batch != null ? i.Batch.BatchNumber : null,
                 Quantity = i.Quantity,
                 UnitCost = i.UnitCost,
-                UnitPrice = i.UnitPrice
+                UnitPrice = i.UnitPrice,
+                Discount = i.DiscountShare
             })
             .ToListAsync();
 

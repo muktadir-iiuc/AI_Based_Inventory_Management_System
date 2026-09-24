@@ -286,8 +286,9 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             var invoice = await db.PurchaseInvoices
                 .Include(p => p.Items)
                 .Include(p => p.Payments)
+                .Include(p => p.Returns).ThenInclude(r => r.Items)
                 .FirstOrDefaultAsync(p => p.Id == model.PurchaseInvoiceId);
-            var due = invoice is null ? 0 : invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount);
+            var due = invoice is null ? 0 : PurchaseDue(invoice);
             if (model.Amount > due)
             {
                 ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed this invoice's due of {due:N2}.");
@@ -298,8 +299,9 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             var invoice = await db.SalesInvoices
                 .Include(s => s.Items)
                 .Include(s => s.Payments)
+                .Include(s => s.Returns).ThenInclude(r => r.Items)
                 .FirstOrDefaultAsync(s => s.Id == model.SalesInvoiceId);
-            var due = invoice is null ? 0 : invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount);
+            var due = invoice is null ? 0 : SalesDue(invoice);
             if (model.Amount > due)
             {
                 ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed this invoice's due of {due:N2}.");
@@ -338,6 +340,15 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             .Select(a => new { a.Id, a.Code, a.Name }).ToListAsync();
     }
 
+    // What is still owed on one invoice: its total, less payments made against it, less goods
+    // returned against it (a return credits the account directly and never creates a payment).
+    // Needs Items, Payments and Returns (with their Items) loaded.
+    private static decimal PurchaseDue(Models.Purchase.PurchaseInvoice invoice) =>
+        invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount) - invoice.Returns.Sum(r => r.TotalAmount);
+
+    private static decimal SalesDue(Models.Sales.SalesInvoice invoice) =>
+        invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount) - invoice.Returns.Sum(r => r.TotalAmount);
+
     private async Task PopulateInvoicesAsync()
     {
         var warehouseIds = User.GetWarehouseIds();
@@ -346,11 +357,13 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             .Include(p => p.Supplier)
             .Include(p => p.Items)
             .Include(p => p.Payments)
+            .Include(p => p.Returns).ThenInclude(r => r.Items)
             .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted);
         var salesInvoicesQuery = db.SalesInvoices
             .Include(s => s.Customer)
             .Include(s => s.Items)
             .Include(s => s.Payments)
+            .Include(s => s.Returns).ThenInclude(r => r.Items)
             .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted);
 
         if (warehouseIds is not null)
@@ -359,8 +372,13 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             salesInvoicesQuery = salesInvoicesQuery.Where(s => warehouseIds.Contains(s.WarehouseId));
         }
 
-        var purchaseInvoices = await purchaseInvoicesQuery.OrderByDescending(p => p.Date).ToListAsync();
-        var salesInvoices = await salesInvoicesQuery.OrderByDescending(s => s.Date).ToListAsync();
+        // Only invoices that still have something to pay: a fully settled invoice (or one wiped
+        // out by a return) has nothing left to record a payment against. The due is computed in
+        // memory because it depends on the NotMapped totals.
+        var purchaseInvoices = (await purchaseInvoicesQuery.OrderByDescending(p => p.Date).ToListAsync())
+            .Where(p => PurchaseDue(p) > 0).ToList();
+        var salesInvoices = (await salesInvoicesQuery.OrderByDescending(s => s.Date).ToListAsync())
+            .Where(s => SalesDue(s) > 0).ToList();
 
         ViewData["PurchaseInvoices"] = new SelectList(
             purchaseInvoices.Select(p => new { p.Id, Label = p.InvoiceNumber + " - " + p.Supplier!.Name }),
@@ -402,9 +420,9 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             .Select(s => new
             {
                 s.CustomerId,
-                Due = s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice)
+                Due = s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare)
                       - s.Payments.Sum(pay => pay.Amount)
-                      - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice))
+                      - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice - ri.DiscountShare))
             })
             .ToListAsync();
         var customerOpening = await db.Customers
@@ -447,7 +465,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             p.Id,
             SupplierName = p.Supplier!.Name,
             InvoiceAmount = p.TotalAmount,
-            InvoiceDue = p.TotalAmount - p.Payments.Sum(pay => pay.Amount),
+            InvoiceDue = PurchaseDue(p),
             SupplierOutstanding = supplierOutstandingTotals.GetValueOrDefault(p.SupplierId)
         }).ToList();
 
@@ -456,7 +474,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             s.Id,
             CustomerName = s.Customer!.Name,
             InvoiceAmount = s.TotalAmount,
-            InvoiceDue = s.TotalAmount - s.Payments.Sum(pay => pay.Amount),
+            InvoiceDue = SalesDue(s),
             CustomerOutstanding = customerOutstandingTotals.GetValueOrDefault(s.CustomerId)
         }).ToList();
     }

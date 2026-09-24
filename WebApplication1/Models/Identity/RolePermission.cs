@@ -18,6 +18,6 @@ public static class Permissions
 
     public static readonly (string Key, string Label, string Description)[] All =
     [
-        (StockTransfer, "Manage Stock Transfers", "Create and cancel inter-warehouse stock transfers.")
+        (StockTransfer, "Manage Stock Transfers", "Request inter-warehouse stock transfers (Sales and Purchase officers, Managers and Admins always can; this extends it to another role).")
     ];
 }

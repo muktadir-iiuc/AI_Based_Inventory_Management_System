@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Accounting;
+using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 
@@ -21,6 +22,40 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
         var savedCount = await db.JournalEntries.CountAsync();
         var pendingCount = db.ChangeTracker.Entries<JournalEntry>().Count(e => e.State == EntityState.Added);
         return $"JE-{savedCount + pendingCount + 1:D6}";
+    }
+
+    // Booked at approval time, at the cost of the batches actually removed/added: a decrease
+    // is a loss (Dr Stock Adjustment, Cr Inventory), an increase a gain (Dr Inventory, Cr Stock
+    // Adjustment). A request with both directions posts both pairs in one balanced entry.
+    public async Task<JournalEntry> PostStockAdjustmentAsync(StockAdjustment adjustment, decimal increaseCost, decimal decreaseCost)
+    {
+        var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
+        var adjustmentAccount = await GetAccountAsync(SystemAccountCodes.StockAdjustment);
+
+        var lines = new List<JournalEntryLine>();
+        if (decreaseCost > 0)
+        {
+            lines.Add(new JournalEntryLine { AccountId = adjustmentAccount.Id, Debit = decreaseCost, Credit = 0, Memo = "Stock written off" });
+            lines.Add(new JournalEntryLine { AccountId = inventory.Id, Debit = 0, Credit = decreaseCost, Memo = "Inventory reduced at cost" });
+        }
+        if (increaseCost > 0)
+        {
+            lines.Add(new JournalEntryLine { AccountId = inventory.Id, Debit = increaseCost, Credit = 0, Memo = "Inventory increased at cost" });
+            lines.Add(new JournalEntryLine { AccountId = adjustmentAccount.Id, Debit = 0, Credit = increaseCost, Memo = "Stock gain" });
+        }
+
+        var entry = new JournalEntry
+        {
+            EntryNumber = await NextEntryNumberAsync(),
+            Date = DateTime.UtcNow,
+            Description = $"Stock adjustment {adjustment.AdjustmentNumber}",
+            Source = JournalSource.StockAdjustment,
+            SourceReference = adjustment.AdjustmentNumber,
+            Lines = lines
+        };
+
+        db.JournalEntries.Add(entry);
+        return entry;
     }
 
     public async Task<JournalEntry> PostPurchaseInvoiceAsync(PurchaseInvoice invoice)
@@ -58,7 +93,9 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
 
         // Superseded lines (from an in-place Edit) stay in Items for audit purposes but must
         // never contribute to the posted total — see SalesInvoiceItem.IsCurrent.
-        var saleTotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice);
+        // Net of the invoice discount: revenue is recognised, and the customer owes, only what
+        // they are actually charged. (Cost of goods sold is unaffected by a discount.)
+        var saleTotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare);
         var costTotal = invoice.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitCost);
 
         var entry = new JournalEntry
@@ -91,7 +128,7 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
         var cogs = await GetAccountAsync(SystemAccountCodes.CostOfGoodsSold);
         var inventory = await GetAccountAsync(SystemAccountCodes.Inventory);
 
-        var returnTotal = salesReturn.Items.Sum(i => i.Quantity * i.UnitPrice);
+        var returnTotal = salesReturn.Items.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare);
         var costTotal = salesReturn.Items.Sum(i => i.Quantity * i.UnitCost);
 
         var entry = new JournalEntry

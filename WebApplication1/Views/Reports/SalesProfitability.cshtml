@@ -73,7 +73,7 @@
             <thead>
                 <tr>
                     <th data-filter="date">Date</th><th>Invoice</th><th>Product</th><th>Batch</th>
-                    <th class="text-end">Qty</th><th class="text-end">Unit Cost</th><th class="text-end">Unit Price</th>
+                    <th class="text-end">Qty</th><th class="text-end">Unit Cost</th><th class="text-end">Unit Price</th><th class="text-end">Discount</th>
                     <th class="text-end">Sales Amount</th><th class="text-end">Cost Amount</th><th class="text-end">Profit</th>
                 </tr>
             </thead>
@@ -88,6 +88,7 @@
                     <td class="text-end">@r.Quantity.ToString("0.##")</td>
                     <td class="text-end">@r.UnitCost.ToString("C")</td>
                     <td class="text-end">@r.UnitPrice.ToString("C")</td>
+                    <td class="text-end">@(r.Discount > 0 ? "-" + r.Discount.ToString("C") : "—")</td>
                     <td class="text-end">@r.SalesAmount.ToString("C")</td>
                     <td class="text-end">@r.CostAmount.ToString("C")</td>
                     <td class="text-end @(r.Profit >= 0 ? "text-success" : "text-danger")">@r.Profit.ToString("C")</td>

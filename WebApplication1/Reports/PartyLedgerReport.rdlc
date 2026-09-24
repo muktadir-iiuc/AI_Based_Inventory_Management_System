@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <DataSources>
+    <DataSource Name="DataSource1">
+      <ConnectionProperties>
+        <DataProvider>SQL</DataProvider>
+        <ConnectString></ConnectString>
+      </ConnectionProperties>
+      <rd:DataSourceID>b7f6b5c0-0000-0000-0000-000000000011</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="LedgerHeader">
+      <Fields>
+        <Field Name="CompanyName"><DataField>CompanyName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyAddress"><DataField>CompanyAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyPhone"><DataField>CompanyPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CompanyLogo"><DataField>CompanyLogo</DataField><rd:TypeName>System.Byte[]</rd:TypeName></Field>
+        <Field Name="CompanyLogoMimeType"><DataField>CompanyLogoMimeType</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ReportTitle"><DataField>ReportTitle</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PartyLabel"><DataField>PartyLabel</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PartyName"><DataField>PartyName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PartyAddress"><DataField>PartyAddress</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PartyPhone"><DataField>PartyPhone</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Period"><DataField>Period</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PrintedOn"><DataField>PrintedOn</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ScopeNote"><DataField>ScopeNote</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="OpeningBalance"><DataField>OpeningBalance</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="TotalDebit"><DataField>TotalDebit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="TotalCredit"><DataField>TotalCredit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ClosingLabel"><DataField>ClosingLabel</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="ClosingBalance"><DataField>ClosingBalance</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>LedgerHeader</CommandText>
+      </Query>
+    </DataSet>
+    <DataSet Name="LedgerRows">
+      <Fields>
+        <Field Name="Date"><DataField>Date</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="DocType"><DataField>DocType</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="DocNumber"><DataField>DocNumber</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Description"><DataField>Description</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Debit"><DataField>Debit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Credit"><DataField>Credit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Balance"><DataField>Balance</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>LedgerRows</CommandText>
+      </Query>
+    </DataSet>
+  </DataSets>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+
+          <Tablix Name="TablixLogo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>1in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.7in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Image Name="CompanyLogo">
+                        <Source>Database</Source>
+                        <Value>=Fields!CompanyLogo.Value</Value>
+                        <MIMEType>=Fields!CompanyLogoMimeType.Value</MIMEType>
+                        <Sizing>FitProportional</Sizing>
+                        <Height>0.68in</Height>
+                        <Width>0.96in</Width>
+                        <Style><Border><Style>None</Style></Border></Style>
+                      </Image>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="LogoGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>0in</Top>
+            <Left>0in</Left>
+            <Height>0.7in</Height>
+            <Width>1in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompany">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompany"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyName.Value</Value><Style><FontSize>16pt</FontSize><FontWeight>Bold</FontWeight><Color>#0d3b66</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>0in</Top>
+            <Left>1.1in</Left>
+            <Height>0.3in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompanyAddress">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.2in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompanyAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyAddress.Value</Value><Style><FontSize>9pt</FontSize><Color>#555555</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyAddressGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>0.3in</Top>
+            <Left>1.1in</Left>
+            <Height>0.2in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixCompanyPhone">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>6.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.2in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                      <Textbox Name="CellTablixCompanyPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CompanyPhone.Value</Value><Style><FontSize>9pt</FontSize><Color>#555555</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="CompanyPhoneGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>0.5in</Top>
+            <Left>1.1in</Left>
+            <Height>0.2in</Height>
+            <Width>6.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixTitle">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>7.7in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.26in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellTitle"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ReportTitle.Value</Value><Style><FontSize>12pt</FontSize><FontWeight>Bold</FontWeight><Color>#555555</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="TitleGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>0.88in</Top>
+            <Left>0in</Left>
+            <Height>0.26in</Height>
+            <Width>7.7in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Line Name="LineTop1">
+            <Top>1.22in</Top>
+            <Left>0in</Left>
+            <Height>0in</Height>
+            <Width>7.7in</Width>
+            <Style><Border><Color>#0d3b66</Color><Style>Solid</Style><Width>1.5pt</Width></Border></Style>
+          </Line>
+
+          <Tablix Name="TablixPartyInfo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>3.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellPartyName"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!PartyLabel.Value</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!PartyName.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellPartyAddress"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Address: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!PartyAddress.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellPartyPhone"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Phone: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!PartyPhone.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="PartyInfoGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>1.36in</Top>
+            <Left>0in</Left>
+            <Height>0.66in</Height>
+            <Width>3.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixPeriodInfo">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>3.6in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellPeriod"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Period: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!Period.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellPrintedOn"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Printed: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!PrintedOn.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellScope"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Scope: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!ScopeNote.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="PeriodInfoGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>1.36in</Top>
+            <Left>4.1in</Left>
+            <Height>0.66in</Height>
+            <Width>3.6in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Tablix Name="TablixLedger">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>0.85in</Width></TablixColumn>
+                <TablixColumn><Width>1.15in</Width></TablixColumn>
+                <TablixColumn><Width>1.0in</Width></TablixColumn>
+                <TablixColumn><Width>1.6in</Width></TablixColumn>
+                <TablixColumn><Width>0.95in</Width></TablixColumn>
+                <TablixColumn><Width>0.95in</Width></TablixColumn>
+                <TablixColumn><Width>1.2in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr0"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Date</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr1"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Document</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr2"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Number</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr3"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Description</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr4"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Debit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr5"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Credit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Hdr6"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.25in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell0"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Date.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell1"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DocType.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell2"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!DocNumber.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell3"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Description.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell4"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Debit.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell5"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Credit.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="Cell6"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Balance.Value</Value><Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <TablixMember>
+                  <Group Name="Details" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>LedgerRows</DataSetName>
+            <Top>2.46in</Top>
+            <Left>0in</Left>
+            <Height>0.55in</Height>
+            <Width>7.7in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Line Name="LineAboveTotals">
+            <Top>3.16in</Top>
+            <Left>4.6in</Left>
+            <Height>0in</Height>
+            <Width>3.1in</Width>
+            <Style><Border><Color>#cccccc</Color><Style>Solid</Style><Width>1pt</Width></Border></Style>
+          </Line>
+
+          <Tablix Name="TablixTotals">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>2.0in</Width></TablixColumn>
+                <TablixColumn><Width>1.1in</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellOpeningCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Opening Balance</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellOpeningValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!OpeningBalance.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDebitCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Debit</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellDebitValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!TotalDebit.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.22in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellCreditCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Credit</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellCreditValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!TotalCredit.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.26in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellClosingCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ClosingLabel.Value</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellClosingValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ClosingBalance.Value</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight><Color>#b02a37</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="TotalsGroup" />
+                  <TablixMembers>
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                    <TablixMember />
+                  </TablixMembers>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>LedgerHeader</DataSetName>
+            <Top>3.21in</Top>
+            <Left>4.6in</Left>
+            <Height>0.96in</Height>
+            <Width>3.1in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+
+          <Line Name="LineSignature">
+            <Top>4.9in</Top>
+            <Left>4.9in</Left>
+            <Height>0in</Height>
+            <Width>2.8in</Width>
+            <Style><Border><Color>#333333</Color><Style>Solid</Style><Width>0.75pt</Width></Border></Style>
+          </Line>
+          <Textbox Name="LblSignature">
+            <Top>4.95in</Top>
+            <Left>4.9in</Left>
+            <Height>0.2in</Height>
+            <Width>2.8in</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Authorized Signature</Value><Style><FontSize>8pt</FontSize><Color>#666666</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+
+        </ReportItems>
+        <Height>5.3in</Height>
+        <Style />
+      </Body>
+      <Width>7.7in</Width>
+      <Page>
+        <PageHeader>
+          <Height>0.34in</Height>
+          <PrintOnFirstPage>false</PrintOnFirstPage>
+          <PrintOnLastPage>true</PrintOnLastPage>
+          <ReportItems>
+            <Textbox Name="PgHdr0">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>0.00in</Left>
+              <Height>0.3in</Height>
+              <Width>0.85in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Date</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr1">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>0.85in</Left>
+              <Height>0.3in</Height>
+              <Width>1.15in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Document</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr2">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>2.00in</Left>
+              <Height>0.3in</Height>
+              <Width>1.0in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Number</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr3">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>3.00in</Left>
+              <Height>0.3in</Height>
+              <Width>1.6in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Description</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr4">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>4.60in</Left>
+              <Height>0.3in</Height>
+              <Width>0.95in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Debit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr5">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>5.55in</Left>
+              <Height>0.3in</Height>
+              <Width>0.95in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Credit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdr6">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>6.50in</Left>
+              <Height>0.3in</Height>
+              <Width>1.2in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+          </ReportItems>
+          <Style />
+        </PageHeader>
+        <PageHeight>11.69in</PageHeight>
+        <PageWidth>8.27in</PageWidth>
+        <LeftMargin>0.25in</LeftMargin>
+        <RightMargin>0.25in</RightMargin>
+        <TopMargin>0.4in</TopMargin>
+        <BottomMargin>0.4in</BottomMargin>
+        <ColumnSpacing>0in</ColumnSpacing>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>c1a3c6a0-0000-0000-0000-000000000012</rd:ReportID>
+</Report>

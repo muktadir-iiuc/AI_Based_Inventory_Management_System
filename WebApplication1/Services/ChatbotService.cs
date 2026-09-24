@@ -453,7 +453,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
                         && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId))
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
-            .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice)) ?? 0;
+            .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice - i.DiscountShare)) ?? 0;
 
         return new ChatbotAnswer { Text = $"Total sales {label}: {total:C}." };
     }
@@ -495,7 +495,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
             .GroupBy(i => i.Product!.Name)
-            .Select(g => new { Name = g.Key, Qty = g.Sum(i => i.Quantity), Revenue = g.Sum(i => i.Quantity * i.UnitPrice) })
+            .Select(g => new { Name = g.Key, Qty = g.Sum(i => i.Quantity), Revenue = g.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare) })
             .OrderByDescending(g => g.Qty)
             .Take(top)
             .ToListAsync();
@@ -520,7 +520,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
                         && (!start.HasValue || i.SalesInvoice!.Date.Date >= start)
                         && (!end.HasValue || i.SalesInvoice!.Date.Date <= end))
             .GroupBy(i => i.SalesInvoice!.Customer!.Name)
-            .Select(g => new { Name = g.Key, Revenue = g.Sum(i => i.Quantity * i.UnitPrice) })
+            .Select(g => new { Name = g.Key, Revenue = g.Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare) })
             .OrderByDescending(g => g.Revenue)
             .Take(top)
             .ToListAsync();
@@ -618,7 +618,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
                 .Where(s => warehouseIds == null || warehouseIds.Contains(s.WarehouseId))
                 .OrderByDescending(s => s.Date).ThenByDescending(s => s.Id)
                 .Take(5)
-                .Select(s => $"{s.InvoiceNumber} - {s.Customer!.Name}, {s.Date:d}, {s.Status}, {s.Items.Sum(i => i.Quantity * i.UnitPrice):C}")
+                .Select(s => $"{s.InvoiceNumber} - {s.Customer!.Name}, {s.Date:d}, {s.Status}, {s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare):C}")
                 .ToListAsync();
 
             return rows.Count == 0

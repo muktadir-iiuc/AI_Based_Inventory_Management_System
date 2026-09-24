@@ -82,6 +82,7 @@ public class SalesReturnsController(
         }
 
         var alreadyReturned = await GetAlreadyReturnedQuantitiesAsync(invoice.Id);
+        var alreadyReturnedDiscount = await GetAlreadyReturnedDiscountAsync(invoice.Id);
         var requestedLines = model.Items.Where(i => i.ReturnQuantity > 0).ToList();
         if (requestedLines.Count == 0)
         {
@@ -130,12 +131,17 @@ public class SalesReturnsController(
             {
                 var item = invoice.Items.First(i => i.Id == line.SalesInvoiceItemId);
 
+                // The customer is credited what they paid for these goods: the price less this
+                // quantity's share of the invoice discount.
+                var remaining = item.Quantity - alreadyReturned.GetValueOrDefault(item.Id, 0);
                 salesReturn.Items.Add(new SalesReturnItem
                 {
                     SalesInvoiceItemId = item.Id,
                     Quantity = line.ReturnQuantity,
                     UnitPrice = item.UnitPrice,
-                    UnitCost = item.UnitCost
+                    UnitCost = item.UnitCost,
+                    DiscountShare = DiscountAllocator.ReturnShare(item.DiscountShare, item.Quantity, line.ReturnQuantity,
+                        alreadyReturnedDiscount.GetValueOrDefault(item.Id, 0), remaining)
                 });
 
                 if (item.Batch is not null)
@@ -183,9 +189,19 @@ public class SalesReturnsController(
             .ToDictionaryAsync(x => x.SalesInvoiceItemId, x => x.Quantity);
     }
 
+    private async Task<Dictionary<int, decimal>> GetAlreadyReturnedDiscountAsync(int salesInvoiceId)
+    {
+        return await db.SalesReturnItems
+            .Where(i => i.SalesInvoiceItem!.SalesInvoiceId == salesInvoiceId)
+            .GroupBy(i => i.SalesInvoiceItemId)
+            .Select(g => new { SalesInvoiceItemId = g.Key, Discount = g.Sum(i => i.DiscountShare) })
+            .ToDictionaryAsync(x => x.SalesInvoiceItemId, x => x.Discount);
+    }
+
     private async Task<SalesReturnCreateViewModel> BuildCreateViewModelAsync(SalesInvoice invoice)
     {
         var alreadyReturned = await GetAlreadyReturnedQuantitiesAsync(invoice.Id);
+        var alreadyReturnedDiscount = await GetAlreadyReturnedDiscountAsync(invoice.Id);
 
         return new SalesReturnCreateViewModel
         {
@@ -198,7 +214,12 @@ public class SalesReturnsController(
                 BatchNumber = i.Batch?.BatchNumber,
                 MaxReturnable = i.Quantity - alreadyReturned.GetValueOrDefault(i.Id, 0),
                 UnitPrice = i.UnitPrice,
-                UnitCost = i.UnitCost
+                UnitCost = i.UnitCost,
+                // What one returned unit would credit, after its share of the invoice discount
+                // (display only; the real share is recomputed on posting).
+                CreditPerUnit = i.Quantity > 0
+                    ? i.UnitPrice - (i.DiscountShare - alreadyReturnedDiscount.GetValueOrDefault(i.Id, 0)) / Math.Max(1, i.Quantity - alreadyReturned.GetValueOrDefault(i.Id, 0))
+                    : i.UnitPrice
             }).Where(l => l.MaxReturnable > 0).ToList()
         };
     }

@@ -1,4 +1,5 @@
 using WebApplication1.Models.Accounting;
+using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 
@@ -11,6 +12,7 @@ public interface IAccountingService
     Task<JournalEntry> PostSalesReturnAsync(SalesReturn salesReturn);
     Task<JournalEntry> PostPurchaseReturnAsync(PurchaseReturn purchaseReturn);
     Task<JournalEntry> PostPaymentAsync(Payment payment);
+    Task<JournalEntry> PostStockAdjustmentAsync(StockAdjustment adjustment, decimal increaseCost, decimal decreaseCost);
     Task<JournalEntry> PostCustomerOpeningBalanceAsync(Customer customer);
     Task<JournalEntry> PostSupplierOpeningBalanceAsync(Supplier supplier);
     Task ReverseJournalEntriesForReferenceAsync(string sourceReference, string reason);

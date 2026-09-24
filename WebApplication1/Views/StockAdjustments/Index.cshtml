@@ -1,0 +1,95 @@
+@using WebApplication1.Extensions
+@model List<StockAdjustment>
+@{
+    ViewData["Title"] = "Stock Adjustments";
+    var status = ViewData["Status"] as StockAdjustmentStatus?;
+    var canReview = ViewData["CanReview"] is true;
+    var pendingCount = (int)ViewData["PendingCount"]!;
+    var canRequest = User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.PurchaseOfficer);
+}
+
+@section Toolbar {
+    @if (canRequest)
+    {
+        <a asp-action="Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Adjustment Request</a>
+    }
+}
+
+@if (canReview && pendingCount > 0 && status != StockAdjustmentStatus.Pending)
+{
+    <div class="alert alert-warning py-2 d-flex align-items-center justify-content-between">
+        <span><i class="fas fa-hourglass-half me-1"></i> <strong>@pendingCount</strong> adjustment request(s) waiting for your approval.</span>
+        <a asp-action="Index" asp-route-status="@StockAdjustmentStatus.Pending" class="btn btn-sm btn-warning">Review pending</a>
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-pills">
+            <li class="nav-item"><a class="nav-link py-1 @(status is null ? "active" : "")" asp-action="Index">All</a></li>
+            @foreach (var s in Enum.GetValues<StockAdjustmentStatus>())
+            {
+                <li class="nav-item">
+                    <a class="nav-link py-1 @(status == s ? "active" : "")" asp-action="Index" asp-route-status="@s">
+                        @s
+                        @if (s == StockAdjustmentStatus.Pending && pendingCount > 0)
+                        {
+                            <span class="badge text-bg-warning ms-1">@pendingCount</span>
+                        }
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped table-hover mb-0 data-table" id="adjustmentTable">
+            <thead>
+                <tr>
+                    <th>Request #</th><th data-filter="select">Warehouse</th><th data-filter="select">Reason</th>
+                    <th class="text-end" data-filter="false">Lines</th><th>Requested By</th><th data-filter="date">Requested</th>
+                    <th data-filter="select">Status</th><th>Reviewed By</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var a in Model)
+            {
+                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = a.Id })">
+                    <td><a asp-action="Details" asp-route-id="@a.Id" class="fw-semibold">@a.AdjustmentNumber</a></td>
+                    <td>@a.Warehouse?.Name</td>
+                    <td>@a.Reason.GetDisplayName()</td>
+                    <td class="text-end">@a.Items.Count</td>
+                    <td>@a.RequestedBy</td>
+                    <td data-date="@a.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd")">@a.RequestedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                    <td>
+                        @switch (a.Status)
+                        {
+                            case StockAdjustmentStatus.Pending: <span class="badge text-bg-warning"><i class="fas fa-hourglass-half"></i> Pending</span> break;
+                            case StockAdjustmentStatus.Approved: <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Approved</span> break;
+                            case StockAdjustmentStatus.Rejected: <span class="badge text-bg-danger"><i class="fas fa-circle-xmark"></i> Rejected</span> break;
+                            default: <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span> break;
+                        }
+                    </td>
+                    <td>@a.ReviewedBy</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    #adjustmentTable tbody tr.clickable-row { cursor: pointer; }
+    #adjustmentTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+</style>
+
+@section Scripts {
+    <script>
+        document.getElementById('adjustmentTable').addEventListener('click', function (e) {
+            if (e.target.closest('a, button, input, select')) return;
+            var row = e.target.closest('tr.clickable-row');
+            if (row && row.dataset.href) {
+                window.location.href = row.dataset.href;
+            }
+        });
+    </script>
+}

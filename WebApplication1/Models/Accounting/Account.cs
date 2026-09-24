@@ -36,4 +36,5 @@ public static class SystemAccountCodes
     public const string OwnersEquity = "3000";
     public const string SalesRevenue = "4000";
     public const string CostOfGoodsSold = "5000";
+    public const string StockAdjustment = "5100";
 }
