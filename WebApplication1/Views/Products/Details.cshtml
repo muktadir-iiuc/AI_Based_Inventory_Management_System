@@ -1,6 +1,6 @@
 @model Product
 @{
-    ViewData["Title"] = $"Product: {Model.Name}";
+    ViewData["Title"] = "Product: " + string.Join(" - ", new[] { Model.Name, Model.Brand, Model.Size }.Where(v => !string.IsNullOrWhiteSpace(v)));
     var scopedStock = ViewData["ScopedStock"] as decimal?;
     var warehouseNames = (Dictionary<int, string>)ViewData["WarehouseNames"]!;
     var warehouseNamesJson = System.Text.Json.JsonSerializer.Serialize(warehouseNames.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value));
