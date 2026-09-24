@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.Middleware;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.ViewModels;
 
@@ -70,6 +71,12 @@ public class AccountController(
 
         await signInManager.SignInWithClaimsAsync(user, model.RememberMe, extraClaims);
 
+        // Presence for Users > Active Users.
+        var now = DateTime.UtcNow;
+        await db.Users.Where(u => u.Id == user.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.LastLoginAt, now).SetProperty(u => u.LastActivityAt, now));
+        UserActivityMiddleware.MarkSeen(user.Id, now);
+
         if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
         {
             return Redirect(model.ReturnUrl);
@@ -82,6 +89,13 @@ public class AccountController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is not null)
+        {
+            await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.LastActivityAt, (DateTime?)null));
+            UserActivityMiddleware.Forget(userId);
+        }
+
         await signInManager.SignOutAsync();
         return RedirectToAction(nameof(Login));
     }

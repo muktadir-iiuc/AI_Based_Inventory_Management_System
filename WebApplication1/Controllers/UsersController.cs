@@ -17,6 +17,72 @@ public class UsersController(
 {
     private static readonly string[] UnrestrictedRoles = [Roles.Admin, Roles.Manager];
 
+    // Who is using the system right now. Presence is "last request seen" (see UserActivityMiddleware),
+    // so Online = active in the last few minutes, Idle = signed in but quiet, Offline = neither.
+    public async Task<IActionResult> Online()
+    {
+        ViewData["Initial"] = await BuildOnlineAsync();
+        return View();
+    }
+
+    // Polled by the Active Users page. Excluded from activity tracking, so an admin leaving the
+    // page open in a tab doesn't appear online for as long as it stays there.
+    [HttpGet]
+    public async Task<IActionResult> OnlineData() => Json(await BuildOnlineAsync());
+
+    private async Task<object> BuildOnlineAsync()
+    {
+        var now = DateTime.UtcNow;
+        var currentUserId = userManager.GetUserId(User);
+        var users = await userManager.Users
+            .Where(u => u.IsActive)
+            .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
+            .ToListAsync();
+
+        var rows = new List<OnlineUserRow>();
+        foreach (var user in users)
+        {
+            var minutesAgo = user.LastActivityAt.HasValue ? (now - user.LastActivityAt.Value).TotalMinutes : double.MaxValue;
+            rows.Add(new OnlineUserRow
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email ?? string.Empty,
+                Roles = (await userManager.GetRolesAsync(user)).ToList(),
+                Warehouses = user.UserWarehouses.Select(uw => uw.Warehouse!.Name).OrderBy(n => n).ToList(),
+                Status = minutesAgo <= OnlineUserRow.OnlineMinutes ? "Online"
+                       : minutesAgo <= OnlineUserRow.IdleMinutes ? "Idle" : "Offline",
+                LastActivityAt = user.LastActivityAt,
+                LastLoginAt = user.LastLoginAt,
+                IsYou = user.Id == currentUserId
+            });
+        }
+
+        int Rank(string status) => status switch { "Online" => 0, "Idle" => 1, _ => 2 };
+        var ordered = rows
+            .OrderBy(r => Rank(r.Status))
+            .ThenByDescending(r => r.LastActivityAt ?? DateTime.MinValue)
+            .ThenBy(r => r.FullName)
+            .Select(r => new
+            {
+                r.Id, r.FullName, r.Email, r.Roles, r.Warehouses, r.Status, r.IsYou,
+                lastActivityAt = r.LastActivityAt.HasValue ? DateTime.SpecifyKind(r.LastActivityAt.Value, DateTimeKind.Utc) : (DateTime?)null,
+                lastLoginAt = r.LastLoginAt.HasValue ? DateTime.SpecifyKind(r.LastLoginAt.Value, DateTimeKind.Utc) : (DateTime?)null
+            })
+            .ToList();
+
+        return new
+        {
+            serverTime = DateTime.SpecifyKind(now, DateTimeKind.Utc),
+            onlineMinutes = OnlineUserRow.OnlineMinutes,
+            idleMinutes = OnlineUserRow.IdleMinutes,
+            online = rows.Count(r => r.Status == "Online"),
+            idle = rows.Count(r => r.Status == "Idle"),
+            offline = rows.Count(r => r.Status == "Offline"),
+            users = ordered
+        };
+    }
+
     public async Task<IActionResult> Index()
     {
         var users = await userManager.Users.Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email).ToListAsync();

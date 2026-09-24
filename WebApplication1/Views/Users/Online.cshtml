@@ -1,0 +1,132 @@
+@{
+    ViewData["Title"] = "Active Users";
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-4">
+        <div class="card h-100"><div class="card-body py-3">
+            <div class="text-muted small">Online now</div>
+            <div class="fs-3 fw-bold text-success" id="cntOnline">0</div>
+            <div class="text-muted small">active in the last @WebApplication1.Models.ViewModels.OnlineUserRow.OnlineMinutes min</div>
+        </div></div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card h-100"><div class="card-body py-3">
+            <div class="text-muted small">Idle</div>
+            <div class="fs-3 fw-bold text-warning" id="cntIdle">0</div>
+            <div class="text-muted small">last seen up to @WebApplication1.Models.ViewModels.OnlineUserRow.IdleMinutes min ago</div>
+        </div></div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card h-100"><div class="card-body py-3">
+            <div class="text-muted small">Offline</div>
+            <div class="fs-3 fw-bold text-secondary" id="cntOffline">0</div>
+            <div class="text-muted small">not seen recently or signed out</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Users</h3>
+        <span class="small text-muted"><i class="fas fa-rotate"></i> Refreshes every 30 seconds &middot; <span id="updatedAt">—</span></span>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped table-hover align-middle mb-0" id="onlineTable">
+            <thead>
+                <tr><th>User</th><th>Role</th><th>Warehouse</th><th>Status</th><th>Last activity</th><th>Last sign-in</th></tr>
+            </thead>
+            <tbody id="onlineBody"></tbody>
+        </table>
+    </div>
+    <div class="card-footer small text-muted">
+        Status comes from each person's last request to the system. Someone who closes the browser without signing out
+        shows as Idle and then Offline; signing out marks them Offline at once.
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var initial = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Initial"], new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+            var body = document.getElementById('onlineBody');
+
+            function ago(iso, nowMs) {
+                if (!iso) return 'never';
+                var secs = Math.max(0, Math.round((nowMs - new Date(iso).getTime()) / 1000));
+                if (secs < 60) return 'just now';
+                var mins = Math.floor(secs / 60);
+                if (mins < 60) return mins + ' min ago';
+                var hrs = Math.floor(mins / 60);
+                if (hrs < 24) return hrs + ' h ' + (mins % 60) + ' min ago';
+                return Math.floor(hrs / 24) + ' d ago';
+            }
+
+            function stamp(iso) {
+                return iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+            }
+
+            function cell(tr, text, cls) {
+                var td = document.createElement('td');
+                if (cls) td.className = cls;
+                td.textContent = text;
+                tr.appendChild(td);
+                return td;
+            }
+
+            function render(data) {
+                var nowMs = new Date(data.serverTime).getTime();
+                document.getElementById('cntOnline').textContent = data.online;
+                document.getElementById('cntIdle').textContent = data.idle;
+                document.getElementById('cntOffline').textContent = data.offline;
+                document.getElementById('updatedAt').textContent = 'updated ' + new Date().toLocaleTimeString();
+
+                body.textContent = '';
+                data.users.forEach(function (u) {
+                    var tr = document.createElement('tr');
+
+                    var who = document.createElement('td');
+                    var name = document.createElement('div');
+                    name.className = 'fw-semibold';
+                    name.textContent = (u.fullName || u.email) + (u.isYou ? ' (you)' : '');
+                    var mail = document.createElement('div');
+                    mail.className = 'small text-muted';
+                    mail.textContent = u.email;
+                    who.appendChild(name);
+                    who.appendChild(mail);
+                    tr.appendChild(who);
+
+                    cell(tr, u.roles.join(', ') || '—');
+                    cell(tr, u.warehouses.length ? u.warehouses.join(', ') : 'All warehouses');
+
+                    var st = document.createElement('td');
+                    var badge = document.createElement('span');
+                    badge.className = 'badge ' + (u.status === 'Online' ? 'text-bg-success' : u.status === 'Idle' ? 'text-bg-warning' : 'text-bg-secondary');
+                    var dot = document.createElement('i');
+                    dot.className = 'fas fa-circle me-1';
+                    dot.style.fontSize = '.5rem';
+                    badge.appendChild(dot);
+                    badge.appendChild(document.createTextNode(u.status));
+                    st.appendChild(badge);
+                    tr.appendChild(st);
+
+                    var act = cell(tr, u.lastActivityAt ? ago(u.lastActivityAt, nowMs) : '—');
+                    if (u.lastActivityAt) act.title = stamp(u.lastActivityAt);
+                    cell(tr, stamp(u.lastLoginAt), 'text-muted');
+
+                    body.appendChild(tr);
+                });
+            }
+
+            function refresh() {
+                fetch('@Url.Action("OnlineData", "Users")', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+                    .then(render)
+                    .catch(function () { document.getElementById('updatedAt').textContent = 'could not refresh'; });
+            }
+
+            render(initial);
+            setInterval(refresh, 30000);
+        })();
+    </script>
+}

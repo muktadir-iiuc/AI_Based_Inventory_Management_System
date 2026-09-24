@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Authorization;
 using WebApplication1.Data;
 using WebApplication1.Hubs;
+using WebApplication1.Middleware;
 using WebApplication1.Models.Identity;
 using WebApplication1.Services;
 
@@ -102,6 +103,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();
+app.UseMiddleware<UserActivityMiddleware>();
 app.UseAuthorization();
 
 app.MapStaticAssets();

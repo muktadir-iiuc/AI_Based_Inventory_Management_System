@@ -11,6 +11,13 @@
     // get the "waiting for you" badge; requesters just see the menu entry.
     var canReviewAdjustments = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
     var canSeeAdjustments = canReviewAdjustments || User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.PurchaseOfficer);
+    // Admin/Manager: how many people were active in the last few minutes (Users > Active Users).
+    var onlineUserCount = 0;
+    if (canReviewAdjustments)
+    {
+        var onlineSince = DateTime.UtcNow.AddMinutes(-WebApplication1.Models.ViewModels.OnlineUserRow.OnlineMinutes);
+        onlineUserCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.Users, u => u.IsActive && u.LastActivityAt >= onlineSince);
+    }
     var pendingTransferCount = canReviewAdjustments
         ? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.StockTransfers, t => t.ApprovalStatus == WebApplication1.Models.Inventory.StockTransferApprovalStatus.Pending)
         : 0;
@@ -267,9 +274,15 @@
                     {
                         <li class="nav-header">ADMINISTRATION</li>
                         <li class="nav-item">
-                            <a asp-controller="Users" asp-action="Index" class="nav-link @(InController("Users") ? "active" : "")">
+                            <a asp-controller="Users" asp-action="Index" class="nav-link @(InController("Users") && !InAction("Users", "Online") ? "active" : "")">
                                 <i class="nav-icon fas fa-user-shield"></i>
                                 <p>Users &amp; Roles</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-controller="Users" asp-action="Online" class="nav-link @(InAction("Users", "Online") ? "active" : "")">
+                                <i class="nav-icon fas fa-signal"></i>
+                                <p>Active Users @if (onlineUserCount > 0) { <span class="badge text-bg-success ms-1">@onlineUserCount</span> }</p>
                             </a>
                         </li>
                         <li class="nav-item">
