@@ -401,13 +401,16 @@ public class StockAdjustmentsController(
         var byProduct = batchTotals.ToLookup(b => b.ProductId);
 
         var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-            .Select(p => new { p.Id, p.Sku, p.Name, Symbol = p.UnitOfMeasure!.Symbol, p.CostPrice, p.SalePrice })
+            .Select(p => new { p.Id, p.Sku, p.Name, p.Brand, p.Size, Category = p.Category!.Name, Symbol = p.UnitOfMeasure!.Symbol, p.CostPrice, p.SalePrice })
             .ToListAsync();
         ViewData["Products"] = products.Select(p => new
         {
             p.Id,
             p.Sku,
             p.Name,
+            p.Brand,
+            p.Size,
+            p.Category,
             p.Symbol,
             p.CostPrice,
             p.SalePrice,

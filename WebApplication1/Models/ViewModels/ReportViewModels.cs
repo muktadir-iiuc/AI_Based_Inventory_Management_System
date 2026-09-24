@@ -42,6 +42,42 @@ public class SalesProfitabilityRow
     public decimal Profit => SalesAmount - CostAmount;
 }
 
+// One breakdown line of a sales invoice — a batch allocation, so a quantity drawn from several
+// FIFO batches shows as several lines, each at its own unit price.
+public class SalesHistoryLine
+{
+    public string Product { get; set; } = string.Empty;
+    public string? BatchNumber { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalPrice => Quantity * UnitPrice;
+}
+
+// Master row of the Sales History report: one per posted invoice, with its breakdown lines as detail.
+public class SalesHistoryInvoice
+{
+    public int Id { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public string WarehouseName { get; set; } = string.Empty;
+    public decimal Quantity => Lines.Sum(l => l.Quantity);
+    public decimal SubTotal => Lines.Sum(l => l.TotalPrice);
+    public decimal Discount { get; set; }
+    public decimal NetTotal => SubTotal - Discount;
+    public List<SalesHistoryLine> Lines { get; set; } = [];
+}
+
+public class SalesHistoryViewModel
+{
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Customers { get; set; } = null!;
+    public int? CustomerId { get; set; }
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
+    public bool WarehouseScoped { get; set; }
+    public List<SalesHistoryInvoice> Invoices { get; set; } = [];
+}
+
 public class SalesProfitabilityViewModel
 {
     public bool WarehouseScoped { get; set; }

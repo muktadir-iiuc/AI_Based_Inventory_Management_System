@@ -817,29 +817,36 @@ public class SalesInvoicesController(
         ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
         ViewData["DefaultWarehouseId"] = defaultWarehouseId;
 
-        // When the user is scoped to one warehouse, show that warehouse's actual stock in the picker;
-        // otherwise fall back to the global total as a guide (the server re-validates against the chosen warehouse on submit).
-        // Unit price is no longer shown here at all — it depends on which batch(es) FIFO draws
-        // from for the entered quantity, computed live via PreviewAllocation as the user types.
-        if (singleWarehouseId.HasValue)
+        // The product picker shows the stock of the warehouse currently selected on the page, so each
+        // product carries its FIFO-available quantity (active-batch total â€” the figure the price
+        // preview and the submit check use) per warehouse and the page picks the right one client-side.
+        // A restricted user only ever receives their own warehouse(s), never other warehouses' quantities.
+        var batchTotalsQuery = db.ProductBatches.Where(b => b.IsActive);
+        if (warehouseIds is not null)
         {
-            ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-                .Select(p => new
-                {
-                    p.Id,
-                    p.Sku,
-                    p.Name,
-                    CurrentStock = p.WarehouseStocks.Where(s => s.WarehouseId == singleWarehouseId).Select(s => s.Quantity).FirstOrDefault(),
-                    p.UnitOfMeasure!.Symbol,
-                    p.CategoryId,
-                    Category = p.Category!.Name
-                }).ToListAsync();
+            batchTotalsQuery = batchTotalsQuery.Where(b => warehouseIds.Contains(b.WarehouseId));
         }
-        else
+        var batchTotals = await batchTotalsQuery
+            .GroupBy(b => new { b.ProductId, b.WarehouseId })
+            .Select(g => new { g.Key.ProductId, g.Key.WarehouseId, Quantity = g.Sum(b => b.RemainingQuantity) })
+            .ToListAsync();
+        var stocksByProduct = batchTotals.ToLookup(b => b.ProductId);
+
+        var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
+            .Select(p => new { p.Id, p.Sku, p.Name, p.Brand, p.Size, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name })
+            .ToListAsync();
+        ViewData["Products"] = products.Select(p => new
         {
-            ViewData["Products"] = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-                .Select(p => new { p.Id, p.Sku, p.Name, p.CurrentStock, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name }).ToListAsync();
-        }
+            p.Id,
+            p.Sku,
+            p.Name,
+            p.Brand,
+            p.Size,
+            p.Symbol,
+            p.CategoryId,
+            p.Category,
+            Stocks = stocksByProduct[p.Id].Select(s => new { s.WarehouseId, s.Quantity })
+        }).ToList();
 
         // Line items pick a category first, then a product filtered to that category — see
         // Views/SalesInvoices/Create.cshtml.

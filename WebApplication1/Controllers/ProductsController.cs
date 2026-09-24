@@ -44,7 +44,8 @@ public class ProductsController(
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(p => p.Name.Contains(search) || p.Sku.Contains(search));
+            query = query.Where(p => p.Name.Contains(search) || p.Sku.Contains(search)
+                || (p.Brand != null && p.Brand.Contains(search)) || (p.Size != null && p.Size.Contains(search)));
         }
         if (categoryId.HasValue)
         {
@@ -114,6 +115,8 @@ public class ProductsController(
             return View(model);
         }
 
+        model.Brand = string.IsNullOrWhiteSpace(model.Brand) ? null : model.Brand.Trim();
+        model.Size = string.IsNullOrWhiteSpace(model.Size) ? null : model.Size.Trim();
         model.Sku = await GenerateSkuAsync(model.CategoryId);
         model.CreatedBy = User.Identity?.Name;
         db.Products.Add(model);
@@ -215,6 +218,8 @@ public class ProductsController(
 
         product.Name = model.Name;
         product.Description = model.Description;
+        product.Brand = string.IsNullOrWhiteSpace(model.Brand) ? null : model.Brand.Trim();
+        product.Size = string.IsNullOrWhiteSpace(model.Size) ? null : model.Size.Trim();
         product.CategoryId = model.CategoryId;
         product.UnitOfMeasureId = model.UnitOfMeasureId;
         product.CostPrice = model.CostPrice;

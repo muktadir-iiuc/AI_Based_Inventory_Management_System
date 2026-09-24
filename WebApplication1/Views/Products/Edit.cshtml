@@ -40,6 +40,18 @@
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
+                    <label asp-for="Brand" class="form-label"></label>
+                    <input asp-for="Brand" class="form-control" />
+                    <span asp-validation-for="Brand" class="text-danger small"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Size" class="form-label"></label>
+                    <input asp-for="Size" class="form-control" />
+                    <span asp-validation-for="Size" class="text-danger small"></span>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
                     <label asp-for="CategoryId" class="form-label required-asterisk"></label>
                     <select asp-for="CategoryId" asp-items="categoryList" class="form-select"></select>
                 </div>

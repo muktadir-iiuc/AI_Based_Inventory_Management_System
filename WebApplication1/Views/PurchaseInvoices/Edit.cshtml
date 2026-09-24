@@ -228,7 +228,7 @@
             let html = '<option value="">-- select product --</option>';
             products.forEach(p => {
                 const sel = (selectedId && selectedId == p.Id) ? 'selected' : '';
-                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}" data-category="${p.Category || ''}" ${sel}>${p.Sku} - ${p.Name}</option>`;
+                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}" data-category="${p.Category || ''}" ${sel}>${productOptionLabel(p)}</option>`;
             });
             return html;
         }

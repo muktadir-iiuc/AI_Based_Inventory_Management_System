@@ -238,7 +238,7 @@
             }
             let html = '<option value="">-- select product --</option>';
             products.filter(p => p.CategoryId == categoryId).forEach(p => {
-                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}">${p.Sku} - ${p.Name}</option>`;
+                html += `<option value="${p.Id}" data-cost="${p.CostPrice}" data-sale="${p.SuggestedSalePrice}" data-symbol="${p.Symbol}">${productOptionLabel(p)}</option>`;
             });
             return html;
         }

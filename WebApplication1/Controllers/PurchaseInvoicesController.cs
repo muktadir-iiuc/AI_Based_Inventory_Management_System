@@ -419,13 +419,15 @@ public class PurchaseInvoicesController(
             .ToDictionaryAsync(x => x.ProductId, x => x.SalePrice);
 
         var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-            .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice, p.SalePrice, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name }).ToListAsync();
+            .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice, p.SalePrice, p.Brand, p.Size, p.UnitOfMeasure!.Symbol, p.CategoryId, Category = p.Category!.Name }).ToListAsync();
 
         ViewData["Products"] = products.Select(p => new
         {
             p.Id,
             p.Sku,
             p.Name,
+            p.Brand,
+            p.Size,
             p.CostPrice,
             SuggestedSalePrice = latestBatchSalePrices.GetValueOrDefault(p.Id, p.SalePrice),
             p.Symbol,

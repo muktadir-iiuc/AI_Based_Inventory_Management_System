@@ -102,6 +102,75 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         return View(suggestions);
     }
 
+    // Invoice-wise sales history: one master row per posted invoice, with its batch-wise lines
+    // (Qty / Unit Price / Total Price) as the expandable detail. Filters: customer and an inclusive
+    // From/To date range. A warehouse-restricted user only ever sees invoices of their own warehouse(s).
+    public async Task<IActionResult> SalesHistory(int? customerId, DateTime? fromDate, DateTime? toDate)
+    {
+        var warehouseIds = User.GetWarehouseIds();
+
+        var query = db.SalesInvoices
+            .Include(s => s.Customer)
+            .Include(s => s.Warehouse)
+            // IsCurrent: an edited invoice keeps its superseded lines, which must not be listed.
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
+            .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted);
+
+        if (warehouseIds is not null)
+        {
+            query = query.Where(s => warehouseIds.Contains(s.WarehouseId));
+        }
+        if (customerId.HasValue)
+        {
+            query = query.Where(s => s.CustomerId == customerId);
+        }
+        if (fromDate.HasValue)
+        {
+            var from = fromDate.Value.Date;
+            query = query.Where(s => s.Date >= from);
+        }
+        if (toDate.HasValue)
+        {
+            var toExclusive = toDate.Value.Date.AddDays(1);
+            query = query.Where(s => s.Date < toExclusive);
+        }
+
+        var invoices = await query.OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync();
+
+        var customers = await db.Customers.OrderBy(c => c.Name).ToListAsync();
+
+        var vm = new SalesHistoryViewModel
+        {
+            Customers = new SelectList(customers, "Id", "Name", customerId),
+            CustomerId = customerId,
+            FromDate = fromDate,
+            ToDate = toDate,
+            WarehouseScoped = warehouseIds is not null,
+            Invoices = invoices.Select(s => new SalesHistoryInvoice
+            {
+                Id = s.Id,
+                InvoiceNumber = s.InvoiceNumber,
+                Date = s.Date,
+                CustomerName = s.Customer?.Name ?? string.Empty,
+                WarehouseName = s.Warehouse?.Name ?? string.Empty,
+                Discount = s.DiscountAmount,
+                Lines = s.Items.OrderBy(i => i.Id).Select(i => new SalesHistoryLine
+                {
+                    Product = i.Product is null
+                        ? string.Empty
+                        : string.Join(" - ", new[] { i.Product.Sku, i.Product.Name, i.Product.Brand, i.Product.Size }
+                            .Where(v => !string.IsNullOrWhiteSpace(v))),
+                    BatchNumber = i.Batch?.BatchNumber,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
     // One row per batch allocation actually sold — Unit Cost/Unit Sale Price are the exact
     // prices frozen on that SalesInvoiceItem at the time of sale (see §7: historical prices
     // never change because a batch's price changed later), so Profit here is always real.

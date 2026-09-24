@@ -17,6 +17,14 @@ public class Product : BaseEntity
     [StringLength(500)]
     public string? Description { get; set; }
 
+    [StringLength(100)]
+    [Display(Name = "Product Brand")]
+    public string? Brand { get; set; }
+
+    [StringLength(50)]
+    [Display(Name = "Product Size")]
+    public string? Size { get; set; }
+
     public int CategoryId { get; set; }
     public Category? Category { get; set; }
 

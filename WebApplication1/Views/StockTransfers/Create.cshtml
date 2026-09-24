@@ -118,7 +118,7 @@
         function productOptions() {
             let html = '<option value="">-- select product --</option>';
             products.forEach(p => {
-                html += `<option value="${p.Id}">${p.Sku} - ${p.Name}</option>`;
+                html += `<option value="${p.Id}">${productOptionLabel(p)}</option>`;
             });
             return html;
         }

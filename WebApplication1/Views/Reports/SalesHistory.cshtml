@@ -1,0 +1,211 @@
+@model SalesHistoryViewModel
+@{
+    ViewData["Title"] = "Sales History";
+    var hasFilters = Model.CustomerId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
+}
+
+@if (Model.WarehouseScoped)
+{
+    <div class="alert alert-info py-2">
+        <i class="fas fa-warehouse me-1"></i>
+        Showing sales for your assigned warehouse(s) only.
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Customer</label>
+                <select name="customerId" asp-items="Model.Customers" class="form-select form-select-sm" style="min-width: 240px;">
+                    <option value="">All customers</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">From date</label>
+                <input type="date" name="fromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">To date</label>
+                <input type="date" name="toDate" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Show</button>
+                @if (hasFilters)
+                {
+                    <a asp-action="SalesHistory" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-xmark"></i> Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Invoices</span>
+                <h4>@Model.Invoices.Count</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Total Quantity</span>
+                <h4>@Model.Invoices.Sum(i => i.Quantity).ToString("0.##")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <span class="text-muted">Net Sales</span>
+                <h4>@Model.Invoices.Sum(i => i.NetTotal).ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Invoices</h3>
+        <div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="expandAll"><i class="fas fa-angles-down"></i> Expand all</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="collapseAll"><i class="fas fa-angles-up"></i> Collapse all</button>
+        </div>
+    </div>
+    <div class="card-body p-0 table-responsive-card">
+        @* Not the shared .data-table class: this table has expandable detail rows, so it is set up below. *@
+        <table class="table table-hover mb-0 w-100" id="historyTable">
+            <thead>
+                <tr>
+                    <th style="width: 2.5rem"></th>
+                    <th>Invoice No.</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Warehouse</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-end">Sub Total</th>
+                    <th class="text-end">Discount</th>
+                    <th class="text-end">Total Price</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var inv in Model.Invoices)
+            {
+                var linesJson = System.Text.Json.JsonSerializer.Serialize(inv.Lines.Select(l => new
+                {
+                    product = l.Product,
+                    batch = l.BatchNumber ?? "—",
+                    qty = l.Quantity.ToString("0.##"),
+                    unitPrice = l.UnitPrice.ToString("C"),
+                    total = l.TotalPrice.ToString("C")
+                }));
+                <tr data-lines="@linesJson">
+                    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 toggle-detail" title="Show breakdown"><i class="fas fa-plus"></i></button></td>
+                    <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@inv.Id" class="fw-semibold">@inv.InvoiceNumber</a></td>
+                    <td data-order="@inv.Date.ToString("yyyyMMdd")">@inv.Date.ToString("MMM dd, yyyy")</td>
+                    <td>@inv.CustomerName</td>
+                    <td>@inv.WarehouseName</td>
+                    <td class="text-end" data-order="@inv.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture)">@inv.Quantity.ToString("0.##")</td>
+                    <td class="text-end" data-order="@inv.SubTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)">@inv.SubTotal.ToString("C")</td>
+                    <td class="text-end" data-order="@inv.Discount.ToString(System.Globalization.CultureInfo.InvariantCulture)">@(inv.Discount > 0 ? "-" + inv.Discount.ToString("C") : "—")</td>
+                    <td class="text-end fw-semibold" data-order="@inv.NetTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)">@inv.NetTotal.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var table = document.getElementById('historyTable');
+
+            var dt = jQuery(table).DataTable({
+                order: [],
+                pageLength: 20,
+                lengthMenu: [10, 20, 50, 100],
+                columnDefs: [{ orderable: false, targets: 0 }],
+                language: { emptyTable: 'No sales found for the selected filters.' }
+            });
+
+            // Detail section: the invoice's breakdown lines (Qty / Unit Price / Total Price), built with
+            // textContent so product names or sizes containing quotes or angle brackets can't break markup.
+            function buildDetail(tr) {
+                var lines = [];
+                try { lines = JSON.parse(tr.getAttribute('data-lines') || '[]'); } catch (e) { }
+
+                var wrap = document.createElement('div');
+                wrap.className = 'bg-body-tertiary p-2 ps-5';
+
+                var tbl = document.createElement('table');
+                tbl.className = 'table table-sm table-bordered mb-0 bg-body';
+                tbl.innerHTML = '<thead><tr><th>Product</th><th>Batch</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Total Price</th></tr></thead>';
+                var body = document.createElement('tbody');
+
+                if (!lines.length) {
+                    var empty = document.createElement('tr');
+                    var emptyCell = document.createElement('td');
+                    emptyCell.colSpan = 5;
+                    emptyCell.className = 'text-center text-muted';
+                    emptyCell.textContent = 'No lines.';
+                    empty.appendChild(emptyCell);
+                    body.appendChild(empty);
+                }
+
+                lines.forEach(function (l) {
+                    var row = document.createElement('tr');
+                    [[l.product, ''], [l.batch, ''], [l.qty, 'text-end'], [l.unitPrice, 'text-end'], [l.total, 'text-end']].forEach(function (c) {
+                        var td = document.createElement('td');
+                        td.className = c[1];
+                        td.textContent = c[0];
+                        row.appendChild(td);
+                    });
+                    body.appendChild(row);
+                });
+
+                tbl.appendChild(body);
+                wrap.appendChild(tbl);
+                return wrap;
+            }
+
+            function setOpen(tr, open) {
+                var row = dt.row(tr);
+                var icon = tr.querySelector('.toggle-detail i');
+                if (open && !row.child.isShown()) {
+                    row.child(buildDetail(tr)).show();
+                } else if (!open && row.child.isShown()) {
+                    row.child.hide();
+                }
+                if (icon) icon.className = row.child.isShown() ? 'fas fa-minus' : 'fas fa-plus';
+            }
+
+            jQuery(table).on('click', 'tbody .toggle-detail', function () {
+                var tr = this.closest('tr');
+                setOpen(tr, !dt.row(tr).child.isShown());
+            });
+
+            // Applies to every invoice matching the current filters/search, across all pages.
+            function setAll(open) {
+                dt.rows({ search: 'applied' }).every(function () {
+                    var tr = this.node();
+                    if (tr) setOpen(tr, open);
+                });
+            }
+            document.getElementById('expandAll').addEventListener('click', function () { setAll(true); });
+            document.getElementById('collapseAll').addEventListener('click', function () { setAll(false); });
+
+            // Rows on other pages have no DOM node until drawn, so re-sync toggle icons after each draw.
+            dt.on('draw', function () {
+                dt.rows({ page: 'current' }).every(function () {
+                    var tr = this.node();
+                    var icon = tr && tr.querySelector('.toggle-detail i');
+                    if (icon) icon.className = this.child.isShown() ? 'fas fa-minus' : 'fas fa-plus';
+                });
+            });
+        })();
+    </script>
+}

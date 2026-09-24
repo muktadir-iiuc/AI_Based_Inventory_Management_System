@@ -16,6 +16,8 @@
                 <dl class="row mb-0">
                     <dt class="col-5">SKU</dt><dd class="col-7">@Model.Sku</dd>
                     <dt class="col-5">Name</dt><dd class="col-7">@Model.Name</dd>
+                    <dt class="col-5">Brand</dt><dd class="col-7">@(string.IsNullOrWhiteSpace(Model.Brand) ? "—" : Model.Brand)</dd>
+                    <dt class="col-5">Size</dt><dd class="col-7">@(string.IsNullOrWhiteSpace(Model.Size) ? "—" : Model.Size)</dd>
                     <dt class="col-5">Category</dt><dd class="col-7">@Model.Category?.Name</dd>
                     <dt class="col-5">Unit</dt><dd class="col-7">@Model.UnitOfMeasure?.Name (@Model.UnitOfMeasure?.Symbol)</dd>
                     <dt class="col-5">Last Cost <small class="text-muted">(default)</small></dt><dd class="col-7">@Model.CostPrice.ToString("C")</dd>

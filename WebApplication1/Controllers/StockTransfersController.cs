@@ -734,13 +734,16 @@ public class StockTransfersController(
         var byProduct = batchTotals.ToLookup(b => b.ProductId);
 
         var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
-            .Select(p => new { p.Id, p.Sku, p.Name, p.UnitOfMeasure!.Symbol })
+            .Select(p => new { p.Id, p.Sku, p.Name, p.Brand, p.Size, Category = p.Category!.Name, p.UnitOfMeasure!.Symbol })
             .ToListAsync();
         ViewData["Products"] = products.Select(p => new
         {
             p.Id,
             p.Sku,
             p.Name,
+            p.Brand,
+            p.Size,
+            p.Category,
             p.Symbol,
             Stocks = byProduct[p.Id].Select(s => new { s.WarehouseId, s.Quantity })
         }).ToList();

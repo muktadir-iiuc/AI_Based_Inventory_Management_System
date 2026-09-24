@@ -116,7 +116,7 @@
             let html = '<option value="">-- select product --</option>';
             products.forEach(p => {
                 const sel = (selectedId && selectedId == p.Id) ? 'selected' : '';
-                html += `<option value="${p.Id}" ${sel}>${p.Sku} - ${p.Name}</option>`;
+                html += `<option value="${p.Id}" ${sel}>${productOptionLabel(p)}</option>`;
             });
             return html;
         }

@@ -193,6 +193,13 @@
             return el ? parseInt(el.value, 10) || 0 : 0;
         }
 
+        // Stock of the warehouse currently selected on the page (0 when it has none).
+        function stockInSelectedWarehouse(product) {
+            const id = currentWarehouseId();
+            const entry = (product.Stocks || []).find(s => s.WarehouseId === id);
+            return entry ? Number(entry.Quantity) : 0;
+        }
+
         function categoryOptions() {
             let html = '<option value="">-- select category --</option>';
             categories.forEach(c => {
@@ -209,7 +216,7 @@
             }
             let html = '<option value="">-- select product --</option>';
             products.filter(p => p.CategoryId == categoryId).forEach(p => {
-                html += `<option value="${p.Id}" data-stock="${p.CurrentStock}" data-symbol="${p.Symbol}">${p.Sku} - ${p.Name} (stock: ${p.CurrentStock})</option>`;
+                html += `<option value="${p.Id}" data-stock="${stockInSelectedWarehouse(p)}" data-symbol="${p.Symbol}">${productOptionLabel(p)} (stock: ${stockInSelectedWarehouse(p)})</option>`;
             });
             return html;
         }
@@ -392,6 +399,17 @@
                 }
             }
 
+            // Rebuilds this row's Product list (keeping the selection) so the stock shown in each
+            // label follows the warehouse currently selected.
+            tr.refreshProductOptions = () => {
+                const current = select.value;
+                select.innerHTML = productOptionsForCategory(parseInt(categorySelect.value, 10) || null);
+                select.value = current;
+                if (typeof jQuery !== 'undefined') {
+                    refreshProductSelect2();
+                }
+            };
+
             categorySelect.addEventListener('change', applyCategorySelection);
             select.addEventListener('change', () => {
                 priceManuallyEdited = false;
@@ -473,7 +491,22 @@
         });
         const warehouseEl = document.getElementById('warehouseId');
         if (warehouseEl && warehouseEl.tagName === 'SELECT') {
-            warehouseEl.addEventListener('change', refreshAllRows);
+            // Relabel every row's product list with the new warehouse's stock, then re-check prices.
+            // Bound to both the native and Select2 events (Select2 doesn't reliably fire the native
+            // one); the last-value guard keeps a double fire from running twice.
+            let lastWarehouse = warehouseEl.value;
+            const onWarehouseChanged = () => {
+                if (warehouseEl.value === lastWarehouse) return;
+                lastWarehouse = warehouseEl.value;
+                document.querySelectorAll('#itemsBody tr.item-row').forEach(tr => {
+                    if (typeof tr.refreshProductOptions === 'function') tr.refreshProductOptions();
+                });
+                refreshAllRows();
+            };
+            warehouseEl.addEventListener('change', onWarehouseChanged);
+            if (typeof jQuery !== 'undefined') {
+                jQuery(warehouseEl).on('select2:select select2:clear', onWarehouseChanged);
+            }
         }
         addRow();
     </script>

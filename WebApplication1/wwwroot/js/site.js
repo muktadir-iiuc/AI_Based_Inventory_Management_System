@@ -131,6 +131,14 @@ function initDataTables(root) {
     });
 }
 
+// Label for a product <option> in the line-item pickers: "SKU - Name - Brand - Size", leaving
+// out whichever of brand/size isn't set. Returns HTML-safe text because callers build the
+// <option> markup with innerHTML.
+function productOptionLabel(p) {
+    const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return [p.Sku, p.Name, p.Brand, p.Size].filter(v => v && String(v).trim()).map(esc).join(' - ');
+}
+
 // Initializes Select2 on every dropdown within the given root element or document.
 // Call this again with a newly-created row/element after inserting it into the DOM
 // (e.g. a dynamically added invoice line) so its <select> gets the same widget.
