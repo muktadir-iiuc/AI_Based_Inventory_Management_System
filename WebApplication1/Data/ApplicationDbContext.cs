@@ -14,6 +14,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     : IdentityDbContext<ApplicationUser, ApplicationRole, string>(options)
 {
     public DbSet<CompanySetting> CompanySettings => Set<CompanySetting>();
+    public DbSet<BackupSetting> BackupSettings => Set<BackupSetting>();
+    public DbSet<DatabaseBackup> DatabaseBackups => Set<DatabaseBackup>();
 
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();

@@ -1,0 +1,185 @@
+@model BackupIndexViewModel
+@{
+    ViewData["Title"] = "Database Backup";
+
+    string FormatSize(long? bytes)
+    {
+        if (bytes is null) return "—";
+        double size = bytes.Value;
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var i = 0;
+        while (size >= 1024 && i < units.Length - 1) { size /= 1024; i++; }
+        return $"{size:0.##} {units[i]}";
+    }
+}
+
+@{
+    var latest = Model.Backups.FirstOrDefault();
+}
+@if (latest is { Status: BackupStatus.Failed })
+{
+    <div class="alert alert-danger py-2">
+        <i class="fas fa-triangle-exclamation me-1"></i>
+        The most recent backup (@latest.StartedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")) failed: @latest.ErrorMessage
+    </div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title">Back up now</h3></div>
+            <div class="card-body">
+                <p class="mb-2">Creates a full backup of <strong>@Model.DatabaseName</strong> right away.</p>
+                <dl class="row small mb-3">
+                    <dt class="col-4 text-muted fw-normal">Saved to</dt>
+                    <dd class="col-8 text-break">@(string.IsNullOrWhiteSpace(Model.EffectiveDirectory) ? "— (set a backup folder in the schedule settings)" : Model.EffectiveDirectory)</dd>
+                </dl>
+                <form asp-action="RunNow" method="post" id="runNowForm">
+                    <button type="submit" class="btn btn-primary" id="runNowButton"><i class="fas fa-database"></i> Back up now</button>
+                </form>
+                <div class="form-text mt-2">Large databases can take a while — keep this page open until it finishes.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title">Automatic backups</h3></div>
+            <div class="card-body">
+                <form asp-action="SaveSettings" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div class="form-check form-switch mb-3">
+                        <input asp-for="Settings.IsEnabled" class="form-check-input" role="switch" />
+                        <label asp-for="Settings.IsEnabled" class="form-check-label"></label>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Settings.Frequency" class="form-label"></label>
+                            <select asp-for="Settings.Frequency" asp-items="Html.GetEnumSelectList<BackupFrequency>()" class="form-select" id="frequencySelect"></select>
+                        </div>
+                        <div class="col-md-4 mb-3" id="weeklyDayGroup">
+                            <label asp-for="Settings.WeeklyDay" class="form-label"></label>
+                            <select asp-for="Settings.WeeklyDay" asp-items="Html.GetEnumSelectList<DayOfWeek>()" class="form-select"></select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Settings.TimeOfDay" class="form-label"></label>
+                            <input asp-for="Settings.TimeOfDay" type="time" class="form-control" />
+                            <span asp-validation-for="Settings.TimeOfDay" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Settings.RetentionCount" class="form-label"></label>
+                            <input asp-for="Settings.RetentionCount" type="number" min="1" max="365" class="form-control" />
+                            <span asp-validation-for="Settings.RetentionCount" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label asp-for="Settings.BackupDirectory" class="form-label"></label>
+                            <input asp-for="Settings.BackupDirectory" class="form-control" placeholder="Leave empty to use SQL Server's default backup folder" />
+                            <span asp-validation-for="Settings.BackupDirectory" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="form-text mb-3">
+                        The time is the web server's local time. SQL Server writes the backup, so it needs write permission on the folder. If it
+                        doesn't (e.g. a user's Desktop), the backup is saved to SQL Server's own backup folder and this app copies it to your folder
+                        (works when the app runs on the SQL Server machine). Once more than the number above exist, the oldest successful backups are deleted.
+                    </div>
+                    @if (Model.NextRunLocal is { } next)
+                    {
+                        <div class="alert alert-info py-2 small"><i class="fas fa-clock me-1"></i> Next automatic backup: <strong>@next.ToString("ddd, dd MMM yyyy HH:mm")</strong></div>
+                    }
+                    <button type="submit" class="btn btn-primary">Save schedule</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3 class="card-title">Backup history</h3></div>
+    <div class="card-body p-0 table-responsive-card">
+        <table class="table table-striped table-hover mb-0 data-table">
+            <thead>
+                <tr>
+                    <th data-filter="false">Started</th>
+                    <th data-filter="select">Type</th>
+                    <th data-filter="select">Status</th>
+                    <th>File</th>
+                    <th class="text-end" data-filter="false">Size</th>
+                    <th>By</th>
+                    <th data-filter="false"></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var b in Model.Backups)
+            {
+                <tr>
+                    <td data-order="@b.StartedAt.ToString("yyyyMMddHHmmss")">@b.StartedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                    <td>@b.Trigger</td>
+                    <td>
+                        @if (b.Status == BackupStatus.Succeeded) { <span class="badge text-bg-success">Succeeded</span> }
+                        else if (b.Status == BackupStatus.Running) { <span class="badge text-bg-warning">Running</span> }
+                        else { <span class="badge text-bg-danger" title="@b.ErrorMessage">Failed</span> }
+                    </td>
+                    <td class="text-break">
+                        @b.FileName
+                        @if (b.Status == BackupStatus.Failed && !string.IsNullOrWhiteSpace(b.ErrorMessage))
+                        {
+                            <div class="small text-danger">@b.ErrorMessage</div>
+                        }
+                        else
+                        {
+                            <div class="small text-muted">@System.IO.Path.GetDirectoryName(b.FilePath)</div>
+                            @if (b.CopyPath is not null)
+                            {
+                                <div class="small text-muted">Copy: @System.IO.Path.GetDirectoryName(b.CopyPath)</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(b.ErrorMessage))
+                            {
+                                <div class="small text-warning-emphasis">@b.ErrorMessage</div>
+                            }
+                        }
+                    </td>
+                    <td class="text-end">@FormatSize(b.SizeBytes)</td>
+                    <td>@b.CreatedBy</td>
+                    <td class="text-end">
+                        <div class="table-actions">
+                            @if (Model.Downloadable.Contains(b.Id))
+                            {
+                                <a asp-action="Download" asp-route-id="@b.Id" class="btn btn-sm btn-outline-primary" title="Download"><i class="fas fa-download"></i></a>
+                            }
+                            @if (b.Status != BackupStatus.Running)
+                            {
+                                <form asp-action="Delete" asp-route-id="@b.Id" method="post" class="confirm-delete" data-confirm-message="Delete this backup@(Model.Downloadable.Contains(b.Id) ? " and its file" : "")?">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var frequency = document.getElementById('frequencySelect');
+            var weeklyGroup = document.getElementById('weeklyDayGroup');
+            function sync() { weeklyGroup.classList.toggle('d-none', frequency.value !== '@((int)BackupFrequency.Weekly)'); }
+            frequency.addEventListener('change', sync);
+            if (typeof jQuery !== 'undefined') { jQuery(frequency).on('select2:select', sync); }
+            sync();
+
+            // A backup runs inside this request; stop a second click from queueing another one.
+            document.getElementById('runNowForm').addEventListener('submit', function () {
+                var button = document.getElementById('runNowButton');
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Backing up…';
+            });
+        })();
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

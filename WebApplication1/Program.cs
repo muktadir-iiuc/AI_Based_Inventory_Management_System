@@ -74,6 +74,8 @@ builder.Services.AddScoped<IActivityNotifier, ActivityNotifier>();
 builder.Services.AddScoped<IChatbotService, ChatbotService>();
 builder.Services.AddScoped<IProductPriceService, ProductPriceService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IDatabaseBackupService, DatabaseBackupService>();
+builder.Services.AddHostedService<BackupSchedulerService>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 builder.Services.AddAuthorization(options =>

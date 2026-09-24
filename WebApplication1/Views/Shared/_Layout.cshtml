@@ -298,6 +298,12 @@
                                 <p>Company Settings</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a asp-controller="DatabaseBackup" asp-action="Index" class="nav-link @(InController("DatabaseBackup") ? "active" : "")">
+                                <i class="nav-icon fas fa-database"></i>
+                                <p>Database Backup</p>
+                            </a>
+                        </li>
                     }
                 </ul>
             </nav>
