@@ -293,7 +293,7 @@ public class SalesInvoicesController(
         var lines = invoice.Items.Select((item, index) => new SalesInvoiceReportLine
         {
             SL = (index + 1).ToString(),
-            ProductName = item.Product?.Name ?? string.Empty,
+            ProductName = string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))),
             Sku = item.Product?.Sku ?? string.Empty,
             Quantity = $"{item.Quantity:0.##} {item.Product?.UnitOfMeasure?.Symbol}".Trim(),
             UnitPrice = item.UnitPrice.ToString("N2"),
@@ -379,6 +379,7 @@ public class SalesInvoicesController(
         {
             SL = (index + 1).ToString(),
             ProductName = item.Product?.Name ?? string.Empty,
+            Details = string.Join(" - ", new[] { item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))),
             Sku = item.Product?.Sku ?? string.Empty,
             Quantity = $"{item.Quantity:0.##} {item.Product?.UnitOfMeasure?.Symbol}".Trim(),
             UnitPrice = item.UnitPrice.ToString("N2"),

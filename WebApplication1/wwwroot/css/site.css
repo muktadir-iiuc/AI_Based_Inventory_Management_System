@@ -171,3 +171,16 @@
         transform: none;
     }
 }
+
+/* A Select2 dropdown sitting beside a button (e.g. the "add new customer/supplier/product" "+")
+   in a flex row. Select2 sets an inline width:100% and its nowrap text gives the box a large
+   automatic minimum width, so a long selected value stopped it shrinking and pushed the button
+   under the neighbouring column. Let the box shrink (its text is ellipsized) and keep the button. */
+.d-flex > .select2-container {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.d-flex > .select2-container ~ .btn {
+    flex-shrink: 0;
+}

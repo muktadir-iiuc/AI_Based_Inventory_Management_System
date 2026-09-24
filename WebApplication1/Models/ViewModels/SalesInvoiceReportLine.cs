@@ -44,6 +44,11 @@ public class SalesInvoiceReportLine
 {
     public string SL { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
+
+    // "Brand - Size" — printed on its own line by the thermal receipt, whose fixed-width item
+    // column would otherwise truncate it off the end of a long name. The A4 invoice puts brand and
+    // size straight into ProductName instead.
+    public string Details { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
     public string Quantity { get; set; } = string.Empty;
     public string UnitPrice { get; set; } = string.Empty;

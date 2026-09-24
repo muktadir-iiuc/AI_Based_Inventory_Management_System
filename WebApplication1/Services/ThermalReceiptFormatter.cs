@@ -9,7 +9,10 @@ namespace WebApplication1.Services;
 // whose row count depends on the invoice, needs to stay plain text.
 public static class ThermalReceiptFormatter
 {
-    public const int LineWidth = 42;
+    // Characters per line. The detail textbox is 3in wide in Consolas 8pt bold (0.55em = 4.4pt per
+    // character), so 49 characters span 2.99in of the 3in box (48 leaves a visible gap). It was 42 (2.57in), which
+    // left the detail section visibly short of the header and totals. Keep this <= 49 or lines wrap.
+    public const int LineWidth = 49;
 
     public static List<SalesInvoiceThermalLine> BuildDetailLines(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items)
     {
@@ -38,6 +41,10 @@ public static class ThermalReceiptFormatter
         {
             var item = items[i];
             lines.Add(TwoColumn(item.ProductName, item.LineTotal));
+            if (!string.IsNullOrWhiteSpace(item.Details))
+            {
+                lines.Add($"  {item.Details}");
+            }
             lines.Add($"  {item.Sku}  {item.Quantity} x {item.UnitPrice}".TrimEnd());
             if (i < items.Count - 1)
             {
