@@ -65,4 +65,10 @@ public class ProductQuickCreateRequest
 
     [StringLength(500)]
     public string? Description { get; set; }
+
+    [StringLength(100)]
+    public string? Brand { get; set; }
+
+    [StringLength(50)]
+    public string? Size { get; set; }
 }

@@ -138,6 +138,16 @@
                 </div>
                 <div class="row">
                     <div class="col-md-6 mb-2">
+                        <label class="form-label">Product Brand</label>
+                        <input type="text" class="form-control" id="quickProductBrand" maxlength="100" placeholder="Optional" data-enter-submit />
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Product Size</label>
+                        <input type="text" class="form-control" id="quickProductSize" maxlength="50" placeholder="Optional" data-enter-submit />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
                         <label class="form-label required-asterisk">Category</label>
                         <select class="form-select" id="quickProductCategory"></select>
                     </div>
@@ -410,6 +420,8 @@
             const saleInput = document.getElementById('quickProductSale');
             const reorderInput = document.getElementById('quickProductReorder');
             const descriptionInput = document.getElementById('quickProductDescription');
+            const brandInput = document.getElementById('quickProductBrand');
+            const sizeInput = document.getElementById('quickProductSize');
             const errorEl = document.getElementById('quickProductError');
             const saveBtn = document.getElementById('saveQuickProduct');
             const token = document.querySelector('#invoiceForm input[name="__RequestVerificationToken"]').value;
@@ -438,6 +450,8 @@
 
             function resetForm() {
                 nameInput.value = '';
+                brandInput.value = '';
+                sizeInput.value = '';
                 descriptionInput.value = '';
                 costInput.value = 0;
                 saleInput.value = 0;
@@ -496,6 +510,8 @@
                             costPrice: parseFloat(costInput.value) || 0,
                             salePrice: parseFloat(saleInput.value) || 0,
                             reorderLevel: parseFloat(reorderInput.value) || 0,
+                            brand: brandInput.value.trim() || null,
+                            size: sizeInput.value.trim() || null,
                             description: descriptionInput.value.trim() || null
                         })
                     });
@@ -513,7 +529,9 @@
                         SuggestedSalePrice: data.salePrice,
                         Symbol: data.symbol,
                         CategoryId: data.categoryId,
-                        Category: data.category
+                        Category: data.category,
+                        Brand: data.brand,
+                        Size: data.size
                     };
                     products.push(product);
                     products.sort((a, b) => a.Name.localeCompare(b.Name));
