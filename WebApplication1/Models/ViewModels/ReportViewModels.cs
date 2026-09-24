@@ -16,6 +16,8 @@ public class StockValuationRow
 public class StockValuationViewModel
 {
     public bool WarehouseScoped { get; set; }
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Warehouses { get; set; } = null!;
+    public int? WarehouseId { get; set; }
     public decimal TotalCostValue { get; set; }
     public decimal TotalSaleValue { get; set; }
     public List<StockValuationRow> Rows { get; set; } = null!;
@@ -40,6 +42,10 @@ public class SalesProfitabilityRow
 public class SalesProfitabilityViewModel
 {
     public bool WarehouseScoped { get; set; }
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Warehouses { get; set; } = null!;
+    public int? WarehouseId { get; set; }
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalCost { get; set; }
     public decimal TotalProfit { get; set; }

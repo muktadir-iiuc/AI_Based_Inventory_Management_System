@@ -23,7 +23,7 @@ public class SalesInvoicesController(
     ICompanySettingsService companySettings,
     IWebHostEnvironment env) : Controller
 {
-    public async Task<IActionResult> Index(int? customerId, int? warehouseId)
+    public async Task<IActionResult> Index(int? customerId, int? warehouseId, DateTime? fromDate, DateTime? toDate)
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.SalesInvoices.Include(s => s.Customer).Include(s => s.Warehouse).AsQueryable();
@@ -40,6 +40,18 @@ public class SalesInvoicesController(
         if (customerId.HasValue)
         {
             query = query.Where(s => s.CustomerId == customerId);
+        }
+
+        // Inclusive on both ends: To covers the whole selected day.
+        if (fromDate.HasValue)
+        {
+            var from = fromDate.Value.Date;
+            query = query.Where(s => s.Date >= from);
+        }
+        if (toDate.HasValue)
+        {
+            var toExclusive = toDate.Value.Date.AddDays(1);
+            query = query.Where(s => s.Date < toExclusive);
         }
 
         ViewData["CustomerId"] = new SelectList(await db.Customers.Where(c => c.IsActive==true).OrderBy(c => c.Name).ToListAsync(), "Id", "Name", customerId);

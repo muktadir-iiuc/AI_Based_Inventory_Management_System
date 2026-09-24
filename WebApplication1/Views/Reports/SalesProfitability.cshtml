@@ -1,6 +1,7 @@
 @model SalesProfitabilityViewModel
 @{
     ViewData["Title"] = "Sales Profitability";
+    var hasFilters = Model.WarehouseId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
 }
 
 @if (Model.WarehouseScoped)
@@ -10,6 +11,34 @@
         Showing sales for your assigned warehouse(s) only.
     </div>
 }
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Warehouse</label>
+                <select name="warehouseId" asp-items="Model.Warehouses" class="form-select form-select-sm" style="min-width: 220px;">
+                    <option value="">@(Model.WarehouseScoped ? "All my warehouses" : "All warehouses")</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">From date</label>
+                <input type="date" name="fromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">To date</label>
+                <input type="date" name="toDate" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+                @if (hasFilters)
+                {
+                    <a asp-action="SalesProfitability" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-xmark"></i> Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="row mb-3">
     <div class="col-md-4">

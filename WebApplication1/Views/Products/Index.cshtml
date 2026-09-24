@@ -51,7 +51,7 @@
                 var defaultWarehouseId = warehouses.Count > 0 ? warehouses[0].Id : 0;
                 var defaultStock = stockByWarehouse.GetValueOrDefault(defaultWarehouseId);
                 var stocksJson = System.Text.Json.JsonSerializer.Serialize(warehouses.ToDictionary(w => w.Id.ToString(), w => stockByWarehouse.GetValueOrDefault(w.Id)));
-                <tr class="clickable-row @(defaultStock <= p.ReorderLevel ? "table-warning" : "")" data-href="@Url.Action("Details", new { id = p.Id })" data-product-id="@p.Id">
+                <tr class="clickable-row @(defaultStock <= p.ReorderLevel ? "table-warning" : "")" data-href="@Url.Action("Details", new { id = p.Id })" data-product-id="@p.Id" data-stocked="@string.Join(",", stockByWarehouse.Keys)">
                     <td>@p.Sku</td>
                     <td><a asp-action="Details" asp-route-id="@p.Id" class="fw-semibold">@p.Name</a></td>
                     <td>@p.Category?.Name</td>
@@ -117,6 +117,53 @@
                 row.classList.toggle('table-warning', atOrBelow);
             }
 
+            // Warehouse column filter. The column's cells are per-row pickers, so the header
+            // filter does two things: it points every row's picker (and so its Stock figure) at
+            // the chosen warehouse, and hides products that have never had stock movement in it
+            // (no stock record for that warehouse — data-stocked lists the ones that do).
+            // Registered after site.js's DOMContentLoaded handler, so the filter row exists.
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof jQuery === 'undefined' || !jQuery.fn.DataTable.isDataTable(table)) return;
+                var dt = jQuery(table).DataTable();
+                var headerCells = table.querySelectorAll('thead tr.filter-row th');
+                var index = Array.prototype.findIndex.call(table.querySelectorAll('thead tr:first-child th'), function (th) {
+                    return th.textContent.trim() === 'Warehouse';
+                });
+                if (index < 0 || !headerCells[index]) return;
+
+                var filter = document.createElement('select');
+                filter.className = 'form-select form-select-sm column-filter';
+                var all = document.createElement('option');
+                all.value = '';
+                all.textContent = 'All';
+                filter.appendChild(all);
+                @foreach (var w in warehouses)
+                {
+                    <text>filter.appendChild(new Option(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(w.Name)), '@w.Id'));</text>
+                }
+                headerCells[index].appendChild(filter);
+                filter.addEventListener('click', function (e) { e.stopPropagation(); });
+
+                var selectedWarehouse = '';
+                jQuery.fn.dataTable.ext.search.push(function (settings, searchData, rowIdx) {
+                    if (settings.nTable !== table || !selectedWarehouse) return true;
+                    var row = dt.row(rowIdx).node();
+                    return !!row && (row.dataset.stocked || '').split(',').indexOf(selectedWarehouse) >= 0;
+                });
+
+                filter.addEventListener('change', function () {
+                    selectedWarehouse = filter.value;
+                    if (selectedWarehouse) {
+                        table.querySelectorAll('select.warehouse-select').forEach(function (select) {
+                            select.value = selectedWarehouse;
+                            if (typeof jQuery !== 'undefined') jQuery(select).trigger('change.select2');
+                            updateRow(select);
+                        });
+                    }
+                    dt.draw();
+                });
+            });
+
             table.querySelectorAll('select.warehouse-select').forEach(function (select) {
                 select.addEventListener('change', function () { updateRow(select); });
                 if (typeof jQuery !== 'undefined') {
@@ -160,9 +207,12 @@
                         var select = row.querySelector('select.warehouse-select');
                         if (!select) return;
                         var stocks = JSON.parse(select.dataset.stocks || '{}');
+                        var stocked = (row.dataset.stocked || '').split(',').filter(Boolean);
                         Object.keys(p.warehouseStocks || {}).forEach(function (wid) {
                             stocks[wid] = p.warehouseStocks[wid];
+                            if (stocked.indexOf(wid) < 0) stocked.push(wid);
                         });
+                        row.dataset.stocked = stocked.join(',');
                         select.dataset.stocks = JSON.stringify(stocks);
                         updateRow(select);
                         flash(select);

@@ -18,7 +18,7 @@ public class PurchaseInvoicesController(
     IAccountingService accountingService,
     IActivityNotifier notifier) : Controller
 {
-    public async Task<IActionResult> Index(int? supplierId, int? warehouseId)
+    public async Task<IActionResult> Index(int? supplierId, int? warehouseId, DateTime? fromDate, DateTime? toDate)
     {
         var warehouseIds = User.GetWarehouseIds();
         var query = db.PurchaseInvoices.Include(p => p.Supplier).Include(p => p.Warehouse).AsQueryable();
@@ -35,6 +35,18 @@ public class PurchaseInvoicesController(
         if (supplierId.HasValue)
         {
             query = query.Where(p => p.SupplierId == supplierId);
+        }
+
+        // Inclusive on both ends: To covers the whole selected day.
+        if (fromDate.HasValue)
+        {
+            var from = fromDate.Value.Date;
+            query = query.Where(p => p.Date >= from);
+        }
+        if (toDate.HasValue)
+        {
+            var toExclusive = toDate.Value.Date.AddDays(1);
+            query = query.Where(p => p.Date < toExclusive);
         }
 
         ViewData["SupplierId"] = new SelectList(await db.Suppliers.OrderBy(s => s.Name).ToListAsync(), "Id", "Name", supplierId);

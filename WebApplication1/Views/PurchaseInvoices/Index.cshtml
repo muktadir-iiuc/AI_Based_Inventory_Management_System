@@ -4,7 +4,10 @@
     var supplierList = (SelectList)ViewData["SupplierId"]!;
     var warehouseList = (SelectList)ViewData["WarehouseId"]!;
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
-    var hasFilters = Context.Request.Query.ContainsKey("supplierId") || Context.Request.Query.ContainsKey("warehouseId");
+    var hasFilters = Context.Request.Query.ContainsKey("supplierId") || Context.Request.Query.ContainsKey("warehouseId")
+        || Context.Request.Query.ContainsKey("fromDate") || Context.Request.Query.ContainsKey("toDate");
+    var fromDate = Context.Request.Query["fromDate"].ToString();
+    var toDate = Context.Request.Query["toDate"].ToString();
     var postedCount = Model.Count(i => i.Status == DocumentStatus.Posted);
     var postedTotal = Model.Where(i => i.Status == DocumentStatus.Posted).Sum(i => i.TotalAmount);
 }
@@ -61,6 +64,14 @@
                     </select>
                 </div>
             }
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">From date</label>
+                <input type="date" name="fromDate" value="@fromDate" class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">To date</label>
+                <input type="date" name="toDate" value="@toDate" class="form-control form-control-sm" />
+            </div>
             <div class="col-auto">
                 <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Filter</button>
                 @if (hasFilters)

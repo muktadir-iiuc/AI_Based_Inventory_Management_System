@@ -13,6 +13,26 @@
     </div>
 }
 
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Warehouse</label>
+                <select name="warehouseId" asp-items="Model.Warehouses" class="form-select form-select-sm" style="min-width: 220px;">
+                    <option value="">@(Model.WarehouseScoped ? "All my warehouses" : "All warehouses")</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+                @if (Model.WarehouseId.HasValue)
+                {
+                    <a asp-action="StockValuation" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-xmark"></i> Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row mb-3">
     <div class="col-md-6">
         <div class="card">
