@@ -99,7 +99,7 @@ public class PurchaseReturnsController(
             if (line.ReturnQuantity > item.Batch.RemainingQuantity)
             {
                 ModelState.AddModelError(string.Empty,
-                    $"{item.Product?.Name}: cannot return {line.ReturnQuantity:0.##} — only {item.Batch.RemainingQuantity:0.##} of batch {item.Batch.BatchNumber} is still in stock (the rest has been sold).");
+                    $"{string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v)))}: cannot return {line.ReturnQuantity:0.##} — only {item.Batch.RemainingQuantity:0.##} of batch {item.Batch.BatchNumber} is still in stock (the rest has been sold).");
             }
         }
 
@@ -175,7 +175,7 @@ public class PurchaseReturnsController(
         Items = invoice.Items.Where(i => i.Batch is not null && i.Batch.RemainingQuantity > 0).Select(i => new PurchaseReturnLineInput
         {
             PurchaseInvoiceItemId = i.Id,
-            ProductName = i.Product?.Name ?? string.Empty,
+            ProductName = string.Join(" - ", new[] { i.Product?.Name, i.Product?.Brand, i.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))),
             BatchNumber = i.Batch?.BatchNumber,
             MaxReturnable = i.Batch!.RemainingQuantity,
             UnitCost = i.UnitPrice

@@ -33,7 +33,7 @@
                     @foreach (var item in Model.Items)
                     {
                         <tr>
-                            <td>@item.PurchaseInvoiceItem?.Product?.Name</td>
+                            <td>@string.Join(" - ", new[] { item.PurchaseInvoiceItem?.Product?.Name, item.PurchaseInvoiceItem?.Product?.Brand, item.PurchaseInvoiceItem?.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v)))</td>
                             <td>@(item.PurchaseInvoiceItem?.Batch?.BatchNumber ?? "—")</td>
                             <td class="text-end">@item.Quantity.ToString("0.##")</td>
                             <td class="text-end">@item.UnitCost.ToString("C")</td>

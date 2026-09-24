@@ -102,7 +102,7 @@ public class SalesReturnsController(
             if (line.ReturnQuantity > maxReturnable)
             {
                 ModelState.AddModelError(string.Empty,
-                    $"{item.Product?.Name}: cannot return {line.ReturnQuantity:0.##} — only {maxReturnable:0.##} remains returnable on this line.");
+                    $"{string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v)))}: cannot return {line.ReturnQuantity:0.##} — only {maxReturnable:0.##} remains returnable on this line.");
             }
         }
 
@@ -210,7 +210,7 @@ public class SalesReturnsController(
             Items = invoice.Items.Select(i => new SalesReturnLineInput
             {
                 SalesInvoiceItemId = i.Id,
-                ProductName = i.Product?.Name ?? string.Empty,
+                ProductName = string.Join(" - ", new[] { i.Product?.Name, i.Product?.Brand, i.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))),
                 BatchNumber = i.Batch?.BatchNumber,
                 MaxReturnable = i.Quantity - alreadyReturned.GetValueOrDefault(i.Id, 0),
                 UnitPrice = i.UnitPrice,
