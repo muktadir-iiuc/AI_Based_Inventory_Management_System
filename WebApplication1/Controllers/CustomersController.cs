@@ -13,7 +13,7 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-public class CustomersController(ApplicationDbContext db, IAccountingService accountingService, IWebHostEnvironment env, ICompanySettingsService companySettings) : Controller
+public class CustomersController(ApplicationDbContext db, IAccountingService accountingService, IWebHostEnvironment env, ICompanySettingsService companySettings, IPartyPaymentService partyPayments) : Controller
 {
     // Customer.OutstandingDue sums whatever SalesInvoices collection is loaded on the entity
     // (Items, Payments and Returns all required — see Customer.OutstandingDue), so a
@@ -177,6 +177,31 @@ public class CustomersController(ApplicationDbContext db, IAccountingService acc
     {
         var vm = await BuildLedgerAsync(partyId, from, to);
         return vm is null ? NotFound() : View("PartyLedger", vm);
+    }
+
+    // Record a payment straight from the ledger: not tied to an invoice, but to what this party
+    // owes in total. The amount is applied oldest-first (see IPartyPaymentService) and can't
+    // exceed the current due the ledger shows for this user's warehouse scope.
+    [HttpPost]
+    [Authorize(Roles = Roles.AccountingManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReceivePayment(int partyId, decimal amount, DateTime? date, string? notes, string? returnUrl)
+    {
+        var result = await partyPayments.RecordAsync(PartyLedgerType.Customer, partyId, amount, date ?? DateTime.UtcNow.Date,
+            notes, User.GetWarehouseIds(), User.Identity?.Name);
+
+        if (result.Ok)
+        {
+            TempData["Success"] = $"Payment {(result.PaymentNumbers.Count == 1 ? " " : "s ")}{string.Join(", ", result.PaymentNumbers)} recorded — applied to: {string.Join("; ", result.Applied)}.";
+        }
+        else
+        {
+            TempData["Error"] = result.Error;
+        }
+
+        return !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? LocalRedirect(returnUrl)
+            : RedirectToAction(nameof(Ledger), new { partyId });
     }
 
     // The same ledger (same rows, same running balance, same warehouse scoping) as an A4 PDF in

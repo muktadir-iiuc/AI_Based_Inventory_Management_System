@@ -179,7 +179,7 @@ public class StockAdjustmentsController(
     [HttpPost]
     [Authorize(Roles = Roles.AdminManagers)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Approve(int id, string? reviewNote)
+    public async Task<IActionResult> Approve(int id, string? reviewNote, string? returnUrl)
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -194,7 +194,7 @@ public class StockAdjustmentsController(
                 if (adjustment.Status != StockAdjustmentStatus.Pending)
                 {
                     TempData["Error"] = $"{adjustment.AdjustmentNumber} has already been {adjustment.Status.ToString().ToLowerInvariant()}.";
-                    return RedirectToAction(nameof(Details), new { id });
+                    return RedirectBack(id, returnUrl);
                 }
 
                 decimal increaseCost = 0, decreaseCost = 0;
@@ -262,7 +262,7 @@ public class StockAdjustmentsController(
                 await NotifyStockChangeAsync(adjustment.Items.Select(i => i.ProductId), adjustment.WarehouseId);
 
                 TempData["Success"] = $"{adjustment.AdjustmentNumber} approved — stock and accounts updated.";
-                return RedirectToAction(nameof(Details), new { id });
+                return RedirectBack(id, returnUrl);
             }
             catch (InsufficientStockException ex)
             {
@@ -270,7 +270,7 @@ public class StockAdjustmentsController(
                 // the request stays pending so the reviewer can reject it (or ask for a new one).
                 db.ChangeTracker.Clear();
                 TempData["Error"] = $"Cannot approve: {ex.Message} The request is still pending — reject it if it is no longer valid.";
-                return RedirectToAction(nameof(Details), new { id });
+                return RedirectBack(id, returnUrl);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -280,7 +280,7 @@ public class StockAdjustmentsController(
                 if (attempt >= MaxApprovalAttempts)
                 {
                     TempData["Error"] = "The stock changed while approving. Please try again.";
-                    return RedirectToAction(nameof(Details), new { id });
+                    return RedirectBack(id, returnUrl);
                 }
             }
         }
@@ -289,7 +289,7 @@ public class StockAdjustmentsController(
     [HttpPost]
     [Authorize(Roles = Roles.AdminManagers)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Reject(int id, string? reviewNote)
+    public async Task<IActionResult> Reject(int id, string? reviewNote, string? returnUrl)
     {
         var adjustment = await db.StockAdjustments.Include(a => a.Warehouse).FirstOrDefaultAsync(a => a.Id == id);
         if (adjustment is null) return NotFound();
@@ -297,13 +297,13 @@ public class StockAdjustmentsController(
         if (adjustment.Status != StockAdjustmentStatus.Pending)
         {
             TempData["Error"] = $"{adjustment.AdjustmentNumber} has already been {adjustment.Status.ToString().ToLowerInvariant()}.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         if (string.IsNullOrWhiteSpace(reviewNote))
         {
             TempData["Error"] = "Please enter a reason for rejecting the request.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         adjustment.Status = StockAdjustmentStatus.Rejected;
@@ -318,7 +318,7 @@ public class StockAdjustmentsController(
         catch (DbUpdateConcurrencyException)
         {
             TempData["Error"] = $"{adjustment.AdjustmentNumber} was changed by someone else — please review it again.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         await notifier.NotifyAsync(
@@ -328,8 +328,15 @@ public class StockAdjustmentsController(
             [adjustment.WarehouseId]);
 
         TempData["Success"] = $"{adjustment.AdjustmentNumber} rejected — no stock was changed.";
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectBack(id, returnUrl);
     }
+
+    // Approve/Reject can be triggered from the list page as well as the Details page; the list
+    // sends where to come back to. Only local URLs are honoured (no open redirect).
+    private IActionResult RedirectBack(int id, string? returnUrl) =>
+        !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? LocalRedirect(returnUrl)
+            : RedirectToAction(nameof(Details), new { id });
 
     // The requester can withdraw their own request while it is still pending.
     [HttpPost]

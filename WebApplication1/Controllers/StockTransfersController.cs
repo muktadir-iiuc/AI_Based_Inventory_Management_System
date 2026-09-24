@@ -194,20 +194,20 @@ public class StockTransfersController(
     [HttpPost]
     [Authorize(Roles = Roles.AdminManagers)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Approve(int id, string? reviewNote)
+    public async Task<IActionResult> Approve(int id, string? reviewNote, string? returnUrl)
     {
         var result = await ApproveCoreAsync(id, reviewNote);
         if (result.NotFound) return NotFound();
 
         if (result.Ok) TempData["Success"] = $"{result.Number} approved — stock has been moved.";
         else TempData["Error"] = result.Error;
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectBack(id, returnUrl);
     }
 
     [HttpPost]
     [Authorize(Roles = Roles.AdminManagers)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Reject(int id, string? reviewNote)
+    public async Task<IActionResult> Reject(int id, string? reviewNote, string? returnUrl)
     {
         var transfer = await db.StockTransfers.Include(t => t.Items.Where(i => i.IsCurrent)).FirstOrDefaultAsync(t => t.Id == id);
         if (transfer is null) return NotFound();
@@ -215,13 +215,13 @@ public class StockTransfersController(
         if (transfer.ApprovalStatus != StockTransferApprovalStatus.Pending)
         {
             TempData["Error"] = $"{transfer.TransferNumber} has already been {transfer.ApprovalStatus.ToString().ToLowerInvariant()}.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         if (string.IsNullOrWhiteSpace(reviewNote))
         {
             TempData["Error"] = "Please enter a reason for rejecting the request.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         transfer.ApprovalStatus = StockTransferApprovalStatus.Rejected;
@@ -236,7 +236,7 @@ public class StockTransfersController(
         catch (DbUpdateConcurrencyException)
         {
             TempData["Error"] = $"{transfer.TransferNumber} was changed by someone else — please review it again.";
-            return RedirectToAction(nameof(Details), new { id });
+            return RedirectBack(id, returnUrl);
         }
 
         await notifier.NotifyAsync(
@@ -247,8 +247,15 @@ public class StockTransfersController(
         await NotifyTransferDocAsync(transfer);
 
         TempData["Success"] = $"{transfer.TransferNumber} rejected — no stock was moved.";
-        return RedirectToAction(nameof(Details), new { id });
+        return RedirectBack(id, returnUrl);
     }
+
+    // Approve/Reject can be triggered from the list page as well as the Details page; the list
+    // sends where to come back to. Only local URLs are honoured (no open redirect).
+    private IActionResult RedirectBack(int id, string? returnUrl) =>
+        !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? LocalRedirect(returnUrl)
+            : RedirectToAction(nameof(Details), new { id });
 
     // The requester can withdraw their own request while it is still pending.
     [HttpPost]

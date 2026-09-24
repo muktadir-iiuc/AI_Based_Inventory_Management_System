@@ -67,6 +67,7 @@ builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 builder.Services.AddScoped<IAccountingService, AccountingService>();
+builder.Services.AddScoped<IPartyPaymentService, PartyPaymentService>();
 builder.Services.AddScoped<IForecastService, ForecastService>();
 builder.Services.AddScoped<IActivityNotifier, ActivityNotifier>();
 builder.Services.AddScoped<IChatbotService, ChatbotService>();

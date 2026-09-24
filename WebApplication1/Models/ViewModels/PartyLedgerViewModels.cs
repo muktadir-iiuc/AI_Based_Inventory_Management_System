@@ -82,6 +82,11 @@ public class PartyLedgerViewModel
 
     public decimal ClosingBalance { get; set; }
 
+    /// <summary>The party's balance right now — after their whole history, ignoring the From/To
+    /// filter (unlike <see cref="ClosingBalance"/>, which is as of the To date). This is what a
+    /// payment made from the ledger settles.</summary>
+    public decimal CurrentBalance { get; set; }
+
     public List<PartyLedgerRow> Rows { get; set; } = [];
 
     /// <summary>Populated only when no party is selected — the landing state of the page.</summary>
@@ -138,6 +143,7 @@ public class PartyLedgerViewModel
             kept.Add(row);
         }
 
+        CurrentBalance = running;
         OpeningBalance = opening;
         Rows = kept;
         TotalDebit = kept.Sum(r => r.Debit);

@@ -5,6 +5,8 @@
     var isApprover = ViewData["IsApprover"] is true;
     var status = ViewData["Status"] as StockTransferApprovalStatus?;
     var pendingCount = (int)ViewData["PendingCount"]!;
+    var canReview = isApprover;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var postedCount = Model.Count(t => t.DisplayStatus == "Posted");
     var totalLines = Model.Sum(t => t.Items.Count);
 }
@@ -71,7 +73,7 @@
     </div>
     <div class="card-body p-0 table-responsive-card">
         <table class="table table-striped table-hover mb-0 data-table" id="transferTable">
-            <thead><tr><th>Transfer #</th><th data-filter="select">From</th><th data-filter="select">To</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th class="text-end">Lines</th></tr></thead>
+            <thead><tr><th>Transfer #</th><th data-filter="select">From</th><th data-filter="select">To</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th class="text-end">Lines</th>@if (canReview) { <th class="text-end" data-filter="false">Actions</th> }</tr></thead>
             <tbody>
             @foreach (var t in Model)
             {
@@ -91,12 +93,53 @@
                         }
                     </td>
                     <td class="text-end lines-cell">@t.Items.Count</td>
+                    @if (canReview)
+                    {
+                        <td class="text-end text-nowrap actions-cell">
+                            @if (t.ApprovalStatus == StockTransferApprovalStatus.Pending)
+                            {
+                                <div class="d-inline-flex gap-1">
+                                    <form asp-action="Approve" asp-route-id="@t.Id" method="post" class="confirm-delete" data-confirm-message="Approve @t.TransferNumber? Stock will be moved immediately.">
+                                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                        <button type="submit" class="btn btn-sm btn-success" title="Approve"><i class="fas fa-check"></i> Approve</button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger reject-btn" data-id="@t.Id" data-number="@t.TransferNumber" title="Reject"><i class="fas fa-xmark"></i> Reject</button>
+                                </div>
+                            }
+                        </td>
+                    }
                 </tr>
             }
             </tbody>
         </table>
     </div>
 </div>
+
+@if (canReview)
+{
+    <div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" id="rejectForm" class="modal-content">
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rejectModalLabel">Reject <span id="rejectNumber"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">Nothing will be changed. The requester will see your reason.</p>
+                    <label for="rejectNote" class="form-label required-asterisk">Reason for rejecting</label>
+                    <textarea id="rejectNote" name="reviewNote" class="form-control" rows="3" maxlength="500" required></textarea>
+                    <div class="invalid-feedback">Please enter a reason.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-xmark"></i> Reject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
 
 <style>
     #transferTable tbody tr.clickable-row { cursor: pointer; }
@@ -109,12 +152,39 @@
             var tableEl = document.getElementById('transferTable');
 
             tableEl.addEventListener('click', function (e) {
-                if (e.target.closest('a, button, input')) return;
+                if (e.target.closest('a, button, input, form')) return;
                 var row = e.target.closest('tr.clickable-row');
                 if (row && row.dataset.href) {
                     window.location.href = row.dataset.href;
                 }
             });
+
+            // Reject needs a reason, so it goes through one shared dialog whose form is pointed at
+            // the clicked row's request. Delegated because DataTables only keeps the current page's
+            // rows in the DOM.
+            var rejectModalEl = document.getElementById('rejectModal');
+            if (rejectModalEl) {
+                var rejectModal = new bootstrap.Modal(rejectModalEl);
+                var rejectForm = document.getElementById('rejectForm');
+                var rejectNote = document.getElementById('rejectNote');
+                tableEl.addEventListener('click', function (e) {
+                    var btn = e.target.closest('.reject-btn');
+                    if (!btn) return;
+                    rejectForm.action = '/StockTransfers/Reject/' + btn.dataset.id;
+                    document.getElementById('rejectNumber').textContent = btn.dataset.number;
+                    rejectNote.value = '';
+                    rejectNote.classList.remove('is-invalid');
+                    rejectModal.show();
+                });
+                rejectModalEl.addEventListener('shown.bs.modal', function () { rejectNote.focus(); });
+                rejectForm.addEventListener('submit', function (e) {
+                    if (!rejectNote.value.trim()) {
+                        e.preventDefault();
+                        rejectNote.classList.add('is-invalid');
+                    }
+                });
+                rejectNote.addEventListener('input', function () { rejectNote.classList.remove('is-invalid'); });
+            }
 
             function statusBadge(status) {
                 switch (status) {
@@ -149,6 +219,9 @@
 
                 if (existing) {
                     existing.querySelector('.status-cell').innerHTML = statusBadge(data.status);
+                    // Once a request is decided its Approve/Reject buttons no longer apply.
+                    var actions = existing.querySelector('.actions-cell');
+                    if (actions && data.status !== 'Pending') actions.innerHTML = '';
                     existing.querySelector('.lines-cell').textContent = data.lineCount;
                     if (dt) { dt.row(existing).invalidate(); dt.draw(false); }
                     flash(existing);
@@ -163,6 +236,10 @@
                     '<td data-date="' + data.date + '">' + data.date + '</td>' +
                     '<td class="status-cell">' + statusBadge(data.status) + '</td>' +
                     '<td class="text-end lines-cell">' + data.lineCount + '</td>' +
+                    (tableEl.querySelector('thead th:last-child').textContent.trim() === 'Actions'
+                        ? '<td class="text-end text-nowrap actions-cell">' + (data.status === 'Pending'
+                            ? '<a href="/StockTransfers/Details/' + data.id + '" class="btn btn-sm btn-outline-primary">Review</a>' : '') + '</td>'
+                        : '') +
                     '</tr>';
 
                 if (dt) {
