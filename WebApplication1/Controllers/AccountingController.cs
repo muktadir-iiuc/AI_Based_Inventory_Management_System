@@ -161,13 +161,18 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
         var query = db.Payments
             .Include(p => p.PurchaseInvoice).ThenInclude(pi => pi!.Supplier)
             .Include(p => p.SalesInvoice).ThenInclude(si => si!.Customer)
+            .Include(p => p.Customer)
+            .Include(p => p.Supplier)
             .AsQueryable();
 
+        // Opening-balance payments have no invoice and so no warehouse; like the opening
+        // balance itself (see Customer.OpeningBalance) they're visible to every user.
         if (warehouseIds is not null)
         {
             query = query.Where(p =>
                 (p.PurchaseInvoice != null && warehouseIds.Contains(p.PurchaseInvoice.WarehouseId)) ||
-                (p.SalesInvoice != null && warehouseIds.Contains(p.SalesInvoice.WarehouseId)));
+                (p.SalesInvoice != null && warehouseIds.Contains(p.SalesInvoice.WarehouseId)) ||
+                (p.PurchaseInvoiceId == null && p.SalesInvoiceId == null));
         }
 
         return View(await query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync());
@@ -184,6 +189,85 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
     [Authorize(Roles = Roles.AccountingManagers)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreatePayment(PaymentCreateViewModel model)
+    {
+        if (model.AgainstOpeningBalance)
+        {
+            await ValidateOpeningBalancePaymentAsync(model);
+        }
+        else
+        {
+            await ValidateInvoicePaymentAsync(model);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateInvoicesAsync();
+            return View(model);
+        }
+
+        var count = await db.Payments.CountAsync();
+        var isOut = model.Direction == PaymentDirection.Out;
+        var payment = new Payment
+        {
+            PaymentNumber = $"PAY-{count + 1:D6}",
+            Direction = model.Direction,
+            Date = model.Date,
+            Amount = model.Amount,
+            Notes = model.Notes,
+            PurchaseInvoiceId = isOut && !model.AgainstOpeningBalance ? model.PurchaseInvoiceId : null,
+            SalesInvoiceId = !isOut && !model.AgainstOpeningBalance ? model.SalesInvoiceId : null,
+            SupplierId = isOut && model.AgainstOpeningBalance ? model.SupplierId : null,
+            CustomerId = !isOut && model.AgainstOpeningBalance ? model.CustomerId : null,
+            CreatedBy = User.Identity?.Name
+        };
+
+        db.Payments.Add(payment);
+        await accountingService.PostPaymentAsync(payment);
+        await db.SaveChangesAsync();
+
+        TempData["Success"] = $"Payment {payment.PaymentNumber} recorded.";
+        return RedirectToAction(nameof(Payments));
+    }
+
+    // Only a positive (due) opening balance can be paid down, and never by more than what's
+    // left of it — re-checked against a fresh read, same as invoice payments below.
+    private async Task ValidateOpeningBalancePaymentAsync(PaymentCreateViewModel model)
+    {
+        decimal? due = null;
+        if (model.Direction == PaymentDirection.In)
+        {
+            if (model.CustomerId is null)
+            {
+                ModelState.AddModelError(nameof(model.CustomerId), "Select the customer whose opening balance is being received.");
+                return;
+            }
+            due = await db.Customers.Where(c => c.Id == model.CustomerId)
+                .Select(c => (decimal?)(c.OpeningBalance - c.OpeningBalancePayments.Sum(p => p.Amount)))
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            if (model.SupplierId is null)
+            {
+                ModelState.AddModelError(nameof(model.SupplierId), "Select the supplier whose opening balance is being paid.");
+                return;
+            }
+            due = await db.Suppliers.Where(s => s.Id == model.SupplierId)
+                .Select(s => (decimal?)(s.OpeningBalance - s.OpeningBalancePayments.Sum(p => p.Amount)))
+                .FirstOrDefaultAsync();
+        }
+
+        if (due is null or <= 0)
+        {
+            ModelState.AddModelError(nameof(model.Amount), "There is no opening balance left to pay for this party.");
+        }
+        else if (model.Amount > due)
+        {
+            ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed the remaining opening balance of {due:N2}.");
+        }
+    }
+
+    private async Task ValidateInvoicePaymentAsync(PaymentCreateViewModel model)
     {
         if (model.Direction == PaymentDirection.Out && model.PurchaseInvoiceId is null)
         {
@@ -221,32 +305,6 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
                 ModelState.AddModelError(nameof(model.Amount), $"Amount cannot exceed this invoice's due of {due:N2}.");
             }
         }
-
-        if (!ModelState.IsValid)
-        {
-            await PopulateInvoicesAsync();
-            return View(model);
-        }
-
-        var count = await db.Payments.CountAsync();
-        var payment = new Payment
-        {
-            PaymentNumber = $"PAY-{count + 1:D6}",
-            Direction = model.Direction,
-            Date = model.Date,
-            Amount = model.Amount,
-            Notes = model.Notes,
-            PurchaseInvoiceId = model.Direction == PaymentDirection.Out ? model.PurchaseInvoiceId : null,
-            SalesInvoiceId = model.Direction == PaymentDirection.In ? model.SalesInvoiceId : null,
-            CreatedBy = User.Identity?.Name
-        };
-
-        db.Payments.Add(payment);
-        await accountingService.PostPaymentAsync(payment);
-        await db.SaveChangesAsync();
-
-        TempData["Success"] = $"Payment {payment.PaymentNumber} recorded.";
-        return RedirectToAction(nameof(Payments));
     }
 
     // ---- Reports ----
@@ -315,21 +373,74 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
         // A supplier/customer's total outstanding balance spans every posted invoice they
         // have, not just the (possibly warehouse-scoped) ones in the dropdowns above — so this
         // is computed from a separate, unscoped query rather than summed from the lists above.
+        // Same formula as the party ledgers' closing balance: remaining opening balance, plus
+        // current (non-superseded) invoice lines, minus payments and returns.
         var supplierOutstanding = await db.PurchaseInvoices
             .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted)
-            .Select(p => new { p.SupplierId, Due = p.Items.Sum(i => i.Quantity * i.UnitPrice) - p.Payments.Sum(pay => pay.Amount) })
+            .Select(p => new
+            {
+                p.SupplierId,
+                Due = p.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice)
+                      - p.Payments.Sum(pay => pay.Amount)
+                      - p.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitCost))
+            })
+            .ToListAsync();
+        var supplierOpening = await db.Suppliers
+            .Where(s => s.OpeningBalance != 0)
+            .Select(s => new { s.Id, s.Name, s.OpeningBalance, Remaining = s.OpeningBalance - s.OpeningBalancePayments.Sum(p => p.Amount) })
             .ToListAsync();
         var supplierOutstandingTotals = supplierOutstanding
             .GroupBy(x => x.SupplierId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Due));
+        foreach (var s in supplierOpening)
+        {
+            supplierOutstandingTotals[s.Id] = supplierOutstandingTotals.GetValueOrDefault(s.Id) + s.Remaining;
+        }
 
         var customerOutstanding = await db.SalesInvoices
             .Where(s => s.Status == Models.Purchase.DocumentStatus.Posted)
-            .Select(s => new { s.CustomerId, Due = s.Items.Sum(i => i.Quantity * i.UnitPrice) - s.Payments.Sum(pay => pay.Amount) })
+            .Select(s => new
+            {
+                s.CustomerId,
+                Due = s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice)
+                      - s.Payments.Sum(pay => pay.Amount)
+                      - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice))
+            })
+            .ToListAsync();
+        var customerOpening = await db.Customers
+            .Where(c => c.OpeningBalance != 0)
+            .Select(c => new { c.Id, c.Name, c.OpeningBalance, Remaining = c.OpeningBalance - c.OpeningBalancePayments.Sum(p => p.Amount) })
             .ToListAsync();
         var customerOutstandingTotals = customerOutstanding
             .GroupBy(x => x.CustomerId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Due));
+        foreach (var c in customerOpening)
+        {
+            customerOutstandingTotals[c.Id] = customerOutstandingTotals.GetValueOrDefault(c.Id) + c.Remaining;
+        }
+
+        // Parties with an opening balance still left to pay, for the "Against: Opening Balance"
+        // option. Not warehouse-scoped — the opening balance belongs to the party, not a warehouse.
+        var openCustomers = customerOpening.Where(c => c.Remaining > 0).OrderBy(c => c.Name).ToList();
+        var openSuppliers = supplierOpening.Where(s => s.Remaining > 0).OrderBy(s => s.Name).ToList();
+        ViewData["OpeningCustomers"] = new SelectList(openCustomers, "Id", "Name");
+        ViewData["OpeningSuppliers"] = new SelectList(openSuppliers, "Id", "Name");
+        ViewData["CustomerOpeningMeta"] = openCustomers.Select(c => new
+        {
+            c.Id,
+            CustomerName = c.Name,
+            c.OpeningBalance,
+            OpeningDue = c.Remaining,
+            CustomerOutstanding = customerOutstandingTotals.GetValueOrDefault(c.Id)
+        }).ToList();
+        ViewData["SupplierOpeningMeta"] = openSuppliers.Select(s => new
+        {
+            s.Id,
+            SupplierName = s.Name,
+            s.OpeningBalance,
+            OpeningDue = s.Remaining,
+            SupplierOutstanding = supplierOutstandingTotals.GetValueOrDefault(s.Id)
+        }).ToList();
 
         ViewData["PurchaseInvoiceMeta"] = purchaseInvoices.Select(p => new
         {

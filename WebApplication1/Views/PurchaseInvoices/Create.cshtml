@@ -4,6 +4,7 @@
     var supplierList = (SelectList)ViewData["Suppliers"]!;
     var warehouseList = (SelectList)ViewData["Warehouses"]!;
     var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
+    var unitList = (SelectList)ViewData["Units"]!;
 }
 
 <form asp-action="Create" method="post" id="invoiceForm">
@@ -27,6 +28,7 @@
                                     <i class="fas fa-plus"></i>
                                 </button>
                             </div>
+                            <div class="small mt-1 d-none" id="supplierDue"></div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
@@ -65,11 +67,11 @@
                             <tr>
                                 <th style="width: 3%">#</th>
                                 <th style="width: 16%">Category</th>
-                                <th style="width: 22%">Product</th>
+                                <th style="width: 25%">Product</th>
                                 <th style="width: 10%">Quantity</th>
                                 <th style="width: 12%">Unit Cost</th>
                                 <th style="width: 13%">Sale Price</th>
-                                <th style="width: 19%" class="text-end">Line Total</th>
+                                <th style="width: 16%" class="text-end">Line Total</th>
                                 <th style="width: 5%"></th>
                             </tr>
                         </thead>
@@ -102,6 +104,15 @@
                         <span class="fw-bold">Grand Total</span>
                         <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
                     </div>
+                    <div class="d-none" id="supplierDueSummary">
+                        <hr />
+                        <dl class="row mb-0">
+                            <dt class="col-7 text-muted fw-normal">Previous due</dt>
+                            <dd class="col-5 text-end" id="supplierPreviousDue"></dd>
+                            <dt class="col-7 fw-semibold">Due after this invoice</dt>
+                            <dd class="col-5 text-end fw-semibold" id="supplierDueAfter"></dd>
+                        </dl>
+                    </div>
                 </div>
                 <div class="card-footer d-grid gap-2">
                     <button type="submit" class="btn btn-primary">Post Purchase Invoice</button>
@@ -111,6 +122,59 @@
         </div>
     </div>
 </form>
+
+<div class="modal fade" id="quickAddProductModal" tabindex="-1" aria-labelledby="quickAddProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickAddProductModalLabel">Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-danger small mb-2 d-none" id="quickProductError"></div>
+                <div class="mb-2">
+                    <label class="form-label required-asterisk">Name</label>
+                    <input type="text" class="form-control" id="quickProductName" maxlength="150" data-enter-submit />
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label required-asterisk">Category</label>
+                        <select class="form-select" id="quickProductCategory"></select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label required-asterisk">Unit</label>
+                        <select class="form-select" id="quickProductUnit" asp-items="unitList">
+                            <option value="">-- select unit --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Cost Price</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="quickProductCost" value="0" data-enter-submit />
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Sale Price</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="quickProductSale" value="0" data-enter-submit />
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Reorder Level</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="quickProductReorder" value="10" data-enter-submit />
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" maxlength="500" id="quickProductDescription"></textarea>
+                </div>
+                <div class="form-text mt-2">The SKU is generated automatically from the category.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveQuickProduct">Save Product</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="quickAddSupplierModal" tabindex="-1" aria-labelledby="quickAddSupplierModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -200,7 +264,12 @@
                     <select class="form-select category-select">${categoryOptions()}</select>
                 </td>
                 <td>
-                    <select name="Items[${rowIndex}].ProductId" class="form-select product-select" disabled>${productOptionsForCategory(null)}</select>
+                    <div class="d-flex gap-1 align-items-center">
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <select name="Items[${rowIndex}].ProductId" class="form-select product-select" disabled>${productOptionsForCategory(null)}</select>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary quick-add-product" title="Product not listed? Add a new one"><i class="fas fa-plus"></i></button>
+                    </div>
                 </td>
                 <td><input name="Items[${rowIndex}].Quantity" type="number" step="1" min="1" class="form-control qty-input" value="1" /></td>
                 <td><input name="Items[${rowIndex}].UnitPrice" type="number" step="0.01" min="0" class="form-control price-input" value="0" /></td>
@@ -256,6 +325,29 @@
                 recalc();
             };
 
+            // Called by the quick-add product modal once the new product is saved: points this
+            // row's Category at the new product's category, rebuilds the Product list (which now
+            // includes it) and selects it, filling in its cost/sale prices like a normal pick.
+            tr.selectNewProduct = (product) => {
+                categorySelect.value = product.CategoryId;
+                if (typeof jQuery !== 'undefined') {
+                    // Namespaced so only Select2's display refreshes — the native 'change'
+                    // listener below would otherwise rebuild the product list a second time.
+                    jQuery(categorySelect).trigger('change.select2');
+                }
+                select.innerHTML = productOptionsForCategory(product.CategoryId);
+                select.disabled = false;
+                select.value = product.Id;
+                if (typeof jQuery !== 'undefined') {
+                    refreshProductSelect2();
+                }
+                applyProductSelection();
+            };
+
+            tr.querySelector('.quick-add-product').addEventListener('click', () => {
+                openQuickAddProduct(tr, parseInt(categorySelect.value, 10) || null);
+            });
+
             categorySelect.addEventListener('change', applyCategorySelection);
             select.addEventListener('change', applyProductSelection);
             qty.addEventListener('input', recalc);
@@ -305,6 +397,155 @@
                 selection.focus();
             }
         });
+        // Quick-add product: opened from a line item's "+" button when the product being
+        // purchased isn't in the catalog yet. On save, the new product joins the page's
+        // `products` list (so every row's Product dropdown can offer it) and is selected in the
+        // row that opened the modal.
+        const openQuickAddProduct = (function () {
+            const modalEl = document.getElementById('quickAddProductModal');
+            const nameInput = document.getElementById('quickProductName');
+            const categoryInput = document.getElementById('quickProductCategory');
+            const unitInput = document.getElementById('quickProductUnit');
+            const costInput = document.getElementById('quickProductCost');
+            const saleInput = document.getElementById('quickProductSale');
+            const reorderInput = document.getElementById('quickProductReorder');
+            const descriptionInput = document.getElementById('quickProductDescription');
+            const errorEl = document.getElementById('quickProductError');
+            const saveBtn = document.getElementById('saveQuickProduct');
+            const token = document.querySelector('#invoiceForm input[name="__RequestVerificationToken"]').value;
+            const modal = new bootstrap.Modal(modalEl);
+            let targetRow = null;
+
+            categoryInput.innerHTML = categoryOptions();
+
+            // Initialized here (before site.js's global initSelect2 runs on DOMContentLoaded,
+            // which then skips them) so their dropdowns render inside the modal — attached to
+            // <body> as usual, Bootstrap's modal focus trap would stop the search box taking focus.
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                [categoryInput, unitInput].forEach(el => {
+                    const $el = jQuery(el);
+                    $el.select2({ width: '100%', dropdownParent: jQuery(modalEl) });
+                    $el.next('.select2-container').find('.select2-selection').data('select2Target', $el);
+                });
+            }
+
+            function setSelectValue(el, value) {
+                el.value = value ?? '';
+                if (typeof jQuery !== 'undefined') {
+                    jQuery(el).trigger('change.select2');
+                }
+            }
+
+            function resetForm() {
+                nameInput.value = '';
+                descriptionInput.value = '';
+                costInput.value = 0;
+                saleInput.value = 0;
+                reorderInput.value = 10;
+                setSelectValue(categoryInput, '');
+                setSelectValue(unitInput, '');
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
+
+            function showError(message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('d-none');
+            }
+
+            modalEl.addEventListener('shown.bs.modal', () => nameInput.focus());
+            // Focus moves on only once the modal has fully closed — Bootstrap returns focus to the
+            // "+" button that opened it on hide, which would override an earlier focus() call.
+            let focusAfterClose = null;
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                resetForm();
+                targetRow = null;
+                if (focusAfterClose) {
+                    focusAfterClose.focus();
+                    focusAfterClose = null;
+                }
+            });
+
+            async function saveProduct() {
+                const name = nameInput.value.trim();
+                const categoryId = parseInt(categoryInput.value, 10) || 0;
+                const unitId = parseInt(unitInput.value, 10) || 0;
+                if (!name) {
+                    showError('Enter a product name.');
+                    nameInput.focus();
+                    return;
+                }
+                if (!categoryId) {
+                    showError('Select a category.');
+                    return;
+                }
+                if (!unitId) {
+                    showError('Select a unit of measure.');
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                try {
+                    const res = await fetch('@Url.Action("QuickCreate", "Products")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                        body: JSON.stringify({
+                            name: name,
+                            categoryId: categoryId,
+                            unitOfMeasureId: unitId,
+                            costPrice: parseFloat(costInput.value) || 0,
+                            salePrice: parseFloat(saleInput.value) || 0,
+                            reorderLevel: parseFloat(reorderInput.value) || 0,
+                            description: descriptionInput.value.trim() || null
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) {
+                        showError(data.error || 'Could not add this product.');
+                        return;
+                    }
+
+                    const product = {
+                        Id: data.id,
+                        Sku: data.sku,
+                        Name: data.name,
+                        CostPrice: data.costPrice,
+                        SuggestedSalePrice: data.salePrice,
+                        Symbol: data.symbol,
+                        CategoryId: data.categoryId,
+                        Category: data.category
+                    };
+                    products.push(product);
+                    products.sort((a, b) => a.Name.localeCompare(b.Name));
+
+                    const row = targetRow && document.body.contains(targetRow) ? targetRow : null;
+                    if (row) {
+                        row.selectNewProduct(product);
+                        focusAfterClose = row.querySelector('.qty-input');
+                    }
+                    modal.hide();
+                } catch {
+                    showError('Unable to reach the server. Please try again.');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            }
+
+            saveBtn.addEventListener('click', saveProduct);
+            modalEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && e.target.matches('input[data-enter-submit]')) {
+                    e.preventDefault();
+                    saveProduct();
+                }
+            });
+
+            return function (row, categoryId) {
+                targetRow = row;
+                setSelectValue(categoryInput, categoryId);
+                modal.show();
+            };
+        })();
+
         addRow();
     </script>
     <script>
@@ -373,6 +614,7 @@
                         $select.select2('destroy');
                     }
                     initSelect2(supplierSelect);
+                    supplierDueWidget.refresh();
 
                     modal.hide();
                 } catch {
@@ -390,6 +632,22 @@
                 }
             });
         })();
+    </script>
+    <script>
+        // Declared with var (not const) so the quick-add script above can reach it: that
+        // script only calls refresh() after a save, by which point this has run.
+        var supplierDueWidget = initPartyDue({
+            select: document.getElementById('SupplierId'),
+            dueUrl: '@Url.Action("Due", "Suppliers")',
+            ledgerUrl: '@Url.Action("Ledger", "Suppliers")?partyId=',
+            dueEl: document.getElementById('supplierDue'),
+            summaryEl: document.getElementById('supplierDueSummary'),
+            previousEl: document.getElementById('supplierPreviousDue'),
+            afterEl: document.getElementById('supplierDueAfter'),
+            grandTotalEl: document.getElementById('grandTotal'),
+            currency: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol)),
+            advanceLabel: 'Advance paid'
+        });
     </script>
     <partial name="_ValidationScriptsPartial" />
 }

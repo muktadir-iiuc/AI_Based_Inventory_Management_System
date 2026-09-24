@@ -36,7 +36,7 @@ public class UsersController(
             });
         }
 
-        return View(items);
+        return View(items.OrderBy(o => o.FullName).ThenBy(o => o.IsActive).ToList());
     }
 
     public async Task<IActionResult> Create()

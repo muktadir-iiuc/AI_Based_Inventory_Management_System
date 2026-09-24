@@ -1,0 +1,258 @@
+@model PartyLedgerViewModel
+@inject ICompanySettingsService CompanySettings
+@{
+    ViewData["Title"] = Model.Title;
+    var company = await CompanySettings.GetAsync();
+    var periodText = Model.From is null && Model.To is null
+        ? "All time"
+        : $"{(Model.From?.ToString("MMM dd, yyyy") ?? "Beginning")} to {(Model.To?.ToString("MMM dd, yyyy") ?? "Today")}";
+    var partyLabelLower = Model.PartyLabel.ToLowerInvariant();
+}
+
+@section Toolbar {
+    @if (Model.PartyId is > 0)
+    {
+        <button type="button" class="btn btn-outline-secondary btn-sm no-print" id="btnPrintLedger">
+            <i class="fas fa-print"></i> Print
+        </button>
+    }
+}
+
+<div class="card mb-3 no-print">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-1 fw-semibold text-muted text-uppercase">@Model.PartyLabel</label>
+                <select name="partyId" class="form-select form-select-sm" style="width:100%;">
+                    <option value="">All @(partyLabelLower)s (summary)</option>
+                    @foreach (var p in Model.Parties)
+                    {
+                        <option value="@p.Value" selected="@(Model.PartyId?.ToString() == p.Value)">@p.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1 fw-semibold text-muted text-uppercase">From</label>
+                <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-1 fw-semibold text-muted text-uppercase">To</label>
+                <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> View Ledger</button>
+                <a asp-action="Ledger" class="btn btn-outline-secondary btn-sm"><i class="fas fa-rotate-left"></i> Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.WarehouseScoped)
+{
+    <div class="alert alert-info py-2 px-3 small no-print">
+        <i class="fas fa-warehouse me-1"></i>
+        Balances and documents shown are limited to your assigned warehouse(s).
+    </div>
+}
+
+@if (Model.PartyId is > 0)
+{
+    <div class="print-only mb-3">
+        <h4 class="mb-0">@company.CompanyName</h4>
+        <div class="text-muted small">@company.Address</div>
+        <h5 class="mt-2 mb-0">@Model.Title &mdash; @Model.PartyName</h5>
+        <div class="small">Period: @periodText</div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <span class="text-muted small text-uppercase">Opening Balance</span>
+                    <h4 class="mb-0">@Model.OpeningBalance.ToString("C")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <span class="text-muted small text-uppercase">Total Debit</span>
+                    <h4 class="mb-0">@Model.TotalDebit.ToString("C")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <span class="text-muted small text-uppercase">Total Credit</span>
+                    <h4 class="mb-0">@Model.TotalCredit.ToString("C")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <span class="text-muted small text-uppercase">Closing @Model.BalanceLabel</span>
+                    <h4 class="mb-0 @(Model.ClosingBalance > 0 ? "text-danger" : "text-success")">@Model.ClosingBalance.ToString("C")</h4>
+                    <span class="text-muted small">@(Model.ClosingBalance == 0 ? "settled in full" : Model.BalanceHint)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-book me-1"></i>@Model.PartyName
+                @if (!string.IsNullOrWhiteSpace(Model.PartyPhone))
+                {
+                    <span class="text-muted fw-normal ms-2">@Model.PartyPhone</span>
+                }
+            </h3>
+            <span class="text-muted small">@periodText</span>
+        </div>
+        <div class="card-body p-0 table-responsive-card">
+            <table class="table table-striped table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th style="width:3rem;">#</th>
+                        <th>Date</th>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Reference</th>
+                        <th class="text-end">Debit</th>
+                        <th class="text-end">Credit</th>
+                        <th class="text-end">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-secondary fw-semibold">
+                        <td></td>
+                        <td>@(Model.From?.ToString("MMM dd, yyyy") ?? "—")</td>
+                        <td colspan="3">Opening Balance</td>
+                        <td class="text-end">—</td>
+                        <td class="text-end">—</td>
+                        <td class="text-end">@Model.OpeningBalance.ToString("C")</td>
+                    </tr>
+                    @{ var sl = 0; }
+                    @foreach (var row in Model.Rows)
+                    {
+                        sl++;
+                        <tr>
+                            <td class="text-muted">@sl</td>
+                            <td>@row.Date.ToString("MMM dd, yyyy")</td>
+                            <td>
+                                @if (row.LinkController is not null)
+                                {
+                                    <a asp-controller="@row.LinkController" asp-action="Details" asp-route-id="@row.LinkId" class="fw-semibold">@row.DocumentNumber</a>
+                                }
+                                else
+                                {
+                                    <span class="fw-semibold">@row.DocumentNumber</span>
+                                }
+                            </td>
+                            <td>@row.DocumentType</td>
+                            <td class="text-muted">@row.Description</td>
+                            <td class="text-end">@(row.Debit > 0 ? row.Debit.ToString("C") : "")</td>
+                            <td class="text-end">@(row.Credit > 0 ? row.Credit.ToString("C") : "")</td>
+                            <td class="text-end fw-semibold">@row.RunningBalance.ToString("C")</td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No transactions in this period.</td></tr>
+                    }
+                </tbody>
+                <tfoot class="border-top">
+                    <tr class="fw-semibold">
+                        <th colspan="5" class="text-end">Period totals</th>
+                        <th class="text-end">@Model.TotalDebit.ToString("C")</th>
+                        <th class="text-end">@Model.TotalCredit.ToString("C")</th>
+                        <th class="text-end">@Model.ClosingBalance.ToString("C")</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2 no-print">
+            <a asp-action="Details" asp-route-id="@Model.PartyId" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to @partyLabelLower
+            </a>
+            <span class="text-muted small">
+                <i class="fas fa-circle-info me-1"></i>
+                Balance runs over the whole account history &mdash; the date filter only decides
+                which rows are listed, never how the balance is calculated.
+            </span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title mb-0"><i class="fas fa-book me-1"></i>@Model.SummaryTitle</h3>
+        </div>
+        <div class="card-body p-0 table-responsive-card">
+            <table class="table table-striped table-hover mb-0 data-table" id="ledgerSummaryTable">
+                <thead>
+                    <tr>
+                        <th>@Model.PartyLabel</th>
+                        <th>Phone</th>
+                        <th class="text-end">Closing @Model.BalanceLabel</th>
+                        <th data-filter="false" class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var s in Model.Summary)
+                {
+                    <tr>
+                        <td class="fw-semibold">@s.Name</td>
+                        <td>@s.Phone</td>
+                        <td class="text-end fw-semibold @(s.Balance > 0 ? "text-danger" : "text-success")">@s.Balance.ToString("C")</td>
+                        <td class="text-end">
+                            <a asp-action="Ledger" asp-route-partyId="@s.Id" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-book"></i> Ledger
+                            </a>
+                        </td>
+                    </tr>
+                }
+                @if (Model.Summary.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-4">Nothing to show yet.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between">
+            <span class="fw-semibold">Total @Model.BalanceLabel</span>
+            @{ var summaryTotal = Model.Summary.Sum(s => s.Balance); }
+            <span class="fw-bold @(summaryTotal > 0 ? "text-danger" : "text-success")">@summaryTotal.ToString("C")</span>
+        </div>
+    </div>
+}
+
+@section Styles {
+    <style>
+        .print-only { display: none; }
+
+        @@media print {
+            .app-header, .app-sidebar, .app-footer, .app-content-header,
+            .no-print, #chatbotToggle, #chatbotPanel, .toast-container { display: none !important; }
+            .app-main, .app-wrapper { margin: 0 !important; padding: 0 !important; }
+            .card { border: 0 !important; box-shadow: none !important; }
+            .print-only { display: block !important; }
+            a { text-decoration: none !important; color: inherit !important; }
+            .table { font-size: 0.8rem; }
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var btn = document.getElementById('btnPrintLedger');
+            if (btn) {
+                btn.addEventListener('click', function () { window.print(); });
+            }
+        })();
+    </script>
+}

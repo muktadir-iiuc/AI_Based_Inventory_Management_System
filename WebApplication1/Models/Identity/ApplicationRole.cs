@@ -30,5 +30,7 @@ public static class Roles
     public const string PurchaseManagers = $"{Admin},{Manager},{PurchaseOfficer}";
     public const string SalesManagers = $"{Admin},{Manager},{SalesOfficer}";
     public const string AccountingManagers = $"{Admin},{Manager},{Accountant}";
+    // Everyone except the read-only Viewer — e.g. who may record Petty Cash entries.
+    public const string AllExceptViewer = $"{Admin},{Manager},{PurchaseOfficer},{SalesOfficer},{Accountant}";
     public const string AllAuthenticated = $"{Admin},{Manager},{PurchaseOfficer},{SalesOfficer},{Accountant},{Viewer}";
 }

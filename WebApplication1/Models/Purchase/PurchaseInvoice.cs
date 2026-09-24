@@ -37,6 +37,10 @@ public class PurchaseInvoice
 
     public ICollection<PurchaseInvoiceItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
+
+    // Inverse of PurchaseReturn.PurchaseInvoice - lets due-calculations net off returns
+    // without a separate query.
+    public ICollection<PurchaseReturn> Returns { get; set; } = [];
 }
 
 public class PurchaseInvoiceItem

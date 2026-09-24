@@ -392,6 +392,7 @@ public class PurchaseInvoicesController(
         ViewData["Suppliers"] = new SelectList(await db.Suppliers.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync(), "Id", "Name");
         ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name", singleWarehouseId);
         ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
+        ViewData["Units"] = new SelectList(await db.UnitOfMeasures.Where(u => u.IsActive).OrderBy(u => u.Name).ToListAsync(), "Id", "Name");
 
         // Most recent batch's sale price per product, as a starting suggestion for the new
         // purchase line's Sale Price field — not authoritative, the user can change it per batch.

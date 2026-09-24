@@ -21,7 +21,26 @@ public class ProductsController(
 {
     public async Task<IActionResult> Index(string? search, int? categoryId)
     {
-        var query = db.Products.Include(p => p.Category).Include(p => p.UnitOfMeasure).AsQueryable().Where(p => p.IsActive);
+        // Product.CurrentStock is a denormalized total across every warehouse — a warehouse-scoped
+        // user must never see that (it would leak other warehouses' quantities), so restricted users
+        // only get their own warehouse(s) in the per-row warehouse picker below, and stock is read
+        // per selected warehouse instead of that denormalized total.
+        var warehouseIds = User.GetWarehouseIds();
+
+        var warehousesQuery = db.Warehouses.Where(w => w.IsActive).AsQueryable();
+        if (warehouseIds is not null)
+        {
+            warehousesQuery = warehousesQuery.Where(w => warehouseIds.Contains(w.Id));
+        }
+        var warehouses = await warehousesQuery.OrderBy(w => w.Name).ToListAsync();
+        ViewData["Warehouses"] = warehouses;
+        ViewData["WarehouseScoped"] = warehouseIds is not null;
+
+        var query = db.Products
+            .Include(p => p.Category)
+            .Include(p => p.UnitOfMeasure)
+            .Include(p => p.WarehouseStocks.Where(s => warehouseIds == null || warehouseIds.Contains(s.WarehouseId)))
+            .AsQueryable().Where(p => p.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -36,20 +55,6 @@ public class ProductsController(
         ViewData["CategoryId"] = new SelectList(await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync(), "Id", "Name", categoryId);
 
         var products = await query.OrderBy(p => p.Name).ToListAsync();
-
-        // Product.CurrentStock is a denormalized total across every warehouse — a warehouse-scoped
-        // user must never see that (it would leak other warehouses' quantities), so for restricted
-        // users the list/reorder-warning both use a per-user total limited to their own warehouse(s).
-        var warehouseIds = User.GetWarehouseIds();
-        if (warehouseIds is not null)
-        {
-            var productIds = products.Select(p => p.Id).ToList();
-            ViewData["ScopedStock"] = await db.ProductWarehouseStocks
-                .Where(s => productIds.Contains(s.ProductId) && warehouseIds.Contains(s.WarehouseId))
-                .GroupBy(s => s.ProductId)
-                .Select(g => new { g.Key, Total = g.Sum(s => s.Quantity) })
-                .ToDictionaryAsync(x => x.Key, x => x.Total);
-        }
 
         return View(products);
     }
@@ -76,6 +81,15 @@ public class ProductsController(
         {
             ViewData["ScopedStock"] = product.WarehouseStocks.Sum(s => s.Quantity);
         }
+
+        // Lets the live stock-update script insert a row for a warehouse that had zero stock (and
+        // so wasn't rendered above) without a page reload — same warehouse scoping as the table itself.
+        var warehouseNamesQuery = db.Warehouses.AsQueryable();
+        if (warehouseIds is not null)
+        {
+            warehouseNamesQuery = warehouseNamesQuery.Where(w => warehouseIds.Contains(w.Id));
+        }
+        ViewData["WarehouseNames"] = await warehouseNamesQuery.ToDictionaryAsync(w => w.Id, w => w.Name);
 
         return View(product);
     }
@@ -106,6 +120,67 @@ public class ProductsController(
         await db.SaveChangesAsync();
         TempData["Success"] = $"Product created with SKU {model.Sku}.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // Lets the Purchase Invoice Create page add a missing product inline from a line item,
+    // without losing the rest of the invoice by navigating away to Products/Create. Same role
+    // gate and SKU generation as the full Create action above.
+    [HttpPost]
+    [Authorize(Roles = Roles.PurchaseManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickCreate([FromBody] ProductQuickCreateRequest? request)
+    {
+        if (request is null || !ModelState.IsValid)
+        {
+            var error = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).FirstOrDefault();
+            return Json(new { ok = false, error = string.IsNullOrWhiteSpace(error) ? "Invalid product details." : error });
+        }
+
+        var name = request.Name.Trim();
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == request.CategoryId && c.IsActive);
+        if (category is null)
+        {
+            return Json(new { ok = false, error = "Select a valid category." });
+        }
+
+        var unit = await db.UnitOfMeasures.FirstOrDefaultAsync(u => u.Id == request.UnitOfMeasureId && u.IsActive);
+        if (unit is null)
+        {
+            return Json(new { ok = false, error = "Select a valid unit of measure." });
+        }
+
+        if (await db.Products.AnyAsync(p => p.Name == name && p.CategoryId == category.Id))
+        {
+            return Json(new { ok = false, error = $"A product with this name already exists in {category.Name}." });
+        }
+
+        var product = new Product
+        {
+            Sku = await GenerateSkuAsync(category.Id),
+            Name = name,
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            CategoryId = category.Id,
+            UnitOfMeasureId = unit.Id,
+            CostPrice = request.CostPrice,
+            SalePrice = request.SalePrice,
+            ReorderLevel = request.ReorderLevel,
+            CreatedBy = User.Identity?.Name
+        };
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        return Json(new
+        {
+            ok = true,
+            id = product.Id,
+            sku = product.Sku,
+            name = product.Name,
+            costPrice = product.CostPrice,
+            salePrice = product.SalePrice,
+            symbol = unit.Symbol,
+            categoryId = category.Id,
+            category = category.Name
+        });
     }
 
     [Authorize(Roles = Roles.PurchaseManagers)]
@@ -152,6 +227,7 @@ public class ProductsController(
             var changedByName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown";
             var icon = priceChange.PriceIncreased ? "fas fa-arrow-trend-up text-success" : "fas fa-arrow-trend-down text-danger";
             await notifier.NotifyAsync("Sale Price Updated", BuildPriceChangeToastMessage(product, priceChange, changedByName), icon, []);
+            await notifier.NotifyDataChangeAsync("ProductPrice", new { productId = product.Id, salePrice = product.SalePrice }, []);
             await priceService.NotifyManagersOfPriceChangeAsync(product, priceChange, changedByName);
         }
 

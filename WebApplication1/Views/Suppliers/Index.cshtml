@@ -33,15 +33,16 @@
                         else { <span class="badge text-bg-secondary">Inactive</span> }
                     </td>
                     <td class="text-end">
-                        @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
-                        {
-                            <div class="table-actions">
+                        <div class="table-actions">
+                            <a asp-action="Ledger" asp-route-partyId="@s.Id" class="btn btn-sm btn-outline-secondary" title="View supplier ledger"><i class="fas fa-book"></i></a>
+                            @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+                            {
                                 <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary" title="Edit supplier"><i class="fas fa-pen"></i></a>
                                 <form asp-action="Delete" asp-route-id="@s.Id" method="post" class="confirm-delete" data-confirm-message="Delete this supplier?">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete supplier"><i class="fas fa-trash"></i></button>
                                 </form>
-                            </div>
-                        }
+                            }
+                        </div>
                     </td>
                 </tr>
             }

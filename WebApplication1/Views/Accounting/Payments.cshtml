@@ -64,6 +64,16 @@
                             <a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@p.SalesInvoiceId">@p.SalesInvoice.InvoiceNumber</a>
                             <span class="text-muted">(@p.SalesInvoice.Customer?.Name)</span>
                         }
+                        @if (p.Customer is not null)
+                        {
+                            <a asp-controller="Customers" asp-action="Ledger" asp-route-partyId="@p.CustomerId">Opening balance</a>
+                            <span class="text-muted">(@p.Customer.Name)</span>
+                        }
+                        @if (p.Supplier is not null)
+                        {
+                            <a asp-controller="Suppliers" asp-action="Ledger" asp-route-partyId="@p.SupplierId">Opening balance</a>
+                            <span class="text-muted">(@p.Supplier.Name)</span>
+                        }
                     </td>
                     <td>@p.Notes</td>
                     <td class="text-end fw-semibold">@p.Amount.ToString("C")</td>

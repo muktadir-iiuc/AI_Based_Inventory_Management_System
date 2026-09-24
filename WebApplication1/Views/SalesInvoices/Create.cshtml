@@ -27,6 +27,7 @@
                                     <i class="fas fa-plus"></i>
                                 </button>
                             </div>
+                            <div class="small mt-1 d-none" id="customerDue"></div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label asp-for="WarehouseId" class="form-label required-asterisk"></label>
@@ -97,6 +98,15 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-bold">Grand Total</span>
                         <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
+                    </div>
+                    <div class="d-none" id="customerDueSummary">
+                        <hr />
+                        <dl class="row mb-0">
+                            <dt class="col-7 text-muted fw-normal">Previous due</dt>
+                            <dd class="col-5 text-end" id="customerPreviousDue"></dd>
+                            <dt class="col-7 fw-semibold">Due after this invoice</dt>
+                            <dd class="col-5 text-end fw-semibold" id="customerDueAfter"></dd>
+                        </dl>
                     </div>
                     <div class="form-text mt-1">
                         Unit price is suggested automatically from the FIFO batch once you pick a product and quantity — edit it if this sale is priced differently.
@@ -502,6 +512,7 @@
                         $select.select2('destroy');
                     }
                     initSelect2(customerSelect);
+                    customerDueWidget.refresh();
 
                     modal.hide();
                 } catch {
@@ -519,6 +530,22 @@
                 }
             });
         })();
+    </script>
+    <script>
+        // Declared with var (not const) so the quick-add script above can reach it: that
+        // script only calls refresh() after a save, by which point this has run.
+        var customerDueWidget = initPartyDue({
+            select: document.getElementById('CustomerId'),
+            dueUrl: '@Url.Action("Due", "Customers")',
+            ledgerUrl: '@Url.Action("Ledger", "Customers")?partyId=',
+            dueEl: document.getElementById('customerDue'),
+            summaryEl: document.getElementById('customerDueSummary'),
+            previousEl: document.getElementById('customerPreviousDue'),
+            afterEl: document.getElementById('customerDueAfter'),
+            grandTotalEl: document.getElementById('grandTotal'),
+            currency: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol)),
+            advanceLabel: 'Advance received'
+        });
     </script>
     <partial name="_ValidationScriptsPartial" />
 }

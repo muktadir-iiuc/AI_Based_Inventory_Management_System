@@ -2,7 +2,6 @@
 @{
     ViewData["Title"] = "New Stock Transfer";
     var warehouseList = (SelectList)ViewData["Warehouses"]!;
-    var warehouseScoped = (bool)ViewData["WarehouseScoped"]!;
 }
 
 <form asp-action="Create" method="post" id="transferForm">
@@ -18,17 +17,9 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label asp-for="FromWarehouseId" class="form-label required-asterisk">From Warehouse</label>
-                            @if (warehouseScoped)
-                            {
-                                <input class="form-control" value="@warehouseList.FirstOrDefault(w => w.Value == Model.FromWarehouseId.ToString())?.Text" readonly />
-                                <input type="hidden" asp-for="FromWarehouseId" id="fromWarehouseId" />
-                            }
-                            else
-                            {
-                                <select asp-for="FromWarehouseId" asp-items="warehouseList" id="fromWarehouseId" class="form-select">
-                                    <option value="">-- select source --</option>
-                                </select>
-                            }
+                            <select asp-for="FromWarehouseId" asp-items="warehouseList" id="fromWarehouseId" class="form-select">
+                                <option value="">-- select source --</option>
+                            </select>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label asp-for="ToWarehouseId" class="form-label required-asterisk">To Warehouse</label>

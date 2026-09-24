@@ -238,7 +238,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<SalesReturn>()
             .HasOne(r => r.SalesInvoice)
-            .WithMany()
+            .WithMany(s => s.Returns)
             .HasForeignKey(r => r.SalesInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
@@ -259,7 +259,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<PurchaseReturn>()
             .HasOne(r => r.PurchaseInvoice)
-            .WithMany()
+            .WithMany(p => p.Returns)
             .HasForeignKey(r => r.PurchaseInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
@@ -305,6 +305,20 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(p => p.SalesInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Set only on a payment against the party's opening balance (no invoice) — see
+        // Payment.CustomerId / SupplierId.
+        builder.Entity<Payment>()
+            .HasOne(p => p.Customer)
+            .WithMany(c => c.OpeningBalancePayments)
+            .HasForeignKey(p => p.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Payment>()
+            .HasOne(p => p.Supplier)
+            .WithMany(s => s.OpeningBalancePayments)
+            .HasForeignKey(p => p.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<ProductPriceHistory>()
             .HasIndex(h => new { h.ProductId, h.ChangedAt });
 
@@ -330,6 +344,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(e => e.PettyCashName)
             .WithMany(n => n.Entries)
             .HasForeignKey(e => e.PettyCashNameId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PettyCashEntry>()
+            .HasOne(e => e.Warehouse)
+            .WithMany()
+            .HasForeignKey(e => e.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -42,3 +42,27 @@ public class CustomerQuickCreateRequest
     [StringLength(300)]
     public string? Address { get; set; }
 }
+
+public class ProductQuickCreateRequest
+{
+    [Required(ErrorMessage = "Enter a product name."), StringLength(150)]
+    public string Name { get; set; } = string.Empty;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Select a category.")]
+    public int CategoryId { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "Select a unit of measure.")]
+    public int UnitOfMeasureId { get; set; }
+
+    [Range(0, 9999999999999999.99, ErrorMessage = "Cost price cannot be negative.")]
+    public decimal CostPrice { get; set; }
+
+    [Range(0, 9999999999999999.99, ErrorMessage = "Sale price cannot be negative.")]
+    public decimal SalePrice { get; set; }
+
+    [Range(0, 9999999999999999.99, ErrorMessage = "Reorder level cannot be negative.")]
+    public decimal ReorderLevel { get; set; } = 10;
+
+    [StringLength(500)]
+    public string? Description { get; set; }
+}

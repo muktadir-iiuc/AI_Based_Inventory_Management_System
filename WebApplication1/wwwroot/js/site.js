@@ -289,3 +289,126 @@ function focusNextField(current, $root, fieldSelector) {
         }
     }
 }
+
+// Shows the selected customer's/supplier's current due on an invoice Create page, fetched from
+// that party's Due endpoint (Customers/Due or Suppliers/Due), which returns exactly the party
+// ledger's closing balance for this user. Also fills an optional "previous due / due after this
+// invoice" block, kept in step with the page's grand total. Options:
+//   select       - the party <select>
+//   dueUrl       - endpoint URL without the id (e.g. "/Customers/Due")
+//   ledgerUrl    - ledger URL without the partyId query value (e.g. "/Customers/Ledger?partyId=")
+//   dueEl        - element under the select for the one-line due message
+//   summaryEl    - optional wrapper shown only once a party's due is known
+//   previousEl, afterEl - optional elements for the two summary figures
+//   grandTotalEl - optional element holding the invoice grand total (its text is watched)
+//   currency     - currency symbol to prefix amounts with
+//   advanceLabel - wording for a negative balance, e.g. "Advance from customer"
+// Returns { refresh } so a page can re-check after changing the selection in code (e.g. an
+// inline quick-add), since setting .value doesn't raise any event.
+function initPartyDue(options) {
+    var select = options.select;
+    var requestSeq = 0;
+    var balance = null;
+    var settled = 0; // what an edited invoice has already received/paid/returned; 0 on Create
+
+    function money(n) {
+        return options.currency + Math.abs(Number(n || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function grandTotal() {
+        if (!options.grandTotalEl) return 0;
+        return parseFloat(options.grandTotalEl.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+    }
+
+    function describe(amount) {
+        if (amount > 0) return { text: money(amount), cls: 'text-danger' };
+        if (amount < 0) return { text: options.advanceLabel + ' ' + money(amount), cls: 'text-success' };
+        return { text: money(0), cls: 'text-muted' };
+    }
+
+    function renderSummary() {
+        if (!options.summaryEl) return;
+        options.summaryEl.classList.toggle('d-none', balance === null);
+        if (balance === null) return;
+        var previous = describe(balance);
+        var after = describe(balance + grandTotal() - settled);
+        options.previousEl.textContent = previous.text;
+        options.previousEl.className = 'col-5 text-end ' + previous.cls;
+        options.afterEl.textContent = after.text;
+        options.afterEl.className = 'col-5 text-end fw-semibold ' + after.cls;
+    }
+
+    function render(id, amount) {
+        var el = options.dueEl;
+        el.textContent = '';
+        el.className = 'small mt-1';
+        var label = document.createElement('span');
+        var link = document.createElement('a');
+        link.href = options.ledgerUrl + id;
+        link.className = 'ms-1';
+        link.textContent = 'View ledger';
+        if (amount > 0) {
+            label.className = 'text-danger fw-semibold';
+            label.textContent = 'Current due: ' + money(amount);
+        } else if (amount < 0) {
+            label.className = 'text-success fw-semibold';
+            label.textContent = options.advanceLabel + ': ' + money(amount);
+        } else {
+            label.className = 'text-muted';
+            label.textContent = 'No outstanding due';
+        }
+        el.appendChild(label);
+        el.appendChild(document.createTextNode(' · '));
+        el.appendChild(link);
+    }
+
+    function hide() {
+        balance = null;
+        options.dueEl.className = 'small mt-1 d-none';
+        options.dueEl.textContent = '';
+        renderSummary();
+    }
+
+    function refresh() {
+        var id = parseInt(select.value, 10);
+        var seq = ++requestSeq;
+        if (!id) {
+            hide();
+            return;
+        }
+        options.dueEl.className = 'small mt-1 text-muted';
+        options.dueEl.textContent = 'Checking due…';
+        fetch(options.dueUrl + '/' + id + (options.excludeInvoiceId ? '?excludeInvoiceId=' + options.excludeInvoiceId : ''), { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                // A slower response for a party the user has since moved away from must not
+                // overwrite the current one.
+                if (seq !== requestSeq) return;
+                if (!data.ok) {
+                    hide();
+                    return;
+                }
+                balance = Number(data.balance) || 0;
+                settled = Number(data.settled) || 0;
+                render(id, balance);
+                renderSummary();
+            })
+            .catch(function () {
+                if (seq !== requestSeq) return;
+                balance = null;
+                options.dueEl.className = 'small mt-1 text-warning';
+                options.dueEl.textContent = 'Could not load the current due.';
+                renderSummary();
+            });
+    }
+
+    select.addEventListener('change', refresh);
+    if (typeof jQuery !== 'undefined') {
+        jQuery(select).on('select2:select select2:clear', refresh);
+    }
+    if (options.grandTotalEl && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(renderSummary).observe(options.grandTotalEl, { childList: true, characterData: true, subtree: true });
+    }
+    refresh();
+    return { refresh: refresh };
+}

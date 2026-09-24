@@ -2,7 +2,11 @@
 @{
     ViewData["Title"] = $"Product: {Model.Name}";
     var scopedStock = ViewData["ScopedStock"] as decimal?;
+    var warehouseNames = (Dictionary<int, string>)ViewData["WarehouseNames"]!;
+    var warehouseNamesJson = System.Text.Json.JsonSerializer.Serialize(warehouseNames.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value));
+    var currencySymbol = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
 }
+<span id="pdMeta" class="d-none" data-product-id="@Model.Id" data-warehouse-names='@Html.Raw(warehouseNamesJson)' data-currency-symbol="@currencySymbol"></span>
 
 <div class="row">
     <div class="col-md-5">
@@ -15,16 +19,16 @@
                     <dt class="col-5">Category</dt><dd class="col-7">@Model.Category?.Name</dd>
                     <dt class="col-5">Unit</dt><dd class="col-7">@Model.UnitOfMeasure?.Name (@Model.UnitOfMeasure?.Symbol)</dd>
                     <dt class="col-5">Last Cost <small class="text-muted">(default)</small></dt><dd class="col-7">@Model.CostPrice.ToString("C")</dd>
-                    <dt class="col-5">Default Sale Price</dt><dd class="col-7">@Model.SalePrice.ToString("C")</dd>
+                    <dt class="col-5">Default Sale Price</dt><dd class="col-7"><span id="salePriceValue">@Model.SalePrice.ToString("C")</span></dd>
                     <dt class="col-5">Current Stock</dt>
                     <dd class="col-7">
                         @if (scopedStock is { } stock)
                         {
-                            @stock.ToString("0.##") <small class="text-muted">(your assigned warehouse(s))</small>
+                            <span id="currentStockValue">@stock.ToString("0.##")</span> <small class="text-muted">(your assigned warehouse(s))</small>
                         }
                         else
                         {
-                            @Model.CurrentStock.ToString("0.##") <small class="text-muted">(all warehouses)</small>
+                            <span id="currentStockValue">@Model.CurrentStock.ToString("0.##")</span> <small class="text-muted">(all warehouses)</small>
                         }
                     </dd>
                     <dt class="col-5">Reorder Level</dt><dd class="col-7">@Model.ReorderLevel.ToString("0.##")</dd>
@@ -50,17 +54,17 @@
             <div class="card-body p-0 table-responsive-card">
                 <table class="table table-striped mb-0">
                     <thead><tr><th>Warehouse</th><th class="text-end">Qty</th></tr></thead>
-                    <tbody>
+                    <tbody id="warehouseStockBody">
                     @foreach (var s in Model.WarehouseStocks.OrderBy(s => s.Warehouse!.Name))
                     {
-                        <tr>
+                        <tr data-warehouse-id="@s.WarehouseId">
                             <td>@s.Warehouse?.Name</td>
-                            <td class="text-end">@s.Quantity.ToString("0.##")</td>
+                            <td class="text-end qty-value">@s.Quantity.ToString("0.##")</td>
                         </tr>
                     }
                     @if (!Model.WarehouseStocks.Any())
                     {
-                        <tr><td colspan="2" class="text-center text-muted py-3">No stock in any warehouse.</td></tr>
+                        <tr data-empty><td colspan="2" class="text-center text-muted py-3">No stock in any warehouse.</td></tr>
                     }
                     </tbody>
                 </table>
@@ -97,3 +101,76 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var meta = document.getElementById('pdMeta');
+            var productId = parseInt(meta.dataset.productId, 10);
+            var warehouseNames = JSON.parse(meta.dataset.warehouseNames || '{}');
+            var tbody = document.getElementById('warehouseStockBody');
+            var priceEl = document.getElementById('salePriceValue');
+            var stockEl = document.getElementById('currentStockValue');
+
+            function formatQty(n) {
+                n = Number(n) || 0;
+                return n.toFixed(2).replace(/\.?0+$/, '');
+            }
+
+            function formatMoney(n) {
+                var symbol = meta.dataset.currencySymbol || '';
+                return symbol + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function flash(el) {
+                if (!el) return;
+                el.classList.add('text-bg-warning');
+                setTimeout(function () { el.classList.remove('text-bg-warning'); }, 1200);
+            }
+
+            function recomputeTotal() {
+                if (!stockEl) return;
+                var total = 0;
+                tbody.querySelectorAll('tr[data-warehouse-id]').forEach(function (row) {
+                    total += Number(row.querySelector('.qty-value').textContent) || 0;
+                });
+                stockEl.textContent = formatQty(total);
+                flash(stockEl);
+            }
+
+            // Live price/stock updates pushed over SignalR (see _Layout.cshtml).
+            window.addEventListener('app:data-update', function (e) {
+                var d = e.detail;
+                if (d.type === 'ProductPrice' && d.data.productId === productId) {
+                    if (priceEl) { priceEl.textContent = formatMoney(d.data.salePrice); flash(priceEl); }
+                    return;
+                }
+
+                if (d.type === 'StockChange') {
+                    var entry = (d.data.products || []).find(function (p) { return p.productId === productId; });
+                    if (!entry) return;
+
+                    var changed = false;
+                    Object.keys(entry.warehouseStocks || {}).forEach(function (wid) {
+                        var qty = Number(entry.warehouseStocks[wid]) || 0;
+                        var row = tbody.querySelector('tr[data-warehouse-id="' + wid + '"]');
+                        if (!row) {
+                            if (qty === 0) return; // don't bother inserting a zero row
+                            var placeholder = tbody.querySelector('tr[data-empty]');
+                            if (placeholder) placeholder.remove();
+                            row = document.createElement('tr');
+                            row.setAttribute('data-warehouse-id', wid);
+                            row.innerHTML = '<td></td><td class="text-end qty-value"></td>';
+                            row.querySelector('td').textContent = warehouseNames[wid] || ('Warehouse ' + wid);
+                            tbody.appendChild(row);
+                        }
+                        row.querySelector('.qty-value').textContent = formatQty(qty);
+                        flash(row.querySelector('.qty-value'));
+                        changed = true;
+                    });
+                    if (changed) recomputeTotal();
+                }
+            });
+        })();
+    </script>
+}

@@ -8,10 +8,32 @@
     var pendingPriceReviewCount = canReviewPrices ? await ProductPriceService.GetPendingMonthlyReviewCountAsync() : 0;
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Resolves and applies the saved/default theme before any CSS paints, so a returning
+         visitor who picked "light" never sees a flash of the server-rendered dark default.
+         AdminLTE's own ColorMode (adminlte.min.js) does the equivalent work but only on
+         DOMContentLoaded - too late to prevent that flash - so this mirrors its resolution
+         logic and shares its "lte-theme" localStorage key; ColorMode.init() then runs anyway
+         and is a no-op here since it reads the same already-correct attribute. Defaults to
+         dark (this app's default theme) when nothing is stored yet. -->
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('lte-theme');
+                var theme = (stored === 'light' || stored === 'dark' || stored === 'auto') ? stored : 'dark';
+                var resolved = theme === 'auto'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : theme;
+                document.documentElement.setAttribute('data-bs-theme', resolved);
+                document.documentElement.style.colorScheme = resolved;
+            } catch (e) {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        })();
+    </script>
     <title>@ViewData["Title"] - @company.CompanyName</title>
     @if (company.LogoImage is not null)
     {
@@ -50,6 +72,26 @@
             </ul>
 
             <ul class="navbar-nav ms-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Theme">
+                        <i class="fas fa-sun d-none" data-lte-theme-icon="light"></i>
+                        <i class="fas fa-moon d-none" data-lte-theme-icon="dark"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-bs-theme-value="light">
+                                <i class="fas fa-sun"></i> Light
+                                <i class="fas fa-check bi-check-lg ms-auto d-none"></i>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-bs-theme-value="dark">
+                                <i class="fas fa-moon"></i> Dark
+                                <i class="fas fa-check bi-check-lg ms-auto d-none"></i>
+                            </button>
+                        </li>
+                    </ul>
+                </li>
                 @if (SignInManager.IsSignedIn(User))
                 {
                     <li class="nav-item dropdown">
@@ -154,7 +196,8 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link @(InController("PurchaseInvoices") ? "active" : "")"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
                             <li class="nav-item"><a asp-controller="PurchaseReturns" asp-action="Index" class="nav-link @(InController("PurchaseReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Purchase Returns</p></a></li>
-                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link @(InController("Suppliers") ? "active" : "")"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
+                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link @(InController("Suppliers") && !InAction("Suppliers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
+                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Ledger" class="nav-link @(InAction("Suppliers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Supplier Ledger</p></a></li>
                         </ul>
                     </li>
 
@@ -166,7 +209,8 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link @(InController("SalesInvoices") ? "active" : "")"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
                             <li class="nav-item"><a asp-controller="SalesReturns" asp-action="Index" class="nav-link @(InController("SalesReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Sales Returns</p></a></li>
-                            <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link @(InController("Customers") ? "active" : "")"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
+                            <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link @(InController("Customers") && !InAction("Customers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
+                            <li class="nav-item"><a asp-controller="Customers" asp-action="Ledger" class="nav-link @(InAction("Customers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Customer Ledger</p></a></li>
                         </ul>
                     </li>
 
@@ -195,15 +239,17 @@
                         </ul>
                     </li>
 
+                    @* Every signed-in user; per-warehouse scoping and the Viewer's read-only mode are
+                       enforced in PettyCashController. *@
+                    <li class="nav-item">
+                        <a asp-controller="PettyCash" asp-action="Index" class="nav-link @(InController("PettyCash") ? "active" : "")">
+                            <i class="nav-icon fas fa-coins"></i>
+                            <p>Petty Cash</p>
+                        </a>
+                    </li>
+
                     @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager))
                     {
-                        <li class="nav-item">
-                            <a asp-controller="PettyCash" asp-action="Index" class="nav-link @(InController("PettyCash") ? "active" : "")">
-                                <i class="nav-icon fas fa-coins"></i>
-                                <p>Petty Cash</p>
-                            </a>
-                        </li>
-
                         <li class="nav-header">ADMINISTRATION</li>
                         <li class="nav-item">
                             <a asp-controller="Users" asp-action="Index" class="nav-link @(InController("Users") ? "active" : "")">
@@ -369,6 +415,12 @@
                 .build();
 
             connection.on('ReceiveNotification', handleNotification);
+            // Structured data-change events (price/stock updates) are re-dispatched as a plain DOM
+            // event so any page's own script can patch its own tables/widgets without _Layout
+            // needing to know what each page looks like.
+            connection.on('ReceiveDataUpdate', function (payload) {
+                window.dispatchEvent(new CustomEvent('app:data-update', { detail: payload }));
+            });
             connection.start().catch(err => console.error('SignalR connection failed:', err));
         })();
     </script>

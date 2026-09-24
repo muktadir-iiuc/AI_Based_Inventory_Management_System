@@ -38,7 +38,7 @@
     <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 1">
         <div class="small-box text-bg-warning">
             <div class="inner">
-                <h3 data-countup="@Model.LowStockCount">0</h3>
+                <h3 id="lowStockCountEl" data-countup="@Model.LowStockCount">0</h3>
                 <p>Low Stock Items</p>
             </div>
             <i class="small-box-icon fas fa-triangle-exclamation"></i>
@@ -89,7 +89,7 @@
             <span class="info-box-icon text-bg-secondary"><i class="fas fa-warehouse"></i></span>
             <div class="info-box-content">
                 <span class="info-box-text">Stock Value</span>
-                <span class="info-box-number" data-countup-money="@Model.StockValue.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</span>
+                <span id="stockValueEl" class="info-box-number" data-countup-money="@Model.StockValue.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)" data-prefix="@currencySymbol">@(currencySymbol)0</span>
             </div>
         </div>
     </div>
@@ -98,7 +98,7 @@
             <span class="info-box-icon text-bg-danger"><i class="fas fa-ban"></i></span>
             <div class="info-box-content">
                 <span class="info-box-text">Out of Stock</span>
-                <span class="info-box-number" data-countup="@Model.OutOfStockCount">0</span>
+                <span id="outOfStockCountEl" class="info-box-number" data-countup="@Model.OutOfStockCount">0</span>
             </div>
         </div>
     </div>
@@ -128,7 +128,7 @@
                     <span class="info-box-icon @(Model.PendingPriceReviewCount > 0 ? "text-bg-warning" : "text-bg-secondary")"><i class="fas fa-tag"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">Monthly Price Review Pending</span>
-                        <span class="info-box-number" data-countup="@Model.PendingPriceReviewCount">0</span>
+                        <span id="pendingPriceReviewEl" class="info-box-number" data-countup="@Model.PendingPriceReviewCount">0</span>
                     </div>
                 </div>
             </a>
@@ -396,13 +396,87 @@
                     el.style.width = (el.dataset.targetWidth || 0) + '%';
                 }, reduceMotion ? 0 : 150 + i * 120);
             });
+
+            // Live widget refresh on SignalR ProductPrice/StockChange events (see _Layout.cshtml).
+            // Debounced and re-fetched from the server rather than recomputed here, since the
+            // aggregates (reorder-level counts, batch-cost stock value) depend on more than what
+            // any single event's payload carries.
+            function setCount(el, value) {
+                if (!el || value === null || value === undefined) return;
+                el.textContent = Math.round(value).toLocaleString();
+                el.classList.add('text-warning');
+                setTimeout(function () { el.classList.remove('text-warning'); }, 1200);
+            }
+
+            function setMoney(el, value) {
+                if (!el) return;
+                var prefix = el.dataset.prefix || '';
+                el.textContent = prefix + (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                el.classList.add('text-warning');
+                setTimeout(function () { el.classList.remove('text-warning'); }, 1200);
+            }
+
+            var dashRefreshTimer = null;
+            window.addEventListener('app:data-update', function (e) {
+                if (e.detail.type !== 'ProductPrice' && e.detail.type !== 'StockChange') return;
+                clearTimeout(dashRefreshTimer);
+                dashRefreshTimer = setTimeout(function () {
+                    fetch('/Home/DashboardStockSummary')
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (data) {
+                            if (!data) return;
+                            setCount(document.getElementById('lowStockCountEl'), data.lowStockCount);
+                            setCount(document.getElementById('outOfStockCountEl'), data.outOfStockCount);
+                            setMoney(document.getElementById('stockValueEl'), data.stockValue);
+                            setCount(document.getElementById('pendingPriceReviewEl'), data.pendingPriceReviewCount);
+                        })
+                        .catch(function () {});
+                }, 800);
+            });
         })();
+
+        // Chart.js reads its axis/legend text and grid-line colors from options set at chart
+        // CREATION time, not from live CSS - so switching the app theme wouldn't otherwise
+        // re-color an already-rendered chart until the page is reloaded. To keep charts legible
+        // in both themes without a reload, colors are pulled from the same Bootstrap CSS
+        // variables the rest of the UI uses (so they always match, in whichever theme is
+        // active) and every chart is re-styled + .update()'d on AdminLTE's theme-change event.
+        function chartThemeColors() {
+            const style = getComputedStyle(document.body);
+            return {
+                text: style.getPropertyValue('--bs-secondary-color').trim() || '#666',
+                grid: style.getPropertyValue('--bs-border-color-translucent').trim() || 'rgba(0, 0, 0, 0.08)',
+                sliceBorder: style.getPropertyValue('--bs-body-bg').trim() || '#fff'
+            };
+        }
+
+        const charts = [];
+
+        function applyChartTheme() {
+            const colors = chartThemeColors();
+            charts.forEach(function (chart) {
+                if (chart.options.scales) {
+                    Object.values(chart.options.scales).forEach(function (scale) {
+                        if (scale.ticks) scale.ticks.color = colors.text;
+                        if (scale.grid) scale.grid.color = colors.grid;
+                    });
+                }
+                if (chart.options.plugins?.legend?.labels) {
+                    chart.options.plugins.legend.labels.color = colors.text;
+                }
+                if (chart.config.type === 'doughnut') {
+                    chart.data.datasets[0].borderColor = colors.sliceBorder;
+                }
+                chart.update();
+            });
+        }
 
         // Sales vs Purchases trend chart, with a client-side 7/14/30-day slice toggle (no server round-trip)
         const allLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
         const allSales = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SalesTrend));
         const allPurchases = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PurchaseTrend));
 
+        const initialColors = chartThemeColors();
         const trendCtx = document.getElementById('trendChart');
         const trendChart = new Chart(trendCtx, {
             type: 'line',
@@ -436,9 +510,14 @@
                 maintainAspectRatio: false,
                 animation: { duration: 900, easing: 'easeOutQuart' },
                 interaction: { mode: 'index', intersect: false },
-                scales: { y: { beginAtZero: true } }
+                plugins: { legend: { labels: { color: initialColors.text } } },
+                scales: {
+                    x: { ticks: { color: initialColors.text }, grid: { color: initialColors.grid } },
+                    y: { beginAtZero: true, ticks: { color: initialColors.text }, grid: { color: initialColors.grid } }
+                }
             }
         });
+        charts.push(trendChart);
 
         document.querySelectorAll('[data-days]').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -458,11 +537,11 @@
         const topProductsData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopProducts.Select(p => p.Revenue)));
         const topProductsCtx = document.getElementById('topProductsChart');
         if (topProductsCtx) {
-            new Chart(topProductsCtx, {
+            const topProductsChart = new Chart(topProductsCtx, {
                 type: 'doughnut',
                 data: {
                     labels: topProductsLabels,
-                    datasets: [{ data: topProductsData, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+                    datasets: [{ data: topProductsData, backgroundColor: palette, borderWidth: 2, borderColor: initialColors.sliceBorder }]
                 },
                 options: {
                     responsive: true,
@@ -472,26 +551,30 @@
                     cutout: '62%'
                 }
             });
+            charts.push(topProductsChart);
         }
 
         const categoryLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryBreakdown.Select(c => c.Name)));
         const categoryData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryBreakdown.Select(c => c.Value)));
         const categoryCtx = document.getElementById('categoryChart');
         if (categoryCtx) {
-            new Chart(categoryCtx, {
+            const categoryChart = new Chart(categoryCtx, {
                 type: 'doughnut',
                 data: {
                     labels: categoryLabels,
-                    datasets: [{ data: categoryData, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+                    datasets: [{ data: categoryData, backgroundColor: palette, borderWidth: 2, borderColor: initialColors.sliceBorder }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: { animateRotate: true, animateScale: true, duration: 1000, easing: 'easeOutQuart' },
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: initialColors.text } } },
                     cutout: '55%'
                 }
             });
+            charts.push(categoryChart);
         }
+
+        document.addEventListener('changed.lte.color-mode', applyChartTheme);
     </script>
 }

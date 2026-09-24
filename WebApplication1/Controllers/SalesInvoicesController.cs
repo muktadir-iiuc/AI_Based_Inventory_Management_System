@@ -360,10 +360,20 @@ public class SalesInvoicesController(
         var paidAmount = invoice.Payments.Sum(p => p.Amount);
         var dueAmount = invoice.TotalAmount - paidAmount;
 
+        // Same invoiced-minus-paid-minus-returned formula as Customer.OutstandingDue / the
+        // Customer Ledger. Must filter Items to IsCurrent (a superseded line from an in-place
+        // Edit would otherwise double-count) and subtract Returns - a sales return credits
+        // Accounts Receivable directly and never creates a refund Payment.
         var customerOutstandingDue = await db.SalesInvoices
-            .Where(s => s.CustomerId == invoice.CustomerId && s.Status != DocumentStatus.Cancelled)
-            .Select(s => s.Items.Sum(i => i.Quantity * i.UnitPrice) - s.Payments.Sum(p => p.Amount))
-            .SumAsync();
+            .Where(s => s.CustomerId == invoice.CustomerId && s.Status == DocumentStatus.Posted)
+            .Select(s => s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice)
+                         - s.Payments.Sum(p => p.Amount)
+                         - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice)))
+            .SumAsync()
+            // Plus whatever is left of the customer's opening balance (see Customer.OpeningBalance).
+            + await db.Customers.Where(c => c.Id == invoice.CustomerId).Select(c => c.OpeningBalance).FirstAsync()
+            - (await db.Payments.Where(p => p.SalesInvoiceId == null && p.CustomerId == invoice.CustomerId)
+                .SumAsync(p => (decimal?)p.Amount) ?? 0);
 
         var company = await companySettings.GetAsync();
 

@@ -14,10 +14,16 @@
                     <dt class="col-4">Phone</dt><dd class="col-8">@Model.Phone</dd>
                     <dt class="col-4">Email</dt><dd class="col-8">@Model.Email</dd>
                     <dt class="col-4">Address</dt><dd class="col-8">@Model.Address</dd>
+                    @if (Model.OpeningBalance != 0)
+                    {
+                        <dt class="col-4">Opening Balance</dt>
+                        <dd class="col-8">@Math.Abs(Model.OpeningBalance).ToString("C") <span class="text-muted small">(@(Model.OpeningBalance > 0 ? "due" : "advance") as of @Model.OpeningBalanceDate?.ToString("MMM dd, yyyy"))</span></dd>
+                    }
                 </dl>
             </div>
             <div class="card-footer">
                 <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
+                <a asp-action="Ledger" asp-route-partyId="@Model.Id" class="btn btn-outline-primary btn-sm"><i class="fas fa-book"></i> Ledger</a>
                 @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
                 {
                     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
@@ -28,6 +34,10 @@
     <div class="col-md-7">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Purchase Invoices</h3></div>
+            @if (ViewData["WarehouseScoped"] is true)
+            {
+                <div class="alert alert-info py-2 px-3 mb-0 rounded-0 border-0 small"><i class="fas fa-circle-info me-1"></i>Invoices shown are limited to your assigned warehouse(s).</div>
+            }
             <div class="card-body p-0 table-responsive-card">
                 <table class="table table-striped mb-0">
                     <thead><tr><th>Invoice #</th><th>Date</th><th>Status</th><th class="text-end">Total</th></tr></thead>

@@ -48,12 +48,12 @@
             <tbody>
             @foreach (var t in Model)
             {
-                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = t.Id })">
+                <tr class="clickable-row" data-href="@Url.Action("Details", new { id = t.Id })" data-transfer-id="@t.Id">
                     <td><a asp-action="Details" asp-route-id="@t.Id" class="fw-semibold">@t.TransferNumber</a></td>
                     <td>@t.FromWarehouse?.Name</td>
                     <td>@t.ToWarehouse?.Name</td>
                     <td data-date="@t.Date.ToString("yyyy-MM-dd")">@t.Date.ToString("MMM dd, yyyy")</td>
-                    <td>
+                    <td class="status-cell">
                         @if (t.Status == DocumentStatus.Posted)
                         {
                             <span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>
@@ -63,7 +63,7 @@
                             <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>
                         }
                     </td>
-                    <td class="text-end">@t.Items.Count</td>
+                    <td class="text-end lines-cell">@t.Items.Count</td>
                 </tr>
             }
             </tbody>
@@ -78,12 +78,69 @@
 
 @section Scripts {
     <script>
-        document.getElementById('transferTable').addEventListener('click', function (e) {
-            if (e.target.closest('a, button, input')) return;
-            var row = e.target.closest('tr.clickable-row');
-            if (row && row.dataset.href) {
-                window.location.href = row.dataset.href;
+        (function () {
+            var tableEl = document.getElementById('transferTable');
+
+            tableEl.addEventListener('click', function (e) {
+                if (e.target.closest('a, button, input')) return;
+                var row = e.target.closest('tr.clickable-row');
+                if (row && row.dataset.href) {
+                    window.location.href = row.dataset.href;
+                }
+            });
+
+            function statusBadge(status) {
+                return status === 'Posted'
+                    ? '<span class="badge text-bg-success"><i class="fas fa-check-circle"></i> Posted</span>'
+                    : '<span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span>';
             }
-        });
+
+            function getDt() {
+                return (typeof jQuery !== 'undefined' && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(tableEl))
+                    ? jQuery(tableEl).DataTable()
+                    : null;
+            }
+
+            function flash(node) {
+                jQuery(node).addClass('table-info');
+                setTimeout(function () { jQuery(node).removeClass('table-info'); }, 1500);
+            }
+
+            // Live transfer updates pushed over SignalR (see _Layout.cshtml) — new transfers are
+            // inserted and existing ones patched in place via the DataTables API so sort/search
+            // state stays consistent, rather than mutating raw DOM rows behind DataTables' back.
+            window.addEventListener('app:data-update', function (e) {
+                var d = e.detail;
+                if (d.type !== 'StockTransferDoc') return;
+                var data = d.data;
+                var dt = getDt();
+                var existing = tableEl.querySelector('tbody tr[data-transfer-id="' + data.id + '"]');
+
+                if (existing) {
+                    existing.querySelector('.status-cell').innerHTML = statusBadge(data.status);
+                    existing.querySelector('.lines-cell').textContent = data.lineCount;
+                    if (dt) { dt.row(existing).invalidate(); dt.draw(false); }
+                    flash(existing);
+                    return;
+                }
+
+                var rowHtml =
+                    '<tr class="clickable-row" data-transfer-id="' + data.id + '" data-href="/StockTransfers/Details/' + data.id + '">' +
+                    '<td><a href="/StockTransfers/Details/' + data.id + '" class="fw-semibold">' + data.transferNumber + '</a></td>' +
+                    '<td>' + (data.fromWarehouseName || '') + '</td>' +
+                    '<td>' + (data.toWarehouseName || '') + '</td>' +
+                    '<td data-date="' + data.date + '">' + data.date + '</td>' +
+                    '<td class="status-cell">' + statusBadge(data.status) + '</td>' +
+                    '<td class="text-end lines-cell">' + data.lineCount + '</td>' +
+                    '</tr>';
+
+                if (dt) {
+                    var node = dt.row.add(jQuery(rowHtml)).draw(false).node();
+                    flash(node);
+                } else {
+                    tableEl.querySelector('tbody').prepend(jQuery(rowHtml)[0]);
+                }
+            });
+        })();
     </script>
 }

@@ -2,7 +2,8 @@
 @{
     ViewData["Title"] = "Products";
     var categoryList = (SelectList)ViewData["CategoryId"]!;
-    var scopedStock = ViewData["ScopedStock"] as Dictionary<int, decimal>;
+    var warehouses = (List<Warehouse>)ViewData["Warehouses"]!;
+    var warehouseScoped = ViewData["WarehouseScoped"] is true;
 }
 
 @section Toolbar {
@@ -28,37 +29,46 @@
             </div>
         </form>
     </div>
-    @if (scopedStock is not null)
+    @if (warehouseScoped)
     {
-        <div class="alert alert-info py-2 px-3 mb-0 rounded-0 border-0 small"><i class="fas fa-circle-info me-1"></i>Stock shown is limited to your assigned warehouse(s).</div>
+        <div class="alert alert-info py-2 px-3 mb-0 rounded-0 border-0 small"><i class="fas fa-circle-info me-1"></i>Warehouse choices and stock shown are limited to your assigned warehouse(s).</div>
     }
     <div class="card-body p-0 table-responsive-card">
-        <table class="table table-striped table-hover mb-0 data-table" id="productTable">
+        <table class="table table-striped table-hover mb-0 data-table" id="productTable" data-currency-symbol="@System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol">
             <thead>
                 <tr>
                     <th>SKU</th><th>Name</th><th data-filter="select">Category</th><th>Unit</th>
                     <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Last Cost</th>
                     <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Default Price</th>
-                    <th class="text-end">Stock</th><th data-filter="false"></th>
+                    <th data-filter="false">Warehouse</th>
+                    <th class="text-end" data-filter="false">Stock</th><th data-filter="false"></th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var p in Model)
             {
-                var stock = scopedStock is not null ? scopedStock.GetValueOrDefault(p.Id) : p.CurrentStock;
-                <tr class="clickable-row @(stock <= p.ReorderLevel ? "table-warning" : "")" data-href="@Url.Action("Details", new { id = p.Id })">
+                var stockByWarehouse = p.WarehouseStocks.ToDictionary(s => s.WarehouseId, s => s.Quantity);
+                var defaultWarehouseId = warehouses.Count > 0 ? warehouses[0].Id : 0;
+                var defaultStock = stockByWarehouse.GetValueOrDefault(defaultWarehouseId);
+                var stocksJson = System.Text.Json.JsonSerializer.Serialize(warehouses.ToDictionary(w => w.Id.ToString(), w => stockByWarehouse.GetValueOrDefault(w.Id)));
+                <tr class="clickable-row @(defaultStock <= p.ReorderLevel ? "table-warning" : "")" data-href="@Url.Action("Details", new { id = p.Id })" data-product-id="@p.Id">
                     <td>@p.Sku</td>
                     <td><a asp-action="Details" asp-route-id="@p.Id" class="fw-semibold">@p.Name</a></td>
                     <td>@p.Category?.Name</td>
                     <td>@p.UnitOfMeasure?.Symbol</td>
                     <td class="text-end">@p.CostPrice.ToString("C")</td>
-                    <td class="text-end">@p.SalePrice.ToString("C")</td>
+                    <td class="text-end price-value">@p.SalePrice.ToString("C")</td>
+                    <td>
+                        <select class="form-select form-select-sm warehouse-select" data-reorder-level="@p.ReorderLevel" data-stocks='@Html.Raw(stocksJson)'>
+                            @foreach (var w in warehouses)
+                            {
+                                <option value="@w.Id">@w.Name</option>
+                            }
+                        </select>
+                    </td>
                     <td class="text-end">
-                        @stock.ToString("0.##")
-                        @if (stock <= p.ReorderLevel)
-                        {
-                            <i class="fas fa-triangle-exclamation text-warning ms-1" title="At or below reorder level"></i>
-                        }
+                        <span class="stock-value">@defaultStock.ToString("0.##")</span>
+                        <i class="fas fa-triangle-exclamation text-warning ms-1 reorder-icon" title="At or below reorder level" hidden="@(defaultStock > p.ReorderLevel)"></i>
                     </td>
                     <td class="text-end">
                         @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
@@ -81,16 +91,84 @@
 <style>
     #productTable tbody tr.clickable-row { cursor: pointer; }
     #productTable tbody tr.clickable-row:hover { background-color: var(--bs-tertiary-bg); }
+    #productTable .warehouse-select { min-width: 10rem; }
 </style>
 
 @section Scripts {
     <script>
-        document.getElementById('productTable').addEventListener('click', function (e) {
-            if (e.target.closest('a, button, input, form')) return;
-            var row = e.target.closest('tr.clickable-row');
-            if (row && row.dataset.href) {
-                window.location.href = row.dataset.href;
+        (function () {
+            var table = document.getElementById('productTable');
+
+            function formatQty(n) {
+                n = Number(n) || 0;
+                return n.toFixed(2).replace(/\.?0+$/, '');
             }
-        });
+
+            function updateRow(select) {
+                var stocks = JSON.parse(select.dataset.stocks || '{}');
+                var reorderLevel = parseFloat(select.dataset.reorderLevel) || 0;
+                var qty = Number(stocks[select.value]) || 0;
+                var row = select.closest('tr');
+                var stockValue = row.querySelector('.stock-value');
+                var icon = row.querySelector('.reorder-icon');
+                if (stockValue) stockValue.textContent = formatQty(qty);
+                var atOrBelow = qty <= reorderLevel;
+                if (icon) icon.hidden = !atOrBelow;
+                row.classList.toggle('table-warning', atOrBelow);
+            }
+
+            table.querySelectorAll('select.warehouse-select').forEach(function (select) {
+                select.addEventListener('change', function () { updateRow(select); });
+                if (typeof jQuery !== 'undefined') {
+                    jQuery(select).on('select2:select select2:clear', function () { updateRow(select); });
+                }
+            });
+
+            table.addEventListener('click', function (e) {
+                if (e.target.closest('a, button, input, form, select, .select2-container')) return;
+                var row = e.target.closest('tr.clickable-row');
+                if (row && row.dataset.href) {
+                    window.location.href = row.dataset.href;
+                }
+            });
+
+            function flash(el) {
+                var row = el && el.closest('tr');
+                if (!row) return;
+                row.classList.add('table-info');
+                setTimeout(function () { row.classList.remove('table-info'); }, 1500);
+            }
+
+            function formatMoney(n) {
+                var symbol = table.dataset.currencySymbol || '';
+                return symbol + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            // Live price/stock updates pushed over SignalR (see _Layout.cshtml) — re-dispatched
+            // there as a plain DOM event so this page doesn't need to know about the hub connection.
+            window.addEventListener('app:data-update', function (e) {
+                var d = e.detail;
+                if (d.type === 'ProductPrice') {
+                    var row = table.querySelector('tr[data-product-id="' + d.data.productId + '"]');
+                    if (!row) return;
+                    var priceCell = row.querySelector('.price-value');
+                    if (priceCell) { priceCell.textContent = formatMoney(d.data.salePrice); flash(priceCell); }
+                } else if (d.type === 'StockChange') {
+                    (d.data.products || []).forEach(function (p) {
+                        var row = table.querySelector('tr[data-product-id="' + p.productId + '"]');
+                        if (!row) return;
+                        var select = row.querySelector('select.warehouse-select');
+                        if (!select) return;
+                        var stocks = JSON.parse(select.dataset.stocks || '{}');
+                        Object.keys(p.warehouseStocks || {}).forEach(function (wid) {
+                            stocks[wid] = p.warehouseStocks[wid];
+                        });
+                        select.dataset.stocks = JSON.stringify(stocks);
+                        updateRow(select);
+                        flash(select);
+                    });
+                }
+            });
+        })();
     </script>
 }

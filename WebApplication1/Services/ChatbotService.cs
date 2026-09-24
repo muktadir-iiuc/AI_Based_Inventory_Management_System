@@ -230,42 +230,84 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return match is null ? null : await db.Suppliers.FirstOrDefaultAsync(s => s.Id == match.Id);
     }
 
+    // Same opening-balance-plus-invoiced-minus-paid-minus-returned formula as
+    // Customer.OutstandingDue / the Customer Ledger - a sales return credits Accounts Receivable
+    // directly and never creates a refund Payment, so it has to be subtracted here too or the
+    // chatbot would overstate the due for any customer who has returned goods. The opening
+    // balance and payments against it aren't warehouse-scoped (same as the ledger).
     private async Task<ChatbotAnswer> CustomerDuesAnswerAsync(Models.Sales.Customer customer, List<int>? warehouseIds)
     {
         var invoices = await db.SalesInvoices.Include(s => s.Items).Include(s => s.Payments)
+            .Include(s => s.Returns).ThenInclude(r => r.Items)
             .Where(s => s.CustomerId == customer.Id && s.Status == DocumentStatus.Posted
                         && (warehouseIds == null || warehouseIds.Contains(s.WarehouseId)))
             .ToListAsync();
 
+        var openingPaid = await db.Payments
+            .Where(p => p.SalesInvoiceId == null && p.CustomerId == customer.Id)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
         var totalInvoiced = invoices.Sum(s => s.TotalAmount);
-        var totalPaid = invoices.Sum(s => s.Payments.Sum(p => p.Amount));
-        var due = totalInvoiced - totalPaid;
+        var totalPaid = invoices.Sum(s => s.Payments.Sum(p => p.Amount)) + openingPaid;
+        var totalReturned = invoices.Sum(s => s.Returns.Sum(r => r.TotalAmount));
+        var due = customer.OpeningBalance + totalInvoiced - totalPaid - totalReturned;
+        var breakdown = DuesBreakdown(customer.OpeningBalance, totalInvoiced, totalPaid, totalReturned);
 
         return new ChatbotAnswer
         {
             Text = due <= 0
-                ? $"{customer.Name} has no outstanding dues. Total invoiced {totalInvoiced:C}, paid {totalPaid:C}."
-                : $"{customer.Name} currently owes {due:C} (total invoiced {totalInvoiced:C}, paid {totalPaid:C})."
+                ? $"{customer.Name} has no outstanding dues. {breakdown}."
+                : $"{customer.Name} currently owes {due:C} ({breakdown})."
         };
     }
 
+    // Mirror of CustomerDuesAnswerAsync for the payable side: a purchase return debits
+    // Accounts Payable directly and never creates a refund Payment.
     private async Task<ChatbotAnswer> SupplierDuesAnswerAsync(Supplier supplier, List<int>? warehouseIds)
     {
         var invoices = await db.PurchaseInvoices.Include(p => p.Items).Include(p => p.Payments)
+            .Include(p => p.Returns).ThenInclude(r => r.Items)
             .Where(p => p.SupplierId == supplier.Id && p.Status == DocumentStatus.Posted
                         && (warehouseIds == null || warehouseIds.Contains(p.WarehouseId)))
             .ToListAsync();
 
+        var openingPaid = await db.Payments
+            .Where(p => p.PurchaseInvoiceId == null && p.SupplierId == supplier.Id)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
         var totalInvoiced = invoices.Sum(p => p.TotalAmount);
-        var totalPaid = invoices.Sum(p => p.Payments.Sum(pay => pay.Amount));
-        var due = totalInvoiced - totalPaid;
+        var totalPaid = invoices.Sum(p => p.Payments.Sum(pay => pay.Amount)) + openingPaid;
+        var totalReturned = invoices.Sum(p => p.Returns.Sum(r => r.TotalAmount));
+        var due = supplier.OpeningBalance + totalInvoiced - totalPaid - totalReturned;
+        var breakdown = DuesBreakdown(supplier.OpeningBalance, totalInvoiced, totalPaid, totalReturned);
 
         return new ChatbotAnswer
         {
             Text = due <= 0
-                ? $"We have no outstanding dues to {supplier.Name}. Total invoiced {totalInvoiced:C}, paid {totalPaid:C}."
-                : $"We currently owe {supplier.Name} {due:C} (total invoiced {totalInvoiced:C}, paid {totalPaid:C})."
+                ? $"We have no outstanding dues to {supplier.Name}. {breakdown}."
+                : $"We currently owe {supplier.Name} {due:C} ({breakdown})."
         };
+    }
+
+    // Opening balance and returns are only mentioned when nonzero, to keep the common case short.
+    private static string DuesBreakdown(decimal openingBalance, decimal totalInvoiced, decimal totalPaid, decimal totalReturned)
+    {
+        var parts = new List<string>();
+        if (openingBalance > 0)
+        {
+            parts.Add($"opening balance {openingBalance:C}");
+        }
+        else if (openingBalance < 0)
+        {
+            parts.Add($"opening advance {-openingBalance:C}");
+        }
+        parts.Add($"total invoiced {totalInvoiced:C}");
+        parts.Add($"paid {totalPaid:C}");
+        if (totalReturned > 0)
+        {
+            parts.Add($"returned {totalReturned:C}");
+        }
+        return string.Join(", ", parts);
     }
 
     private static string UnitLabel(Product product) => product.UnitOfMeasure?.Symbol ?? product.UnitOfMeasure?.Name ?? "unit(s)";

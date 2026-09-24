@@ -183,6 +183,66 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
         return entry;
     }
 
+    // Source reference shared by a party's opening-balance entry and any later reversal of it
+    // (e.g. on delete). Needs the party's saved Id, so the party must be saved before posting.
+    public static string CustomerOpeningBalanceReference(int customerId) => $"OB-CUS-{customerId}";
+    public static string SupplierOpeningBalanceReference(int supplierId) => $"OB-SUP-{supplierId}";
+
+    // A customer's opening balance is receivable that existed before the system did, so its
+    // other side is Owner's Equity (the same account the seeded opening capital uses). A
+    // negative balance is an advance received — the same entry with the sides swapped.
+    public async Task<JournalEntry> PostCustomerOpeningBalanceAsync(Customer customer)
+    {
+        var receivable = await GetAccountAsync(SystemAccountCodes.AccountsReceivable);
+        var equity = await GetAccountAsync(SystemAccountCodes.OwnersEquity);
+        var amount = Math.Abs(customer.OpeningBalance);
+        var isDue = customer.OpeningBalance > 0;
+
+        var entry = new JournalEntry
+        {
+            EntryNumber = await NextEntryNumberAsync(),
+            Date = customer.OpeningBalanceDate ?? DateTime.UtcNow.Date,
+            Description = $"Opening balance for customer {customer.Name}",
+            Source = JournalSource.OpeningBalance,
+            SourceReference = CustomerOpeningBalanceReference(customer.Id),
+            Lines =
+            [
+                new JournalEntryLine { AccountId = receivable.Id, Debit = isDue ? amount : 0, Credit = isDue ? 0 : amount, Memo = isDue ? "Opening receivable brought forward" : "Opening customer advance brought forward" },
+                new JournalEntryLine { AccountId = equity.Id, Debit = isDue ? 0 : amount, Credit = isDue ? amount : 0, Memo = "Opening balance equity" }
+            ]
+        };
+
+        db.JournalEntries.Add(entry);
+        return entry;
+    }
+
+    // Mirror of PostCustomerOpeningBalanceAsync on the payable side: a positive balance is
+    // money we owe the supplier (credits Accounts Payable), a negative one an advance we paid.
+    public async Task<JournalEntry> PostSupplierOpeningBalanceAsync(Supplier supplier)
+    {
+        var payable = await GetAccountAsync(SystemAccountCodes.AccountsPayable);
+        var equity = await GetAccountAsync(SystemAccountCodes.OwnersEquity);
+        var amount = Math.Abs(supplier.OpeningBalance);
+        var isDue = supplier.OpeningBalance > 0;
+
+        var entry = new JournalEntry
+        {
+            EntryNumber = await NextEntryNumberAsync(),
+            Date = supplier.OpeningBalanceDate ?? DateTime.UtcNow.Date,
+            Description = $"Opening balance for supplier {supplier.Name}",
+            Source = JournalSource.OpeningBalance,
+            SourceReference = SupplierOpeningBalanceReference(supplier.Id),
+            Lines =
+            [
+                new JournalEntryLine { AccountId = equity.Id, Debit = isDue ? amount : 0, Credit = isDue ? 0 : amount, Memo = "Opening balance equity" },
+                new JournalEntryLine { AccountId = payable.Id, Debit = isDue ? 0 : amount, Credit = isDue ? amount : 0, Memo = isDue ? "Opening payable brought forward" : "Opening supplier advance brought forward" }
+            ]
+        };
+
+        db.JournalEntries.Add(entry);
+        return entry;
+    }
+
     public async Task ReverseJournalEntriesForReferenceAsync(string sourceReference, string reason)
     {
         // !IsReversed matters when the same reference is reposted in place (an Edit) rather than

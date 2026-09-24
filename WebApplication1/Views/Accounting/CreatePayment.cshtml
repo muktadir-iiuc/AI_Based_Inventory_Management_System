@@ -3,6 +3,9 @@
     ViewData["Title"] = "New Payment / Receipt";
     var purchaseList = (SelectList)ViewData["PurchaseInvoices"]!;
     var salesList = (SelectList)ViewData["SalesInvoices"]!;
+    var openingCustomers = (SelectList)ViewData["OpeningCustomers"]!;
+    var openingSuppliers = (SelectList)ViewData["OpeningSuppliers"]!;
+    var isOut = Model.Direction == PaymentDirection.Out;
 }
 
 <form asp-action="CreatePayment" method="post" id="paymentForm">
@@ -18,11 +21,22 @@
                     <div class="mb-3">
                         <label class="form-label required-asterisk">Direction</label>
                         <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="Direction" id="dirIn" value="@((int)PaymentDirection.In)" checked>
+                            <input type="radio" class="btn-check" name="Direction" id="dirIn" value="@((int)PaymentDirection.In)" checked="@(!isOut)">
                             <label class="btn btn-outline-success" for="dirIn"><i class="fas fa-arrow-down"></i> Receive from Customer</label>
 
-                            <input type="radio" class="btn-check" name="Direction" id="dirOut" value="@((int)PaymentDirection.Out)">
+                            <input type="radio" class="btn-check" name="Direction" id="dirOut" value="@((int)PaymentDirection.Out)" checked="@isOut">
                             <label class="btn btn-outline-danger" for="dirOut"><i class="fas fa-arrow-up"></i> Pay to Supplier</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required-asterisk">Against</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="AgainstOpeningBalance" id="againstInvoice" value="false" checked="@(!Model.AgainstOpeningBalance)">
+                            <label class="btn btn-outline-secondary" for="againstInvoice"><i class="fas fa-file-invoice"></i> Invoice</label>
+
+                            <input type="radio" class="btn-check" name="AgainstOpeningBalance" id="againstOpening" value="true" checked="@Model.AgainstOpeningBalance">
+                            <label class="btn btn-outline-secondary" for="againstOpening"><i class="fas fa-scale-balanced"></i> Opening Balance</label>
                         </div>
                     </div>
 
@@ -60,6 +74,40 @@
                         </div>
                     </div>
 
+                    <div class="mb-3 d-none" id="customerOpeningGroup">
+                        <label asp-for="CustomerId" class="form-label">Customer</label>
+                        <select asp-for="CustomerId" asp-items="openingCustomers" class="form-select" id="customerOpeningSelect">
+                            <option value="">-- select customer with an opening balance due --</option>
+                        </select>
+                        <div class="alert alert-info py-2 small mt-2 mb-0 d-none" id="customerOpeningInfo">
+                            <dl class="row mb-0">
+                                <dt class="col-7 fw-normal">Opening Balance</dt>
+                                <dd class="col-5 text-end" id="customerOpeningAmount">0.00</dd>
+                                <dt class="col-7 fw-normal">Opening Balance Still Due</dt>
+                                <dd class="col-5 text-end" id="customerOpeningDue">0.00</dd>
+                                <dt class="col-7 fw-normal">Customer Total Outstanding</dt>
+                                <dd class="col-5 text-end fw-bold" id="customerOpeningOutstanding">0.00</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="supplierOpeningGroup">
+                        <label asp-for="SupplierId" class="form-label">Supplier</label>
+                        <select asp-for="SupplierId" asp-items="openingSuppliers" class="form-select" id="supplierOpeningSelect">
+                            <option value="">-- select supplier with an opening balance due --</option>
+                        </select>
+                        <div class="alert alert-info py-2 small mt-2 mb-0 d-none" id="supplierOpeningInfo">
+                            <dl class="row mb-0">
+                                <dt class="col-7 fw-normal">Opening Balance</dt>
+                                <dd class="col-5 text-end" id="supplierOpeningAmount">0.00</dd>
+                                <dt class="col-7 fw-normal">Opening Balance Still Due</dt>
+                                <dd class="col-5 text-end" id="supplierOpeningDue">0.00</dd>
+                                <dt class="col-7 fw-normal">Supplier Total Outstanding</dt>
+                                <dd class="col-5 text-end fw-bold" id="supplierOpeningOutstanding">0.00</dd>
+                            </dl>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label asp-for="Date" class="form-label required-asterisk"></label>
@@ -70,7 +118,7 @@
                             <input asp-for="Amount" class="form-control" type="number" step="0.01" min="0.01" id="amountInput" />
                             <span asp-validation-for="Amount" class="text-danger small"></span>
                             <div class="text-danger small d-none" id="amountExceedsWarning"></div>
-                            <div class="form-text">Pre-filled with the selected invoice's due amount — adjust for a partial payment, but it can't exceed what's still due.</div>
+                            <div class="form-text" id="amountHint">Pre-filled with the selected invoice's due amount — adjust for a partial payment, but it can't exceed what's still due.</div>
                         </div>
                     </div>
                     <div class="mb-0">
@@ -91,7 +139,7 @@
                         <span class="badge fs-6" id="directionBadge">Receive from Customer</span>
                     </div>
                     <dl class="row mb-0">
-                        <dt class="col-6 text-muted fw-normal">Invoice</dt>
+                        <dt class="col-6 text-muted fw-normal">Against</dt>
                         <dd class="col-6 text-end" id="summaryInvoice">&mdash;</dd>
                         <dt class="col-6 text-muted fw-normal">Party</dt>
                         <dd class="col-6 text-end" id="summaryParty">&mdash;</dd>
@@ -115,36 +163,133 @@
     <script>
         const dirIn = document.getElementById('dirIn');
         const dirOut = document.getElementById('dirOut');
-        const salesGroup = document.getElementById('salesInvoiceGroup');
-        const purchaseGroup = document.getElementById('purchaseInvoiceGroup');
+        const againstInvoice = document.getElementById('againstInvoice');
+        const againstOpening = document.getElementById('againstOpening');
         const directionBadge = document.getElementById('directionBadge');
         const amountInput = document.getElementById('amountInput');
+        const amountHint = document.getElementById('amountHint');
         const summaryInvoice = document.getElementById('summaryInvoice');
         const summaryParty = document.getElementById('summaryParty');
         const summaryAmount = document.getElementById('summaryAmount');
+        const amountWarning = document.getElementById('amountExceedsWarning');
+        const submitButton = document.querySelector('#paymentForm button[type="submit"]');
+        let amountManuallyEdited = false;
 
-        function toggle() {
-            if (dirIn.checked) {
-                salesGroup.classList.remove('d-none');
-                purchaseGroup.classList.add('d-none');
-                directionBadge.textContent = 'Receive from Customer';
-                directionBadge.className = 'badge fs-6 text-bg-success';
-            } else {
-                salesGroup.classList.add('d-none');
-                purchaseGroup.classList.remove('d-none');
-                directionBadge.textContent = 'Pay to Supplier';
-                directionBadge.className = 'badge fs-6 text-bg-danger';
+        // One entry per (direction, against) combination: which group/select is active, where
+        // its meta rows come from, and how to read "what's still due" off a meta row.
+        const sources = {
+            inInvoice: {
+                group: 'salesInvoiceGroup', select: 'salesInvoiceSelect', info: 'salesInvoiceInfo',
+                meta: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["SalesInvoiceMeta"])),
+                fields: { salesInvoiceAmount: r => r.InvoiceAmount, salesInvoiceDue: r => r.InvoiceDue, customerOutstanding: r => r.CustomerOutstanding },
+                due: r => r.InvoiceDue, party: r => r.CustomerName, label: sel => sel.text.split(' - ')[0],
+                dueName: "this invoice's due"
+            },
+            outInvoice: {
+                group: 'purchaseInvoiceGroup', select: 'purchaseInvoiceSelect', info: 'purchaseInvoiceInfo',
+                meta: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["PurchaseInvoiceMeta"])),
+                fields: { purchaseInvoiceAmount: r => r.InvoiceAmount, purchaseInvoiceDue: r => r.InvoiceDue, supplierOutstanding: r => r.SupplierOutstanding },
+                due: r => r.InvoiceDue, party: r => r.SupplierName, label: sel => sel.text.split(' - ')[0],
+                dueName: "this invoice's due"
+            },
+            inOpening: {
+                group: 'customerOpeningGroup', select: 'customerOpeningSelect', info: 'customerOpeningInfo',
+                meta: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["CustomerOpeningMeta"])),
+                fields: { customerOpeningAmount: r => r.OpeningBalance, customerOpeningDue: r => r.OpeningDue, customerOpeningOutstanding: r => r.CustomerOutstanding },
+                due: r => r.OpeningDue, party: r => r.CustomerName, label: () => 'Opening balance',
+                dueName: 'the remaining opening balance'
+            },
+            outOpening: {
+                group: 'supplierOpeningGroup', select: 'supplierOpeningSelect', info: 'supplierOpeningInfo',
+                meta: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["SupplierOpeningMeta"])),
+                fields: { supplierOpeningAmount: r => r.OpeningBalance, supplierOpeningDue: r => r.OpeningDue, supplierOpeningOutstanding: r => r.SupplierOutstanding },
+                due: r => r.OpeningDue, party: r => r.SupplierName, label: () => 'Opening balance',
+                dueName: 'the remaining opening balance'
             }
+        };
 
-            // Switching direction leaves behind an amount (and possibly an invoice pick) that
-            // belonged to the other invoice type — clear both back to a blank slate rather than
-            // carrying over a value that no longer corresponds to anything selected.
-            document.getElementById('salesInvoiceSelect').value = '';
-            document.getElementById('purchaseInvoiceSelect').value = '';
-            document.getElementById('salesInvoiceInfo').classList.add('d-none');
-            document.getElementById('purchaseInvoiceInfo').classList.add('d-none');
-            amountInput.value = '';
-            amountManuallyEdited = false;
+        function money(n) {
+            return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function activeKey() {
+            return (dirIn.checked ? 'in' : 'out') + (againstOpening.checked ? 'Opening' : 'Invoice');
+        }
+
+        function currentRow() {
+            const src = sources[activeKey()];
+            const id = parseInt(document.getElementById(src.select).value, 10);
+            return src.meta.find(m => m.Id === id);
+        }
+
+        // Re-checked against the same due figure shown in the info panel — the server always
+        // re-validates against a fresh read too, since due can change between page load and submit.
+        function validateAmount() {
+            const src = sources[activeKey()];
+            const row = currentRow();
+            const amount = parseFloat(amountInput.value) || 0;
+            const exceeds = !!row && amount > src.due(row);
+
+            amountInput.classList.toggle('is-invalid', exceeds);
+            amountWarning.classList.toggle('d-none', !exceeds);
+            if (exceeds) {
+                amountWarning.textContent = `Amount cannot exceed ${src.dueName} of ${money(src.due(row))}.`;
+            }
+            if (submitButton) {
+                submitButton.disabled = exceeds;
+            }
+            return !exceeds;
+        }
+
+        function updateSummary() {
+            const src = sources[activeKey()];
+            const row = currentRow();
+            const option = document.getElementById(src.select).selectedOptions[0];
+            summaryInvoice.textContent = row && option ? src.label(option) : '—';
+            summaryParty.textContent = row ? src.party(row) : '—';
+            summaryAmount.textContent = money(amountInput.value);
+            validateAmount();
+        }
+
+        function updateInfo(src) {
+            const info = document.getElementById(src.info);
+            const row = src.meta.find(m => m.Id === parseInt(document.getElementById(src.select).value, 10));
+            if (!row) {
+                info.classList.add('d-none');
+            } else {
+                Object.entries(src.fields).forEach(([id, get]) => document.getElementById(id).textContent = money(get(row)));
+                info.classList.remove('d-none');
+                if (!amountManuallyEdited) {
+                    amountInput.value = src.due(row).toFixed(2);
+                }
+            }
+            updateSummary();
+        }
+
+        // resetValues is false only on first load, so a form redisplayed after a server-side
+        // validation error keeps the user's direction, selection and amount.
+        function toggle(resetValues) {
+            const key = activeKey();
+            Object.entries(sources).forEach(([k, src]) => {
+                document.getElementById(src.group).classList.toggle('d-none', k !== key);
+                if (resetValues || k !== key) {
+                    // Only the visible select may submit a value — the server reads the one
+                    // matching Direction/AgainstOpeningBalance, but stale ones would confuse it.
+                    document.getElementById(src.select).value = '';
+                    document.getElementById(src.info).classList.add('d-none');
+                }
+            });
+
+            directionBadge.textContent = dirIn.checked ? 'Receive from Customer' : 'Pay to Supplier';
+            directionBadge.className = 'badge fs-6 ' + (dirIn.checked ? 'text-bg-success' : 'text-bg-danger');
+            amountHint.textContent = againstOpening.checked
+                ? "Pre-filled with what's left of the opening balance — adjust for a partial payment, but it can't exceed what's still due."
+                : "Pre-filled with the selected invoice's due amount — adjust for a partial payment, but it can't exceed what's still due.";
+
+            if (resetValues) {
+                amountInput.value = '';
+                amountManuallyEdited = false;
+            }
             amountInput.classList.remove('is-invalid');
             amountWarning.classList.add('d-none');
 
@@ -154,95 +299,36 @@
                 jQuery(el).select2('destroy');
             });
             initSelect2(document);
+            if (!resetValues) {
+                updateInfo(sources[key]);
+            }
             updateSummary();
         }
-        dirIn.addEventListener('change', toggle);
-        dirOut.addEventListener('change', toggle);
-
-        const salesInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["SalesInvoiceMeta"]));
-        const purchaseInvoiceMeta = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["PurchaseInvoiceMeta"]));
-        const amountWarning = document.getElementById('amountExceedsWarning');
-        const submitButton = document.querySelector('#paymentForm button[type="submit"]');
-        let amountManuallyEdited = false;
-
-        function money(n) {
-            return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        function currentInvoiceRow() {
-            const inSales = dirIn.checked;
-            const select = document.getElementById(inSales ? 'salesInvoiceSelect' : 'purchaseInvoiceSelect');
-            const meta = inSales ? salesInvoiceMeta : purchaseInvoiceMeta;
-            const id = parseInt(select.value, 10);
-            return meta.find(m => m.Id === id);
-        }
-
-        // Re-checked against the same due figure shown in the info panel — the server always
-        // re-validates against a fresh read too, since due can change between page load and submit.
-        function validateAmount() {
-            const row = currentInvoiceRow();
-            const amount = parseFloat(amountInput.value) || 0;
-            const exceeds = !!row && amount > row.InvoiceDue;
-
-            amountInput.classList.toggle('is-invalid', exceeds);
-            amountWarning.classList.toggle('d-none', !exceeds);
-            if (exceeds) {
-                amountWarning.textContent = `Amount cannot exceed this invoice's due of ${money(row.InvoiceDue)}.`;
-            }
-            if (submitButton) {
-                submitButton.disabled = exceeds;
-            }
-            return !exceeds;
-        }
-
-        function updateSummary() {
-            const row = currentInvoiceRow();
-            const select = document.getElementById(dirIn.checked ? 'salesInvoiceSelect' : 'purchaseInvoiceSelect');
-            summaryInvoice.textContent = select.selectedOptions[0]?.value ? select.selectedOptions[0].text.split(' - ')[0] : '—';
-            summaryParty.textContent = row ? (row.CustomerName || row.SupplierName) : '—';
-            summaryAmount.textContent = money(amountInput.value);
-            validateAmount();
-        }
+        [dirIn, dirOut, againstInvoice, againstOpening].forEach(el => el.addEventListener('change', () => toggle(true)));
 
         amountInput.addEventListener('input', () => {
             amountManuallyEdited = true;
             updateSummary();
         });
 
-        function wireInvoiceInfo(selectId, meta, infoId, amountId, dueId, partyOutstandingId) {
-            const select = document.getElementById(selectId);
-            const info = document.getElementById(infoId);
-
-            function update() {
-                const id = parseInt(select.value, 10);
-                const row = meta.find(m => m.Id === id);
-                if (!row) {
-                    info.classList.add('d-none');
-                    updateSummary();
-                    return;
-                }
-                document.getElementById(amountId).textContent = money(row.InvoiceAmount);
-                document.getElementById(dueId).textContent = money(row.InvoiceDue);
-                document.getElementById(partyOutstandingId).textContent = money(row.SupplierOutstanding ?? row.CustomerOutstanding);
-                info.classList.remove('d-none');
-
-                if (!amountManuallyEdited) {
-                    amountInput.value = row.InvoiceDue.toFixed(2);
-                }
-                updateSummary();
-            }
-
-            select.addEventListener('change', () => { amountManuallyEdited = false; update(); });
+        Object.values(sources).forEach(src => {
+            const select = document.getElementById(src.select);
+            const onPick = () => { amountManuallyEdited = false; updateInfo(src); };
+            select.addEventListener('change', onPick);
             if (typeof jQuery !== 'undefined') {
-                jQuery(select).on('select2:select select2:clear', () => { amountManuallyEdited = false; update(); });
+                // Bound on the <select> itself (where Select2 triggers these), so it survives
+                // toggle() destroying and recreating the Select2 widget.
+                jQuery(select).on('select2:select select2:clear', onPick);
             }
-            select.wireUpdate = update;
+        });
+
+        // A fresh page renders the model's default 0 — show it blank, as before. A redisplayed
+        // form keeps the user's amount rather than overwriting it with the due.
+        if (!(parseFloat(amountInput.value) > 0)) {
+            amountInput.value = '';
         }
-
-        wireInvoiceInfo('salesInvoiceSelect', salesInvoiceMeta, 'salesInvoiceInfo', 'salesInvoiceAmount', 'salesInvoiceDue', 'customerOutstanding');
-        wireInvoiceInfo('purchaseInvoiceSelect', purchaseInvoiceMeta, 'purchaseInvoiceInfo', 'purchaseInvoiceAmount', 'purchaseInvoiceDue', 'supplierOutstanding');
-
-        toggle();
+        amountManuallyEdited = amountInput.value !== '';
+        toggle(false);
     </script>
     <partial name="_ValidationScriptsPartial" />
 }

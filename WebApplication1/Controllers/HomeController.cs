@@ -157,6 +157,49 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
         return View(vm);
     }
 
+    // Recomputes just the stock-derived dashboard widgets, for the client to re-fetch when a
+    // SignalR ProductPrice/StockChange event arrives — avoids duplicating this aggregate math
+    // (reorder-level comparisons, batch-cost stock valuation) in JavaScript from a payload that
+    // only carries the products directly touched by one transfer/price edit.
+    [HttpGet]
+    public async Task<IActionResult> DashboardStockSummary()
+    {
+        var warehouseIds = User.GetWarehouseIds();
+
+        int lowStockCount;
+        int outOfStockCount;
+        decimal stockValue;
+
+        if (warehouseIds is not null)
+        {
+            lowStockCount = await db.ProductWarehouseStocks
+                .Include(s => s.Product)
+                .CountAsync(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel);
+            outOfStockCount = await db.ProductWarehouseStocks
+                .Include(s => s.Product)
+                .CountAsync(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= 0);
+            stockValue = await db.ProductBatches
+                .Where(b => warehouseIds.Contains(b.WarehouseId) && b.IsActive && b.Product!.IsActive)
+                .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
+        }
+        else
+        {
+            lowStockCount = await db.Products.CountAsync(p => p.IsActive && p.CurrentStock <= p.ReorderLevel);
+            outOfStockCount = await db.Products.CountAsync(p => p.IsActive && p.CurrentStock <= 0);
+            stockValue = await db.ProductBatches
+                .Where(b => b.IsActive && b.Product!.IsActive)
+                .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
+        }
+
+        int? pendingPriceReviewCount = null;
+        if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
+        {
+            pendingPriceReviewCount = await priceService.GetPendingMonthlyReviewCountAsync();
+        }
+
+        return Json(new { lowStockCount, outOfStockCount, stockValue, pendingPriceReviewCount });
+    }
+
     private async Task<decimal> GetBalanceAsync(string accountCode, bool debitPositive)
     {
         var account = await db.Accounts.Include(a => a.JournalEntryLines).FirstOrDefaultAsync(a => a.Code == accountCode);

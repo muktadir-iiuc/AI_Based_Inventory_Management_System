@@ -1,10 +1,20 @@
 /* The Sneat auth theme (lib/sneat) computes every primary-colored control (buttons, focus
    rings, checked checkboxes, links) from these CSS variables via color-mix(), so retargeting
    just the variables keeps the app's existing blue instead of Sneat's default violet without
-   touching any of Sneat's layout/spacing rules. */
-:root, [data-bs-theme="light"] {
+   touching any of Sneat's layout/spacing rules. --bs-primary/-rgb are the same in both
+   Bootstrap themes, so they're set unconditionally at :root. The three derived variants
+   (text-emphasis/bg-subtle/border-subtle) DO differ between themes and must be scoped to
+   [data-bs-theme="light"] only, NOT :root - :root always matches regardless of the current
+   theme attribute, so an unscoped rule here would clobber Bootstrap's own correct
+   [data-bs-theme="dark"] values (light-mode-appropriate navy text / pale-blue background would
+   otherwise bleed into dark mode). #0d6efd is Bootstrap's own stock primary, so its built-in
+   dark-theme variants already match without needing a dark override here. */
+:root {
     --bs-primary: #0d6efd;
     --bs-primary-rgb: 13, 110, 253;
+}
+
+[data-bs-theme="light"] {
     --bs-primary-text-emphasis: #052c65;
     --bs-primary-bg-subtle: #cfe2ff;
     --bs-primary-border-subtle: #9ec5fe;

@@ -8,4 +8,13 @@ public interface IActivityNotifier
     /// the triggering operation has already been committed to the database.
     /// </summary>
     Task NotifyAsync(string title, string message, string icon, IEnumerable<int> warehouseIds);
+
+    /// <summary>
+    /// Pushes a structured data-change event (as opposed to a human-readable toast) to the same
+    /// warehouse-scoped audience as <see cref="NotifyAsync"/>, so open pages can patch their own
+    /// tables/widgets in place instead of requiring a reload. <paramref name="type"/> is a short
+    /// tag ("ProductPrice", "StockChange", "StockTransferDoc") the client dispatches on to decide
+    /// what to update; <paramref name="data"/> is serialized as-is into the payload's `data` field.
+    /// </summary>
+    Task NotifyDataChangeAsync(string type, object data, IEnumerable<int> warehouseIds);
 }

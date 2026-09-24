@@ -2,17 +2,26 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.Extensions;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.PettyCash;
 using WebApplication1.Models.ViewModels;
 
 namespace WebApplication1.Controllers;
 
-[Authorize(Roles = Roles.AdminManagers)]
+// Every signed-in user can open Petty Cash (the app-wide fallback policy already requires
+// sign-in); only non-Viewer roles can change it. Entries are kept per warehouse and scoped the
+// same way as the rest of the app: a warehouse-restricted user only sees and records entries for
+// their assigned warehouse(s). The Names list is shared across all warehouses.
 public class PettyCashController(ApplicationDbContext db) : Controller
 {
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
+        ViewData["Warehouses"] = await AllowedWarehousesQuery()
+            .OrderBy(w => w.Name)
+            .Select(w => new PettyCashWarehouseOption(w.Id, w.Name))
+            .ToListAsync();
+        ViewData["CanEdit"] = CanEdit();
         return View();
     }
 
@@ -27,6 +36,7 @@ public class PettyCashController(ApplicationDbContext db) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = Roles.AllExceptViewer)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddName([FromBody] PettyCashNameRequest? request)
     {
@@ -48,18 +58,21 @@ public class PettyCashController(ApplicationDbContext db) : Controller
         return Json(new { ok = true, id = entity.Id, name = entity.Name });
     }
 
+    // Names are shared, so a name is only deletable once no warehouse uses it — the check counts
+    // entries in every warehouse, not just the caller's.
     [HttpPost]
+    [Authorize(Roles = Roles.AllExceptViewer)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteName(int id)
     {
-        var entity = await db.PettyCashNames.Include(n => n.Entries).FirstOrDefaultAsync(n => n.Id == id);
+        var entity = await db.PettyCashNames.FirstOrDefaultAsync(n => n.Id == id);
         if (entity is null)
         {
             return Json(new { ok = false, error = "Name not found." });
         }
-        if (entity.Entries.Count != 0)
+        if (await db.PettyCashEntries.AnyAsync(e => e.PettyCashNameId == id))
         {
-            return Json(new { ok = false, error = "Cannot delete a name that already has petty cash entries." });
+            return Json(new { ok = false, error = "Cannot delete a name that already has petty cash entries (in any warehouse)." });
         }
 
         db.PettyCashNames.Remove(entity);
@@ -68,15 +81,34 @@ public class PettyCashController(ApplicationDbContext db) : Controller
     }
 
     // Balance is a running cash-in-hand figure computed across the FULL chronological history
-    // (oldest first) so it stays meaningful regardless of which rows a filter then hides — the
-    // filter only decides which already-computed rows are returned, it never recomputes balance
-    // from a subset. Income/Expense/TotalBalance are the opposite: sums over just the filtered
-    // rows, since those headline figures are meant to answer "how did cash move in this filter".
+    // (oldest first) of the selected warehouse — or of all the caller's warehouses combined when
+    // none is picked — so it stays meaningful regardless of which rows a filter then hides. The
+    // date/name/type filters only decide which already-computed rows are returned; they never
+    // recompute balance from a subset. The warehouse choice is different: it picks WHICH cash
+    // book is being read, so it scopes the history the balance runs over. Income/Expense/
+    // TotalBalance are sums over just the filtered rows, since those headline figures answer
+    // "how did cash move in this filter".
     [HttpGet]
-    public async Task<IActionResult> Entries(DateTime? from, DateTime? to, int? nameId, int? type)
+    public async Task<IActionResult> Entries(int? warehouseId, DateTime? from, DateTime? to, int? nameId, int? type)
     {
-        var all = await db.PettyCashEntries
+        var query = db.PettyCashEntries.AsQueryable();
+        var allowedIds = User.GetWarehouseIds();
+        if (allowedIds is not null)
+        {
+            query = query.Where(e => allowedIds.Contains(e.WarehouseId));
+        }
+        if (warehouseId is > 0)
+        {
+            if (!User.IsWarehouseAllowed(warehouseId.Value))
+            {
+                return Json(new { rows = Array.Empty<object>(), totalIncome = 0m, totalExpense = 0m, totalBalance = 0m });
+            }
+            query = query.Where(e => e.WarehouseId == warehouseId.Value);
+        }
+
+        var all = await query
             .Include(e => e.PettyCashName)
+            .Include(e => e.Warehouse)
             .OrderBy(e => e.Date).ThenBy(e => e.Id)
             .ToListAsync();
 
@@ -103,6 +135,8 @@ public class PettyCashController(ApplicationDbContext db) : Controller
             sl = index + 1,
             id = l.Entry.Id,
             date = l.Entry.Date.ToString("yyyy-MM-dd"),
+            warehouseId = l.Entry.WarehouseId,
+            warehouse = l.Entry.Warehouse!.Name,
             nameId = l.Entry.PettyCashNameId,
             name = l.Entry.PettyCashName!.Name,
             type = (int)l.Entry.Type,
@@ -124,6 +158,7 @@ public class PettyCashController(ApplicationDbContext db) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = Roles.AllExceptViewer)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddEntry([FromBody] PettyCashEntryRequest? request)
     {
@@ -136,6 +171,7 @@ public class PettyCashController(ApplicationDbContext db) : Controller
         var entity = new PettyCashEntry
         {
             Date = request!.Date.Date,
+            WarehouseId = request.WarehouseId,
             PettyCashNameId = request.NameId,
             Type = (PettyCashType)request.Type,
             Amount = request.Amount,
@@ -147,6 +183,7 @@ public class PettyCashController(ApplicationDbContext db) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = Roles.AllExceptViewer)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateEntry(int id, [FromBody] PettyCashEntryRequest? request)
     {
@@ -156,13 +193,14 @@ public class PettyCashController(ApplicationDbContext db) : Controller
             return Json(new { ok = false, error });
         }
 
-        var entity = await db.PettyCashEntries.FindAsync(id);
+        var entity = await FindAllowedEntryAsync(id);
         if (entity is null)
         {
             return Json(new { ok = false, error = "Entry not found." });
         }
 
         entity.Date = request!.Date.Date;
+        entity.WarehouseId = request.WarehouseId;
         entity.PettyCashNameId = request.NameId;
         entity.Type = (PettyCashType)request.Type;
         entity.Amount = request.Amount;
@@ -171,10 +209,11 @@ public class PettyCashController(ApplicationDbContext db) : Controller
     }
 
     [HttpPost]
+    [Authorize(Roles = Roles.AllExceptViewer)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteEntry(int id)
     {
-        var entity = await db.PettyCashEntries.FindAsync(id);
+        var entity = await FindAllowedEntryAsync(id);
         if (entity is null)
         {
             return Json(new { ok = false, error = "Entry not found." });
@@ -185,10 +224,33 @@ public class PettyCashController(ApplicationDbContext db) : Controller
         return Json(new { ok = true });
     }
 
+    private bool CanEdit() =>
+        Roles.AllExceptViewer.Split(',').Any(User.IsInRole);
+
+    private IQueryable<Models.Inventory.Warehouse> AllowedWarehousesQuery()
+    {
+        var allowedIds = User.GetWarehouseIds();
+        var query = db.Warehouses.Where(w => w.IsActive);
+        return allowedIds is null ? query : query.Where(w => allowedIds.Contains(w.Id));
+    }
+
+    // An entry in a warehouse the caller isn't assigned to is treated as not found, so its
+    // existence doesn't leak either.
+    private async Task<PettyCashEntry?> FindAllowedEntryAsync(int id)
+    {
+        var entity = await db.PettyCashEntries.FindAsync(id);
+        return entity is not null && User.IsWarehouseAllowed(entity.WarehouseId) ? entity : null;
+    }
+
     private async Task<string?> ValidateEntryRequestAsync(PettyCashEntryRequest? request)
     {
         if (request is null) return "Invalid request.";
         if (request.Date == default) return "Select a date.";
+        if (request.WarehouseId <= 0 || !User.IsWarehouseAllowed(request.WarehouseId)
+            || !await AllowedWarehousesQuery().AnyAsync(w => w.Id == request.WarehouseId))
+        {
+            return "Select a warehouse you're assigned to.";
+        }
         if (request.Type != 0 && request.Type != 1) return "Select a valid type.";
         if (request.Amount <= 0) return "Enter an amount greater than zero.";
         if (!await db.PettyCashNames.AnyAsync(n => n.Id == request.NameId)) return "Select a valid name.";

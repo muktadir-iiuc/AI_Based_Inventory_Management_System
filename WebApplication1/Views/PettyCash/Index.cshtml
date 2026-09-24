@@ -1,6 +1,12 @@
 @{
     ViewData["Title"] = "Petty Cash";
     int[] denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+    var warehouses = (List<PettyCashWarehouseOption>)ViewData["Warehouses"]!;
+    var canEdit = (bool)ViewData["CanEdit"]!;
+    // Only a user with more than one warehouse gets a warehouse picker, filter and column — for
+    // everyone else there's just the one cash book, named in the entry card's header.
+    var multiWarehouse = warehouses.Count > 1;
+    var colspan = 6 + (multiWarehouse ? 1 : 0) + (canEdit ? 1 : 0);
 }
 
 <form id="antiForgeryForm">@Html.AntiForgeryToken()</form>
@@ -50,17 +56,43 @@
     </div>
 
     <div class="col-md-8">
+        @if (warehouses.Count == 0)
+        {
+            <div class="alert alert-warning">You aren't assigned to any active warehouse, so there's no petty cash book to show.</div>
+        }
+        @if (canEdit && warehouses.Count > 0)
+        {
         <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-cash-register text-primary me-2"></i>Petty Cash Entry</h3>
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0"><i class="fas fa-cash-register text-primary me-2"></i>Petty Cash Entry</h3>
+                @if (!multiWarehouse)
+                {
+                    <span class="badge text-bg-secondary"><i class="fas fa-warehouse me-1"></i>@warehouses[0].Name</span>
+                }
             </div>
             <div class="card-body">
                 <div class="row g-3 align-items-end">
+                    @if (multiWarehouse)
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold text-muted small text-uppercase">Warehouse</label>
+                            <select id="entryWarehouse" class="form-select" style="width:100%;">
+                                @foreach (var w in warehouses)
+                                {
+                                    <option value="@w.Id">@w.Name</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <input type="hidden" id="entryWarehouse" value="@warehouses[0].Id" />
+                    }
                     <div class="col-md-2">
                         <label class="form-label fw-semibold text-muted small text-uppercase">Date</label>
                         <input type="date" id="entryDate" class="form-control" />
                     </div>
-                    <div class="col-md-4">
+                    <div class="@(multiWarehouse ? "col-md-3" : "col-md-4")">
                         <label class="form-label fw-semibold text-muted small text-uppercase">Name</label>
                         <div class="d-flex align-items-stretch gap-1">
                             <select id="entryName" class="form-select" style="width:100%;"></select>
@@ -68,14 +100,14 @@
                             <button type="button" id="btnDeleteName" class="btn btn-outline-danger" title="Delete the selected name"><i class="fas fa-trash-alt"></i></button>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="@(multiWarehouse ? "col-md-2" : "col-md-3")">
                         <label class="form-label fw-semibold text-muted small text-uppercase">Type</label>
                         <select id="entryType" class="form-select" style="width:100%;">
                             <option value="0">Cash In (Income)</option>
                             <option value="1">Cash Out (Expense)</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="@(multiWarehouse ? "col-md-2" : "col-md-3")">
                         <label class="form-label fw-semibold text-muted small text-uppercase">Amount</label>
                         <div class="input-group">
                             <span class="input-group-text">৳</span>
@@ -94,10 +126,24 @@
                 <div class="text-danger small mt-2 d-none" id="entryError"></div>
             </div>
         </div>
+        }
 
         <div class="card mb-3">
             <div class="card-body">
                 <div class="row g-2 align-items-end">
+                    @if (multiWarehouse)
+                    {
+                        <div class="col-auto" style="min-width:12rem;">
+                            <label class="form-label small mb-1">Warehouse</label>
+                            <select id="filterWarehouse" class="form-select form-select-sm" style="width:100%;">
+                                <option value="">All My Warehouses</option>
+                                @foreach (var w in warehouses)
+                                {
+                                    <option value="@w.Id">@w.Name</option>
+                                }
+                            </select>
+                        </div>
+                    }
                     <div class="col-auto">
                         <label class="form-label small mb-1">From</label>
                         <input type="date" id="filterFrom" class="form-control form-control-sm" />
@@ -163,16 +209,23 @@
                             <tr>
                                 <th>SL</th>
                                 <th>Date</th>
+                                @if (multiWarehouse)
+                                {
+                                    <th>Warehouse</th>
+                                }
                                 <th>Name</th>
                                 <th>Type</th>
                                 <th class="text-end">Income</th>
                                 <th class="text-end">Expense</th>
                                 <th class="text-end">Balance</th>
-                                <th class="text-center">Action</th>
+                                @if (canEdit)
+                                {
+                                    <th class="text-center">Action</th>
+                                }
                             </tr>
                         </thead>
                         <tbody id="entryTableBody">
-                            <tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>
+                            <tr><td colspan="@colspan" class="text-center text-muted py-3">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -223,7 +276,13 @@
         (function () {
             const $ = jQuery;
             const token = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]').value;
+            // A Viewer's page has no entry card (and no Edit/Del column), so every entry-form
+            // element below is null for them and all entry-form wiring is skipped.
+            const canEdit = @Json.Serialize(canEdit);
+            const multiWarehouse = @Json.Serialize(multiWarehouse);
+            const colspan = @colspan;
 
+            const entryWarehouse = document.getElementById('entryWarehouse');
             const entryDate = document.getElementById('entryDate');
             const entryName = document.getElementById('entryName');
             const entryType = document.getElementById('entryType');
@@ -232,6 +291,7 @@
             const editingNotice = document.getElementById('editingNotice');
             const editingNoticeText = document.getElementById('editingNoticeText');
 
+            const filterWarehouse = document.getElementById('filterWarehouse');
             const filterFrom = document.getElementById('filterFrom');
             const filterTo = document.getElementById('filterTo');
             const filterName = document.getElementById('filterName');
@@ -272,16 +332,18 @@
             }
 
             function renderNameOptions() {
-                const entrySelected = entryName.value;
+                const entrySelected = entryName ? entryName.value : '';
                 const filterSelected = filterName.value;
 
-                entryName.innerHTML = '';
-                names.forEach(function (n) {
-                    const opt = document.createElement('option');
-                    opt.value = n.id;
-                    opt.textContent = n.name;
-                    entryName.appendChild(opt);
-                });
+                if (entryName) {
+                    entryName.innerHTML = '';
+                    names.forEach(function (n) {
+                        const opt = document.createElement('option');
+                        opt.value = n.id;
+                        opt.textContent = n.name;
+                        entryName.appendChild(opt);
+                    });
+                }
 
                 filterName.innerHTML = '<option value="">All Names</option>';
                 names.forEach(function (n) {
@@ -291,14 +353,16 @@
                     filterName.appendChild(opt);
                 });
 
-                if (names.some(function (n) { return String(n.id) === entrySelected; })) {
+                if (entryName && names.some(function (n) { return String(n.id) === entrySelected; })) {
                     entryName.value = entrySelected;
                 }
                 if (names.some(function (n) { return String(n.id) === filterSelected; })) {
                     filterName.value = filterSelected;
                 }
 
-                refreshSelect2(entryName);
+                if (entryName) {
+                    refreshSelect2(entryName);
+                }
                 refreshSelect2(filterName);
             }
 
@@ -324,7 +388,7 @@
                 return res.json();
             }
 
-            document.getElementById('btnAddName').addEventListener('click', async function () {
+            if (canEdit) document.getElementById('btnAddName').addEventListener('click', async function () {
                 const typed = (entryName.value || '').trim();
                 if (!typed) {
                     showError('Type a name in the Name box first.');
@@ -347,7 +411,7 @@
                 refreshSelect2(entryName);
             });
 
-            document.getElementById('btnDeleteName').addEventListener('click', async function () {
+            if (canEdit) document.getElementById('btnDeleteName').addEventListener('click', async function () {
                 const selected = entryName.value;
                 if (!selected || !isKnownNameId(selected)) {
                     showError('Select an existing name to delete.');
@@ -369,7 +433,7 @@
 
             function renderRows(rows) {
                 if (!rows.length) {
-                    tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No petty cash entries found.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="' + colspan + '" class="text-center text-muted py-3">No petty cash entries found.</td></tr>';
                     return;
                 }
 
@@ -380,15 +444,18 @@
                     return '<tr>' +
                         '<td>' + r.sl + '</td>' +
                         '<td>' + r.date + '</td>' +
+                        (multiWarehouse ? '<td>' + escapeHtml(r.warehouse) + '</td>' : '') +
                         '<td>' + escapeHtml(r.name) + '</td>' +
                         '<td>' + typeBadge + '</td>' +
                         '<td class="text-end">' + (r.income !== null ? money(r.income) : '-') + '</td>' +
                         '<td class="text-end">' + (r.expense !== null ? money(r.expense) : '-') + '</td>' +
                         '<td class="text-end">' + money(r.balance) + '</td>' +
-                        '<td class="text-center">' +
-                            '<button type="button" class="btn btn-sm btn-success btn-edit-entry" data-id="' + r.id + '" data-date="' + r.date + '" data-name-id="' + r.nameId + '" data-type="' + r.type + '" data-amount="' + (r.income !== null ? r.income : r.expense) + '">Edit</button> ' +
-                            '<button type="button" class="btn btn-sm btn-danger btn-del-entry" data-id="' + r.id + '">Del</button>' +
-                        '</td>' +
+                        (canEdit
+                            ? '<td class="text-center">' +
+                                '<button type="button" class="btn btn-sm btn-success btn-edit-entry" data-id="' + r.id + '" data-date="' + r.date + '" data-warehouse-id="' + r.warehouseId + '" data-name-id="' + r.nameId + '" data-type="' + r.type + '" data-amount="' + (r.income !== null ? r.income : r.expense) + '">Edit</button> ' +
+                                '<button type="button" class="btn btn-sm btn-danger btn-del-entry" data-id="' + r.id + '">Del</button>' +
+                              '</td>'
+                            : '') +
                     '</tr>';
                 }).join('');
 
@@ -408,6 +475,7 @@
 
             async function loadEntries() {
                 const params = new URLSearchParams();
+                if (filterWarehouse && filterWarehouse.value) params.set('warehouseId', filterWarehouse.value);
                 if (filterFrom.value) params.set('from', filterFrom.value);
                 if (filterTo.value) params.set('to', filterTo.value);
                 if (filterName.value) params.set('nameId', filterName.value);
@@ -425,6 +493,10 @@
             function startEdit(data) {
                 clearError();
                 editingEntryId = data.id;
+                entryWarehouse.value = data.warehouseId;
+                if (multiWarehouse) {
+                    refreshSelect2(entryWarehouse);
+                }
                 entryDate.value = data.date;
                 entryName.value = data.nameId;
                 refreshSelect2(entryName);
@@ -447,7 +519,7 @@
                 entryAmount.value = '';
             }
 
-            document.getElementById('btnCancelEdit').addEventListener('click', stopEdit);
+            if (canEdit) document.getElementById('btnCancelEdit').addEventListener('click', stopEdit);
 
             async function submitEntry() {
                 clearError();
@@ -459,6 +531,7 @@
                 }
 
                 const payload = {
+                    warehouseId: parseInt(entryWarehouse.value, 10),
                     date: entryDate.value,
                     nameId: parseInt(nameValue, 10),
                     type: parseInt(entryType.value, 10),
@@ -487,7 +560,7 @@
                 await loadEntries();
             }
 
-            entryAmount.addEventListener('keydown', function (e) {
+            if (canEdit) entryAmount.addEventListener('keydown', function (e) {
                 if (e.key !== 'Enter') return;
                 e.preventDefault();
                 submitEntry();
@@ -508,6 +581,10 @@
 
             document.getElementById('btnApplyFilter').addEventListener('click', loadEntries);
             document.getElementById('btnResetFilter').addEventListener('click', function () {
+                if (filterWarehouse) {
+                    filterWarehouse.value = '';
+                    refreshSelect2(filterWarehouse);
+                }
                 filterFrom.value = '';
                 filterTo.value = '';
                 filterName.value = '';
@@ -517,11 +594,24 @@
                 loadEntries();
             });
 
-            entryDate.value = todayIso();
+            if (canEdit) {
+                entryDate.value = todayIso();
+            }
 
             (async function init() {
                 await loadNames();
-                refreshSelect2(entryType);
+                if (canEdit) {
+                    refreshSelect2(entryType);
+                    if (multiWarehouse) {
+                        refreshSelect2(entryWarehouse);
+                    }
+                }
+                if (filterWarehouse) {
+                    refreshSelect2(filterWarehouse);
+                    // Switching to a different cash book is a bigger change than the other
+                    // filters, so it applies straight away instead of waiting for "Apply".
+                    $(filterWarehouse).on('change', loadEntries); // Select2 raises this jQuery change on pick
+                }
                 refreshSelect2(filterType);
                 await loadEntries();
             })();

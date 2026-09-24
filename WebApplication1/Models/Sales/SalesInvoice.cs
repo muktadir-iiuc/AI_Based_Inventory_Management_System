@@ -32,6 +32,10 @@ public class SalesInvoice
 
     public ICollection<SalesInvoiceItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
+
+    // Inverse of SalesReturn.SalesInvoice - lets OutstandingDue-style calculations net off
+    // returns without a separate query. See Customer.OutstandingDue.
+    public ICollection<SalesReturn> Returns { get; set; } = [];
 }
 
 public class SalesInvoiceItem

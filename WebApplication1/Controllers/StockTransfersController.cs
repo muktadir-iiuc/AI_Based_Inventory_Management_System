@@ -72,18 +72,10 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         {
             ModelState.AddModelError(nameof(model.FromWarehouseId), "Please select a source warehouse.");
         }
-        else if (!User.IsWarehouseAllowed(model.FromWarehouseId))
-        {
-            ModelState.AddModelError(nameof(model.FromWarehouseId), "You are not assigned to this warehouse.");
-        }
 
         if (!await db.Warehouses.AnyAsync(w => w.Id == model.ToWarehouseId))
         {
             ModelState.AddModelError(nameof(model.ToWarehouseId), "Please select a destination warehouse.");
-        }
-        else if (!User.IsWarehouseAllowed(model.ToWarehouseId))
-        {
-            ModelState.AddModelError(nameof(model.ToWarehouseId), "You are not assigned to this warehouse.");
         }
 
         var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
@@ -147,6 +139,8 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             $"{transfer.TransferNumber} — {transfer.Items.Count} line(s) moved from {fromName} to {toName}.",
             "fas fa-truck-ramp-box text-warning",
             [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+        await NotifyStockChangeAsync(transfer.Items.Select(i => i.ProductId), [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+        await NotifyTransferDocAsync(transfer, fromName, toName);
 
         TempData["Success"] = $"Stock transfer {transfer.TransferNumber} posted.";
         return RedirectToAction(nameof(Details), new { id = transfer.Id });
@@ -177,6 +171,8 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             $"{transfer.TransferNumber} was cancelled and reversed.",
             "fas fa-ban text-danger",
             [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+        await NotifyStockChangeAsync(transfer.Items.Select(i => i.ProductId), [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+        await NotifyTransferDocAsync(transfer);
 
         TempData["Success"] = $"Stock transfer {transfer.TransferNumber} cancelled and reversed.";
         return RedirectToAction(nameof(Details), new { id });
@@ -249,18 +245,10 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         {
             ModelState.AddModelError(nameof(model.FromWarehouseId), "Please select a source warehouse.");
         }
-        else if (!User.IsWarehouseAllowed(model.FromWarehouseId))
-        {
-            ModelState.AddModelError(nameof(model.FromWarehouseId), "You are not assigned to this warehouse.");
-        }
 
         if (!await db.Warehouses.AnyAsync(w => w.Id == model.ToWarehouseId))
         {
             ModelState.AddModelError(nameof(model.ToWarehouseId), "Please select a destination warehouse.");
-        }
-        else if (!User.IsWarehouseAllowed(model.ToWarehouseId))
-        {
-            ModelState.AddModelError(nameof(model.ToWarehouseId), "You are not assigned to this warehouse.");
         }
 
         if (!ModelState.IsValid)
@@ -273,6 +261,9 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         // Reverse this transfer's own stock effect first — the availability check just below
         // sees the restored quantity immediately (EF resolves the same tracked
         // ProductWarehouseStock instances by identity rather than re-reading stale DB values).
+        var oldFromWarehouseId = transfer.FromWarehouseId;
+        var oldToWarehouseId = transfer.ToWarehouseId;
+        var oldProductIds = transfer.Items.Select(i => i.ProductId).ToList();
         foreach (var item in transfer.Items)
         {
             item.IsCurrent = false;
@@ -335,6 +326,11 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
             "fas fa-pen text-info",
             [transfer.FromWarehouseId, transfer.ToWarehouseId]);
 
+        var touchedProductIds = oldProductIds.Concat(transfer.Items.Where(i => i.IsCurrent).Select(i => i.ProductId));
+        var touchedWarehouseIds = new[] { oldFromWarehouseId, oldToWarehouseId, transfer.FromWarehouseId, transfer.ToWarehouseId };
+        await NotifyStockChangeAsync(touchedProductIds, touchedWarehouseIds);
+        await NotifyTransferDocAsync(transfer, fromName, toName);
+
         TempData["Success"] = $"Stock transfer {transfer.TransferNumber} updated.";
         return RedirectToAction(nameof(Details), new { id });
     }
@@ -368,20 +364,61 @@ public class StockTransfersController(ApplicationDbContext db, IStockService sto
         return null;
     }
 
+    // Broadcasts the authoritative post-save stock figures for every affected product so open
+    // pages (Products Index/Details) can patch their own displayed quantities instead of relying
+    // on the recipient's page being reloaded. Sends absolute new values, not deltas — deltas would
+    // require the client to already know the pre-change quantity, which it may not if it only
+    // just opened the page or if it's not tracking every warehouse shown here.
+    private async Task NotifyStockChangeAsync(IEnumerable<int> productIds, IEnumerable<int> warehouseIds)
+    {
+        var productIdList = productIds.Distinct().ToList();
+        var warehouseIdList = warehouseIds.Distinct().ToList();
+
+        var products = await db.Products
+            .Where(p => productIdList.Contains(p.Id))
+            .Select(p => new { p.Id, p.CurrentStock })
+            .ToListAsync();
+        var stocks = await db.ProductWarehouseStocks
+            .Where(s => productIdList.Contains(s.ProductId) && warehouseIdList.Contains(s.WarehouseId))
+            .ToListAsync();
+
+        var payloadProducts = products.Select(p => new
+        {
+            productId = p.Id,
+            currentStock = p.CurrentStock,
+            warehouseStocks = stocks.Where(s => s.ProductId == p.Id).ToDictionary(s => s.WarehouseId.ToString(), s => s.Quantity)
+        });
+
+        await notifier.NotifyDataChangeAsync("StockChange", new { products = payloadProducts }, warehouseIdList);
+    }
+
+    // fromName/toName are only needed by the client when it has to insert a brand-new row (a
+    // freshly posted transfer it doesn't have yet) — Cancel/Edit only ever touch a row already on
+    // the page, so they can omit them.
+    private Task NotifyTransferDocAsync(StockTransfer transfer, string? fromName = null, string? toName = null)
+    {
+        return notifier.NotifyDataChangeAsync("StockTransferDoc", new
+        {
+            id = transfer.Id,
+            transferNumber = transfer.TransferNumber,
+            fromWarehouseId = transfer.FromWarehouseId,
+            fromWarehouseName = fromName,
+            toWarehouseId = transfer.ToWarehouseId,
+            toWarehouseName = toName,
+            date = transfer.Date.ToString("yyyy-MM-dd"),
+            status = transfer.Status.ToString(),
+            lineCount = transfer.Items.Count(i => i.IsCurrent)
+        }, [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+    }
+
+    // Both From and To Warehouse dropdowns always list every warehouse — including inactive ones,
+    // since a transfer is often exactly how remaining stock gets moved OUT of a warehouse that's
+    // been deactivated — and regardless of the user's own assignment. This is deliberately unscoped
+    // and unfiltered here, unlike every other warehouse-facing dropdown in the app.
     private async Task PopulateDropdownsAsync()
     {
-        var warehouseIds = User.GetWarehouseIds();
-        var warehouses = db.Warehouses.Where(w => w.IsActive).AsQueryable();
-        if (warehouseIds is not null)
-        {
-            warehouses = warehouses.Where(w => warehouseIds.Contains(w.Id));
-        }
-
-        var singleWarehouseId = warehouseIds is { Count: 1 } ids ? ids[0] : (int?)null;
-
-        ViewData["Warehouses"] = new SelectList(await warehouses.OrderBy(w => w.Name).ToListAsync(), "Id", "Name");
-        ViewData["WarehouseScoped"] = singleWarehouseId.HasValue;
-        ViewData["ScopedWarehouseId"] = singleWarehouseId;
+        var warehouses = await db.Warehouses.OrderBy(w => w.Name).ToListAsync();
+        ViewData["Warehouses"] = new SelectList(warehouses, "Id", "Name");
 
         // Show stock for the scoped/source warehouse in the picker; for unscoped users this
         // reflects whichever warehouse they currently have selected as "From" on the client.

@@ -41,6 +41,12 @@ public class PaymentCreateViewModel
     public int? PurchaseInvoiceId { get; set; }
     public int? SalesInvoiceId { get; set; }
 
+    // When true the payment settles the party's opening balance instead of an invoice, and
+    // CustomerId (receipt) / SupplierId (payment out) identify whose.
+    public bool AgainstOpeningBalance { get; set; }
+    public int? CustomerId { get; set; }
+    public int? SupplierId { get; set; }
+
     public string? Notes { get; set; }
 }
 

@@ -11,6 +11,8 @@ public interface IAccountingService
     Task<JournalEntry> PostSalesReturnAsync(SalesReturn salesReturn);
     Task<JournalEntry> PostPurchaseReturnAsync(PurchaseReturn purchaseReturn);
     Task<JournalEntry> PostPaymentAsync(Payment payment);
+    Task<JournalEntry> PostCustomerOpeningBalanceAsync(Customer customer);
+    Task<JournalEntry> PostSupplierOpeningBalanceAsync(Supplier supplier);
     Task ReverseJournalEntriesForReferenceAsync(string sourceReference, string reason);
     Task<List<TrialBalanceRow>> GetTrialBalanceAsync();
     Task<List<JournalEntryLine>> GetLedgerAsync(int accountId);

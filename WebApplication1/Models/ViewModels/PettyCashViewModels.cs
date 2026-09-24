@@ -8,7 +8,10 @@ public class PettyCashNameRequest
 public class PettyCashEntryRequest
 {
     public DateTime Date { get; set; }
+    public int WarehouseId { get; set; }
     public int NameId { get; set; }
     public int Type { get; set; }
     public decimal Amount { get; set; }
 }
+
+public record PettyCashWarehouseOption(int Id, string Name);

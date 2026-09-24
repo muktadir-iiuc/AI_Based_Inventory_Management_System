@@ -38,6 +38,34 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">Opening Balance</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="OpeningBalance" class="form-label">Amount</label>
+                            <input asp-for="OpeningBalance" class="form-control" type="number" step="0.01" min="0" id="openingAmountInput" />
+                            <span asp-validation-for="OpeningBalance" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="OpeningBalanceIsAdvance" class="form-label">Type</label>
+                            <select asp-for="OpeningBalanceIsAdvance" class="form-select" id="openingTypeSelect">
+                                <option value="False">Due — customer owes us</option>
+                                <option value="True">Advance — customer paid us in advance</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="OpeningBalanceDate" class="form-label">As of Date</label>
+                            <input asp-for="OpeningBalanceDate" class="form-control" type="date" value="@((Model.OpeningBalanceDate ?? DateTime.Today).ToString("yyyy-MM-dd"))" />
+                            <span asp-validation-for="OpeningBalanceDate" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="form-text mb-0">Optional. Any balance this customer already had before being added here — it becomes the first line of their Customer Ledger and counts toward their outstanding due. Leave 0 if there's none.</div>
+                </div>
+            </div>
         </div>
 
         <div class="col-lg-4">
@@ -49,6 +77,7 @@
                     <div class="text-muted small mb-1">This customer will appear as</div>
                     <div class="fw-semibold fs-5" id="namePreview">Customer name</div>
                     <div class="text-muted small" id="contactPreview"></div>
+                    <div class="small mt-2 d-none" id="openingPreview"></div>
                     <hr />
                     <div class="small text-muted">
                         Once saved, you can raise sales invoices against this customer and track their outstanding due from the Customers list.
@@ -73,13 +102,26 @@
             const namePreview = document.getElementById('namePreview');
             const contactPreview = document.getElementById('contactPreview');
 
+            const openingAmountInput = document.getElementById('openingAmountInput');
+            const openingTypeSelect = document.getElementById('openingTypeSelect');
+            const openingPreview = document.getElementById('openingPreview');
+
             function updatePreview() {
                 namePreview.textContent = nameInput.value.trim() || 'Customer name';
                 const parts = [contactInput.value.trim(), phoneInput.value.trim(), emailInput.value.trim()].filter(Boolean);
                 contactPreview.textContent = parts.join(' · ');
+
+                const amount = parseFloat(openingAmountInput.value) || 0;
+                const isAdvance = openingTypeSelect.value === 'True';
+                openingPreview.className = 'small mt-2 fw-semibold ' + (amount <= 0 ? 'd-none' : isAdvance ? 'text-success' : 'text-danger');
+                openingPreview.textContent = `Opening ${isAdvance ? 'advance' : 'due'}: ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
 
-            [nameInput, contactInput, phoneInput, emailInput].forEach(el => el.addEventListener('input', updatePreview));
+            [nameInput, contactInput, phoneInput, emailInput, openingAmountInput].forEach(el => el.addEventListener('input', updatePreview));
+            openingTypeSelect.addEventListener('change', updatePreview);
+            if (typeof jQuery !== 'undefined') {
+                jQuery(openingTypeSelect).on('select2:select', updatePreview);
+            }
             updatePreview();
         })();
     </script>
