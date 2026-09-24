@@ -100,7 +100,7 @@
                         var stock = available.GetValueOrDefault(item.ProductId);
                         var short_ = isPending && isDecrease && item.Quantity > stock;
                         <tr class="@(short_ ? "table-danger" : "")">
-                            <td>@item.Product?.Sku — @item.Product?.Name</td>
+                            <td>@item.Product?.Sku — @string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v)))</td>
                             <td>
                                 @if (isDecrease) { <span class="badge text-bg-danger"><i class="fas fa-arrow-down"></i> Decrease</span> }
                                 else { <span class="badge text-bg-success"><i class="fas fa-arrow-up"></i> Increase</span> }
