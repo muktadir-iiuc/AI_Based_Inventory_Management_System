@@ -53,7 +53,7 @@
                     @foreach (var item in Model.Items)
                     {
                         <tr>
-                            <td>@item.Product?.Name <small class="text-muted">(@item.Product?.Sku)</small></td>
+                            <td>@string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))) <small class="text-muted">(@item.Product?.Sku)</small></td>
                             <td class="text-end">@item.Quantity.ToString("0.##")</td>
                             <td class="text-end">@item.UnitPrice.ToString("C")</td>
                             <td class="text-end">@item.LineTotal.ToString("C")</td>
