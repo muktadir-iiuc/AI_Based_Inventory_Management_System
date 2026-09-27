@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Extensions;
+using WebApplication1.Models.Accounting;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.ViewModels;
@@ -84,7 +85,7 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
         {
             rows.Add(new PartyLedgerRow
             {
-                Date = supplier.OpeningBalanceDate ?? supplier.CreatedAt.Date,
+                Date = (supplier.OpeningBalanceDate ?? supplier.CreatedAt).WithTime(supplier.CreatedAt),
                 DocumentType = "Opening Balance",
                 DocumentNumber = "—",
                 Description = supplier.OpeningBalance > 0 ? "Balance brought forward" : "Advance brought forward",
@@ -103,7 +104,7 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
 
         rows.AddRange(invoices.Select(inv => new PartyLedgerRow
         {
-            Date = inv.Date,
+            Date = inv.Date.WithTime(inv.CreatedAt),
             DocumentType = "Purchase Invoice",
             DocumentNumber = inv.InvoiceNumber,
             Description = inv.Warehouse?.Name,
@@ -122,7 +123,7 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
 
         rows.AddRange(returns.Select(ret => new PartyLedgerRow
         {
-            Date = ret.Date,
+            Date = ret.Date.WithTime(ret.CreatedAt),
             DocumentType = "Purchase Return",
             DocumentNumber = ret.ReturnNumber,
             Description = $"Against {ret.PurchaseInvoice?.InvoiceNumber}",
@@ -141,15 +142,16 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
                          && p.PurchaseInvoice.Status == DocumentStatus.Posted
                          && (warehouseIds == null || warehouseIds.Contains(p.PurchaseInvoice!.WarehouseId)))
                         || (p.PurchaseInvoiceId == null && p.SupplierId == supplier.Id))
-            .Select(p => new { p.Date, p.PaymentNumber, p.Amount, InvoiceNumber = p.PurchaseInvoice != null ? p.PurchaseInvoice.InvoiceNumber : null })
+            .Select(p => new { p.Date, p.CreatedAt, p.Method, p.BankName, p.PaymentNumber, p.Amount, InvoiceNumber = p.PurchaseInvoice != null ? p.PurchaseInvoice.InvoiceNumber : null })
             .ToListAsync();
 
         rows.AddRange(payments.Select(p => new PartyLedgerRow
         {
-            Date = p.Date,
+            Date = p.Date.WithTime(p.CreatedAt),
             DocumentType = "Payment Made",
             DocumentNumber = p.PaymentNumber,
-            Description = p.InvoiceNumber is null ? "Against opening balance" : $"Against {p.InvoiceNumber}",
+            Description = p.InvoiceNumber is null ? "Opening balance / advance" : $"Against {p.InvoiceNumber}",
+            PaymentMethod = PaymentMethods.Describe(p.Method, p.BankName),
             Debit = p.Amount,
             TypeRank = 2
         }));
@@ -165,15 +167,15 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
     }
 
     // Record a payment straight from the ledger: not tied to an invoice, but to what this party
-    // owes in total. The amount is applied oldest-first (see IPartyPaymentService) and can't
-    // exceed the current due the ledger shows for this user's warehouse scope.
+    // owes in total. The amount is applied oldest-first (see IPartyPaymentService); there is no
+    // upper limit - anything beyond the current due is kept as an advance.
     [HttpPost]
     [Authorize(Roles = Roles.AccountingManagers)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> MakePayment(int partyId, decimal amount, DateTime? date, string? notes, string? returnUrl)
+    public async Task<IActionResult> MakePayment(int partyId, decimal amount, DateTime? date, PaymentMethod method, string? bankName, string? notes, string? returnUrl)
     {
         var result = await partyPayments.RecordAsync(PartyLedgerType.Supplier, partyId, amount, date ?? DateTime.UtcNow.Date,
-            notes, User.GetWarehouseIds(), User.Identity?.Name);
+            method, bankName, notes, User.GetWarehouseIds(), User.Identity?.Name);
 
         if (result.Ok)
         {

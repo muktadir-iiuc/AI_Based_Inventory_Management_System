@@ -17,7 +17,7 @@
             @foreach (var h in Model)
             {
                 <tr>
-                    <td>@h.ChangedAt.ToString("dd-MMM-yyyy hh:mm tt")</td>
+                    <td>@h.ChangedAt.ToLocalTime().ToDateTimeText()</td>
                     <td class="text-end">@h.OldPrice.ToString("C")</td>
                     <td class="text-end">@h.NewPrice.ToString("C")</td>
                     <td>@(h.ChangedByUser?.FullName ?? "Unknown")</td>

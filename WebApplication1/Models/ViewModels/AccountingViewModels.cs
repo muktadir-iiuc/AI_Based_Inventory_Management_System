@@ -47,8 +47,17 @@ public class PaymentCreateViewModel
     public int? CustomerId { get; set; }
     public int? SupplierId { get; set; }
 
+    public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+
+    // Required when Method = Bank.
+    public string? BankName { get; set; }
+
     public string? Notes { get; set; }
 }
+
+// Drives Views/Shared/_PaymentMethodFields: the posted field names, current values and a
+// prefix that keeps element ids unique when several forms share a page.
+public record PaymentMethodFieldsModel(string MethodField, string BankField, PaymentMethod Method, string? BankName, string IdPrefix, string ColumnClass = "col-md-6");
 
 public class LedgerViewModel
 {

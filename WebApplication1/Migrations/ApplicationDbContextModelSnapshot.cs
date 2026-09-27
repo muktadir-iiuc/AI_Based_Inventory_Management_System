@@ -254,6 +254,10 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -267,6 +271,9 @@ namespace WebApplication1.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Direction")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Method")
                         .HasColumnType("int");
 
                     b.Property<string>("Notes")

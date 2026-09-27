@@ -81,7 +81,7 @@
                     <td><a asp-action="Details" asp-route-id="@t.Id" class="fw-semibold">@t.TransferNumber</a></td>
                     <td>@t.FromWarehouse?.Name</td>
                     <td>@t.ToWarehouse?.Name</td>
-                    <td data-date="@t.Date.ToString("yyyy-MM-dd")">@t.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@t.Date.ToString("yyyy-MM-dd")">@t.Date.ToDateTimeText(t.CreatedAt)</td>
                     <td class="status-cell">
                         @switch (t.DisplayStatus)
                         {
@@ -233,7 +233,7 @@
                     '<td><a href="/StockTransfers/Details/' + data.id + '" class="fw-semibold">' + data.transferNumber + '</a></td>' +
                     '<td>' + (data.fromWarehouseName || '') + '</td>' +
                     '<td>' + (data.toWarehouseName || '') + '</td>' +
-                    '<td data-date="' + data.date + '">' + data.date + '</td>' +
+                    '<td data-date="' + data.date + '">' + data.dateText + '</td>' +
                     '<td class="status-cell">' + statusBadge(data.status) + '</td>' +
                     '<td class="text-end lines-cell">' + data.lineCount + '</td>' +
                     (tableEl.querySelector('thead th:last-child').textContent.trim() === 'Actions'

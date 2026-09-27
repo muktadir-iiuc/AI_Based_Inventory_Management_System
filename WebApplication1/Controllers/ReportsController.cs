@@ -151,7 +151,7 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
             {
                 Id = s.Id,
                 InvoiceNumber = s.InvoiceNumber,
-                Date = s.Date,
+                Date = s.Date.WithTime(s.CreatedAt),
                 CustomerName = s.Customer?.Name ?? string.Empty,
                 WarehouseName = s.Warehouse?.Name ?? string.Empty,
                 Discount = s.DiscountAmount,
@@ -219,6 +219,7 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
             .Select(i => new SalesProfitabilityRow
             {
                 Date = i.SalesInvoice!.Date,
+                CreatedAt = i.SalesInvoice!.CreatedAt,
                 InvoiceNumber = i.SalesInvoice!.InvoiceNumber,
                 ProductName = i.Product!.Name,
                 BatchNumber = i.Batch != null ? i.Batch.BatchNumber : null,

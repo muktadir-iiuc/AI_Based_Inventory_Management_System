@@ -42,17 +42,18 @@
 <div class="card">
     <div class="card-body p-0 table-responsive-card">
         <table class="table table-striped table-hover mb-0 data-table">
-            <thead><tr><th>Payment #</th><th data-filter="date">Date</th><th data-filter="select">Direction</th><th>Against</th><th>Notes</th><th class="text-end">Amount</th></tr></thead>
+            <thead><tr><th>Payment #</th><th data-filter="date">Date</th><th data-filter="select">Direction</th><th data-filter="select">Method</th><th>Against</th><th>Notes</th><th class="text-end">Amount</th></tr></thead>
             <tbody>
             @foreach (var p in Model)
             {
                 <tr>
                     <td class="fw-semibold">@p.PaymentNumber</td>
-                    <td data-date="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToDateTimeText(p.CreatedAt)</td>
                     <td>
                         @if (p.Direction == PaymentDirection.Out) { <span class="badge text-bg-danger">Paid to supplier</span> }
                         else { <span class="badge text-bg-success">Received from customer</span> }
                     </td>
+                    <td>@p.MethodText</td>
                     <td>
                         @if (p.PurchaseInvoice is not null)
                         {

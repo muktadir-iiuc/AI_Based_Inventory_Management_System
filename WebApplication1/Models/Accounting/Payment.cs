@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
@@ -8,6 +9,48 @@ public enum PaymentDirection
 {
     Out = 1, // paid to a supplier
     In = 2   // received from a customer
+}
+
+// How the money moved. Each method posts to its own asset account (see PaymentMethods), so
+// the trial balance shows what is held in cash, in each mobile wallet and in the bank.
+public enum PaymentMethod
+{
+    Cash = 1,
+    [Display(Name = "bKash")] BKash = 2,
+    Rocket = 3,
+    Nagad = 4,
+    Bank = 5
+}
+
+public static class PaymentMethods
+{
+    public static string AccountCode(PaymentMethod method) => method switch
+    {
+        PaymentMethod.BKash => SystemAccountCodes.BKash,
+        PaymentMethod.Rocket => SystemAccountCodes.Rocket,
+        PaymentMethod.Nagad => SystemAccountCodes.Nagad,
+        PaymentMethod.Bank => SystemAccountCodes.Bank,
+        _ => SystemAccountCodes.Cash
+    };
+
+    // Returns an error message, or null when valid. Bank payments must name the bank.
+    public static string? Validate(PaymentMethod method, string? bankName)
+    {
+        if (!Enum.IsDefined(method)) return "Select a payment method.";
+        if (method == PaymentMethod.Bank && string.IsNullOrWhiteSpace(bankName)) return "Enter the bank name for a bank payment.";
+        if (bankName?.Trim().Length > 100) return "The bank name can be at most 100 characters.";
+        return null;
+    }
+
+    // The bank name is only kept for bank payments.
+    public static string? CleanBankName(PaymentMethod method, string? bankName) =>
+        method == PaymentMethod.Bank ? bankName?.Trim() : null;
+
+    public static string Name(PaymentMethod method) => method == PaymentMethod.BKash ? "bKash" : method.ToString();
+
+    // "Bank (City Bank)", "bKash", "Cash" …
+    public static string Describe(PaymentMethod method, string? bankName) =>
+        method == PaymentMethod.Bank && !string.IsNullOrWhiteSpace(bankName) ? $"Bank ({bankName})" : Name(method);
 }
 
 public class Payment
@@ -24,6 +67,15 @@ public class Payment
     public decimal Amount { get; set; }
 
     public string? Notes { get; set; }
+
+    public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+
+    // Only for Method = Bank.
+    [StringLength(100)]
+    public string? BankName { get; set; }
+
+    [NotMapped]
+    public string MethodText => PaymentMethods.Describe(Method, BankName);
 
     public int? PurchaseInvoiceId { get; set; }
     public PurchaseInvoice? PurchaseInvoice { get; set; }

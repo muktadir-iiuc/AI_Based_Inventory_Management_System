@@ -1,3 +1,4 @@
+using WebApplication1.Extensions;
 using System.Globalization;
 using AspNetCore.Reporting;
 using WebApplication1.Models.Common;
@@ -62,10 +63,11 @@ public static class PartyLedgerReportBuilder
 
         lines.AddRange(vm.Rows.Select(r => new PartyLedgerReportLine
         {
-            Date = r.Date.ToString("dd MMM yyyy"),
+            Date = r.Date.ToDateTimeText(),
             DocType = r.DocumentType,
             DocNumber = r.DocumentNumber,
             Description = r.Description ?? string.Empty,
+            PaymentMethod = r.PaymentMethod ?? string.Empty,
             Debit = r.Debit == 0 ? string.Empty : Money(r.Debit),
             Credit = r.Credit == 0 ? string.Empty : Money(r.Credit),
             Balance = Money(r.RunningBalance)

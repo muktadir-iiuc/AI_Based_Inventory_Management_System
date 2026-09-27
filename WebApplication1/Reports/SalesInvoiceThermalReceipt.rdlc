@@ -288,7 +288,7 @@
                   <Height>0.24in</Height>
                   <TablixCells>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellCustomerDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Outstanding</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
+                      <Textbox Name="CellCustomerDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Due</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
                       <Textbox Name="CellCustomerDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CustomerOutstandingDue.Value</Value><Style><FontFamily>Arial</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#000000</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><PaddingTop>6pt</PaddingTop></Style></Textbox>

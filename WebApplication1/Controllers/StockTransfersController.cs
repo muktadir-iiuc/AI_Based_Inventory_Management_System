@@ -711,6 +711,7 @@ public class StockTransfersController(
             toWarehouseId = transfer.ToWarehouseId,
             toWarehouseName = toName,
             date = transfer.Date.ToString("yyyy-MM-dd"),
+            dateText = transfer.Date.ToDateTimeText(transfer.CreatedAt),
             status = transfer.DisplayStatus,
             lineCount = transfer.Items.Count(i => i.IsCurrent)
         }, [transfer.FromWarehouseId, transfer.ToWarehouseId]);

@@ -83,7 +83,7 @@
                     @foreach (var t in Model.StockTransactions)
                     {
                         <tr>
-                            <td>@t.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@t.Date.ToLocalTime().ToDateTimeText()</td>
                             <td>@t.Warehouse?.Name</td>
                             <td>
                                 @if (t.Type == StockTransactionType.In) { <span class="badge text-bg-success">In</span> }

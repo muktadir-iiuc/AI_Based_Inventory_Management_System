@@ -34,7 +34,7 @@
                     <td><a asp-action="Details" asp-route-id="@r.Id" class="fw-semibold">@r.ReturnNumber</a></td>
                     <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@r.PurchaseInvoiceId">@r.PurchaseInvoice?.InvoiceNumber</a></td>
                     <td>@r.PurchaseInvoice?.Supplier?.Name</td>
-                    <td data-date="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToDateTimeText(r.CreatedAt)</td>
                     <td class="text-end fw-semibold">@r.TotalAmount.ToString("C")</td>
                 </tr>
             }

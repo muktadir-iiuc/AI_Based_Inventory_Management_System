@@ -155,6 +155,11 @@ function initSelect2(root) {
 
     $selects.each(function () {
         var $el = jQuery(this);
+        // data-no-select2 keeps a short native dropdown (e.g. the payment method), which also
+        // works inside Bootstrap modals without Select2's dropdownParent workarounds.
+        if ($el.is('[data-no-select2]')) {
+            return;
+        }
         if (!$el.hasClass('select2-hidden-accessible')) {
             $el.select2({ width: '100%' });
             // Tag the visible widget with a direct reference back to its <select>, so code
@@ -309,6 +314,7 @@ function focusNextField(current, $root, fieldSelector) {
 //   summaryEl    - optional wrapper shown only once a party's due is known
 //   previousEl, afterEl - optional elements for the two summary figures
 //   grandTotalEl - optional element holding the invoice grand total (its text is watched)
+//   paidEl       - optional input with an amount paid now, taken off the "due after" figure
 //   currency     - currency symbol to prefix amounts with
 //   advanceLabel - wording for a negative balance, e.g. "Advance from customer"
 // Returns { refresh } so a page can re-check after changing the selection in code (e.g. an
@@ -339,7 +345,8 @@ function initPartyDue(options) {
         options.summaryEl.classList.toggle('d-none', balance === null);
         if (balance === null) return;
         var previous = describe(balance);
-        var after = describe(balance + grandTotal() - settled);
+        var paidNow = options.paidEl ? (parseFloat(options.paidEl.value) || 0) : 0;
+        var after = describe(balance + grandTotal() - settled - paidNow);
         options.previousEl.textContent = previous.text;
         options.previousEl.className = 'col-5 text-end ' + previous.cls;
         options.afterEl.textContent = after.text;
@@ -423,6 +430,33 @@ function initPartyDue(options) {
     if (options.grandTotalEl && typeof MutationObserver !== 'undefined') {
         new MutationObserver(renderSummary).observe(options.grandTotalEl, { childList: true, characterData: true, subtree: true });
     }
+    if (options.paidEl) {
+        options.paidEl.addEventListener('input', renderSummary);
+    }
     refresh();
-    return { refresh: refresh };
+    // balance(): the party's current due as last loaded (negative = advance), or null when no
+    // party is selected / it hasn't loaded.
+    return { refresh: refresh, balance: function () { return balance; } };
 }
+
+// Payment method fields (Views/Shared/_PaymentMethodFields): the Bank name box is only shown —
+// and only required — when "Bank" is the selected method.
+(function () {
+    function syncPaymentMethod(select) {
+        var group = select.closest('[data-payment-method-group]');
+        if (!group) return;
+        var isBank = select.value === '5';
+        var bankGroup = group.querySelector('[data-bank-name-group]');
+        var bankInput = bankGroup && bankGroup.querySelector('input');
+        if (!bankGroup) return;
+        bankGroup.classList.toggle('d-none', !isBank);
+        if (bankInput) bankInput.required = isBank;
+    }
+    document.addEventListener('change', function (e) {
+        if (e.target.matches && e.target.matches('[data-payment-method]')) syncPaymentMethod(e.target);
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-payment-method]').forEach(syncPaymentMethod);
+    });
+    window.syncPaymentMethod = syncPaymentMethod;
+})();

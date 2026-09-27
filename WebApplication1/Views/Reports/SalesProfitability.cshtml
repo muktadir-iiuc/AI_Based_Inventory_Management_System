@@ -81,7 +81,7 @@
             @foreach (var r in Model.Rows)
             {
                 <tr>
-                    <td data-date="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToDateTimeText(r.CreatedAt)</td>
                     <td>@r.InvoiceNumber</td>
                     <td>@r.ProductName</td>
                     <td>@(r.BatchNumber ?? "—")</td>

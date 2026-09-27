@@ -12,7 +12,7 @@
         <div>
             <strong>Last Price Change:</strong>
             @lastPriceChange.OldPrice.ToString("C") &rarr; @lastPriceChange.NewPrice.ToString("C")
-            by @(lastPriceChange.ChangedByUser?.FullName ?? "Unknown") on @lastPriceChange.ChangedAt.ToString("dd-MMM-yyyy hh:mm tt")
+            by @(lastPriceChange.ChangedByUser?.FullName ?? "Unknown") on @lastPriceChange.ChangedAt.ToLocalTime().ToDateTimeText()
         </div>
         <a asp-action="PriceHistory" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary">View Price History</a>
     </div>

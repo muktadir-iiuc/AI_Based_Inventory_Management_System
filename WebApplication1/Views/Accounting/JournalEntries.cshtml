@@ -39,7 +39,7 @@
             {
                 <tr class="clickable-row" data-href="@Url.Action("JournalEntryDetails", new { id = j.Id })">
                     <td><a asp-action="JournalEntryDetails" asp-route-id="@j.Id" class="fw-semibold">@j.EntryNumber</a></td>
-                    <td data-date="@j.Date.ToString("yyyy-MM-dd")">@j.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@j.Date.ToString("yyyy-MM-dd")">@j.Date.ToDateTimeText(j.CreatedAt)</td>
                     <td>@j.Description</td>
                     <td><span class="badge text-bg-light border">@j.Source</span></td>
                     <td class="text-end fw-semibold">@j.TotalDebit.ToString("C")</td>

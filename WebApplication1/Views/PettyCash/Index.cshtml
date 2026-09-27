@@ -220,7 +220,7 @@
                                 <th class="text-end">Balance</th>
                                 @if (canEdit)
                                 {
-                                    <th class="text-center">Action</th>
+                                    <th class="text-center text-nowrap">Action</th>
                                 }
                             </tr>
                         </thead>
@@ -443,7 +443,7 @@
                         : '<span class="fw-semibold text-danger">Cash Out</span>';
                     return '<tr>' +
                         '<td>' + r.sl + '</td>' +
-                        '<td>' + r.date + '</td>' +
+                        '<td>' + r.dateText + '</td>' +
                         (multiWarehouse ? '<td>' + escapeHtml(r.warehouse) + '</td>' : '') +
                         '<td>' + escapeHtml(r.name) + '</td>' +
                         '<td>' + typeBadge + '</td>' +
@@ -451,9 +451,9 @@
                         '<td class="text-end">' + (r.expense !== null ? money(r.expense) : '-') + '</td>' +
                         '<td class="text-end">' + money(r.balance) + '</td>' +
                         (canEdit
-                            ? '<td class="text-center">' +
-                                '<button type="button" class="btn btn-sm btn-success btn-edit-entry" data-id="' + r.id + '" data-date="' + r.date + '" data-warehouse-id="' + r.warehouseId + '" data-name-id="' + r.nameId + '" data-type="' + r.type + '" data-amount="' + (r.income !== null ? r.income : r.expense) + '">Edit</button> ' +
-                                '<button type="button" class="btn btn-sm btn-danger btn-del-entry" data-id="' + r.id + '">Del</button>' +
+                            ? '<td class="text-center text-nowrap">' +
+                                '<button type="button" class="btn btn-sm btn-success btn-edit-entry" title="Edit" aria-label="Edit" data-id="' + r.id + '" data-date="' + r.date + '" data-warehouse-id="' + r.warehouseId + '" data-name-id="' + r.nameId + '" data-type="' + r.type + '" data-amount="' + (r.income !== null ? r.income : r.expense) + '"><i class="fas fa-edit"></i></button> ' +
+                                '<button type="button" class="btn btn-sm btn-danger btn-del-entry" title="Delete" aria-label="Delete" data-id="' + r.id + '"><i class="fas fa-trash-alt"></i></button>' +
                               '</td>'
                             : '') +
                     '</tr>';

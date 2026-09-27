@@ -39,6 +39,15 @@ public class SalesInvoiceCreateViewModel
     [Range(0, double.MaxValue, ErrorMessage = "Discount cannot be negative.")]
     public decimal DiscountValue { get; set; }
 
+    // Optional payment taken while creating the invoice (Create only; Edit ignores these). It is
+    // recorded as an ordinary payment against the new invoice, up to its total.
+    [Range(0, double.MaxValue, ErrorMessage = "Paid amount cannot be negative.")]
+    public decimal PaidAmount { get; set; }
+
+    public Accounting.PaymentMethod PaymentMethod { get; set; } = Accounting.PaymentMethod.Cash;
+
+    public string? BankName { get; set; }
+
     public List<SalesLineInput> Items { get; set; } = [];
 }
 

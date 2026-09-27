@@ -10,7 +10,7 @@
     <div class="card-body">
         <dl class="row">
             <dt class="col-sm-2">Entry #</dt><dd class="col-sm-4">@Model.EntryNumber</dd>
-            <dt class="col-sm-2">Date</dt><dd class="col-sm-4">@Model.Date.ToString("MMM dd, yyyy")</dd>
+            <dt class="col-sm-2">Date</dt><dd class="col-sm-4">@Model.Date.ToDateTimeText(Model.CreatedAt)</dd>
             <dt class="col-sm-2">Source</dt><dd class="col-sm-4">@Model.Source</dd>
             <dt class="col-sm-2">Reference</dt><dd class="col-sm-4">@Model.SourceReference</dd>
         </dl>

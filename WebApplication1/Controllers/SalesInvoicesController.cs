@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Extensions;
+using WebApplication1.Models.Accounting;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
@@ -20,6 +21,7 @@ public class SalesInvoicesController(
     IFifoAllocationService fifoService,
     IAccountingService accountingService,
     IActivityNotifier notifier,
+    IPartyPaymentService partyPayments,
     ICompanySettingsService companySettings,
     IWebHostEnvironment env) : Controller
 {
@@ -69,6 +71,7 @@ public class SalesInvoicesController(
             .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
             .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
             .Include(s => s.Payments)
+            .Include(s => s.Returns).ThenInclude(r => r.Items)
             .FirstOrDefaultAsync(s => s.Id == id);
 
         if (invoice is null) return NotFound();
@@ -142,6 +145,11 @@ public class SalesInvoicesController(
         else if (!User.IsWarehouseAllowed(model.WarehouseId))
         {
             ModelState.AddModelError(nameof(model.WarehouseId), "You are not assigned to this warehouse.");
+        }
+
+        if (model.PaidAmount > 0 && PaymentMethods.Validate(model.PaymentMethod, model.BankName) is { } methodError)
+        {
+            ModelState.AddModelError(model.PaymentMethod == PaymentMethod.Bank ? nameof(model.BankName) : nameof(model.PaymentMethod), methodError);
         }
 
         var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
@@ -243,6 +251,20 @@ public class SalesInvoicesController(
                 ModelState.AddModelError(nameof(model.DiscountValue), $"The discount ({discount:C}) cannot be more than the invoice subtotal ({subtotal:C}).");
             }
 
+            // "Paid now" may also clear the customer's earlier dues, but never goes past their total
+            // due (previous due + this invoice) — no advances here. Negative previous due = advance.
+            var invoiceTotal = subtotal - discount;
+            var paidNow = Math.Round(model.PaidAmount, 2);
+            if (paidNow > 0 && ModelState.IsValid)
+            {
+                var previousDue = await partyPayments.CustomerBalanceAsync(model.CustomerId, User.GetWarehouseIds());
+                var totalDue = Math.Max(0, Math.Round(previousDue + invoiceTotal, 2));
+                if (paidNow > totalDue)
+                {
+                    ModelState.AddModelError(nameof(model.PaidAmount), $"The paid amount ({paidNow:C}) cannot be more than the customer's total due ({totalDue:C}).");
+                }
+            }
+
             if (!ModelState.IsValid)
             {
                 await PopulateDropdownsAsync();
@@ -252,6 +274,48 @@ public class SalesInvoicesController(
             DiscountAllocator.Allocate(invoice.Items.ToList(), discount);
             db.SalesInvoices.Add(invoice);
             await accountingService.PostSalesInvoiceAsync(invoice);
+
+            // Money taken at the counter while creating the invoice: an ordinary payment against it.
+            // Up to the invoice total is paid against this invoice; anything above that settles the
+            // customer's older dues, oldest first, saved in the same SaveChanges below.
+            Payment? payment = null;
+            var invoicePart = Math.Min(paidNow, invoiceTotal);
+            var olderDuesPart = paidNow - invoicePart;
+            if (invoicePart > 0)
+            {
+                payment = new Payment
+                {
+                    PaymentNumber = await NextPaymentNumberAsync(),
+                    Direction = PaymentDirection.In,
+                    Date = invoice.Date,
+                    Amount = invoicePart,
+                    Method = model.PaymentMethod,
+                    BankName = PaymentMethods.CleanBankName(model.PaymentMethod, model.BankName),
+                    Notes = $"Paid with invoice {invoice.InvoiceNumber}",
+                    SalesInvoice = invoice,
+                    CreatedBy = User.Identity?.Name
+                };
+                db.Payments.Add(payment);
+                await accountingService.PostPaymentAsync(payment);
+            }
+
+            PartyPaymentResult? olderDues = null;
+            if (olderDuesPart > 0)
+            {
+                olderDues = await partyPayments.RecordAsync(PartyLedgerType.Customer, model.CustomerId, olderDuesPart, invoice.Date,
+                    model.PaymentMethod, model.BankName, $"Paid with invoice {invoice.InvoiceNumber}", User.GetWarehouseIds(),
+                    User.Identity?.Name, save: false);
+                if (!olderDues.Ok)
+                {
+                    foreach (var entry in db.ChangeTracker.Entries().ToList())
+                    {
+                        entry.State = EntityState.Detached;
+                    }
+                    ModelState.AddModelError(nameof(model.PaidAmount), olderDues.Error ?? "Could not apply the payment to the customer's earlier dues.");
+                    await PopulateDropdownsAsync();
+                    return View(model);
+                }
+            }
 
             try
             {
@@ -273,10 +337,64 @@ public class SalesInvoicesController(
                 "fas fa-cash-register text-success",
                 [invoice.WarehouseId]);
 
-            TempData["Success"] = $"Sales invoice {invoice.InvoiceNumber} posted.";
+            TempData["Success"] = $"Sales invoice {invoice.InvoiceNumber} posted."
+                + (payment is null ? "" : $" Payment {payment.PaymentNumber} of {payment.Amount:C} received ({payment.MethodText}).")
+                + (olderDues is null ? "" : $" {olderDuesPart:C} applied to earlier dues: {string.Join(", ", olderDues.Applied)}.");
             return RedirectToAction(nameof(Details), new { id = invoice.Id });
         }
     }
+
+    // Receive a payment against this invoice from its Details page. Sales staff take money at the
+    // counter, so this is open to the sales roles as well as accounting (unlike Accounting →
+    // Create Payment). Capped at what is still due on the invoice.
+    [HttpPost]
+    [Authorize(Roles = $"{Roles.SalesManagers},{Roles.Accountant}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReceivePayment(int id, decimal amount, DateTime? date, PaymentMethod method, string? bankName, string? notes)
+    {
+        var invoice = await db.SalesInvoices
+            .Include(s => s.Items.Where(i => i.IsCurrent))
+            .Include(s => s.Payments)
+            .Include(s => s.Returns).ThenInclude(r => r.Items)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (invoice is null) return NotFound();
+        if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
+
+        amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        var due = invoice.TotalAmount - invoice.Payments.Sum(p => p.Amount) - invoice.Returns.Sum(r => r.TotalAmount);
+        string? error = null;
+        if (invoice.Status != DocumentStatus.Posted) error = "Payments can only be received on a posted invoice.";
+        else if (amount <= 0) error = "Enter an amount greater than zero.";
+        else if (amount > due) error = $"The amount cannot be more than this invoice's due of {due:N2}.";
+        else error = PaymentMethods.Validate(method, bankName);
+
+        if (error is not null)
+        {
+            TempData["Error"] = error;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var payment = new Payment
+        {
+            PaymentNumber = await NextPaymentNumberAsync(),
+            Direction = PaymentDirection.In,
+            Date = (date ?? DateTime.Today).Date,
+            Amount = amount,
+            Method = method,
+            BankName = PaymentMethods.CleanBankName(method, bankName),
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            SalesInvoiceId = invoice.Id,
+            CreatedBy = User.Identity?.Name
+        };
+        db.Payments.Add(payment);
+        await accountingService.PostPaymentAsync(payment);
+        await db.SaveChangesAsync();
+
+        TempData["Success"] = $"Payment {payment.PaymentNumber} of {payment.Amount:C} received ({payment.MethodText}).";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    private async Task<string> NextPaymentNumberAsync() => $"PAY-{await db.Payments.CountAsync() + 1:D6}";
 
     public async Task<IActionResult> PrintPdf(int id)
     {
@@ -284,6 +402,7 @@ public class SalesInvoicesController(
             .Include(s => s.Customer)
             .Include(s => s.Warehouse)
             .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product).ThenInclude(p => p!.UnitOfMeasure)
+            .Include(s => s.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product).ThenInclude(p => p!.Category)
             .Include(s => s.Payments)
             .FirstOrDefaultAsync(s => s.Id == id);
 
@@ -294,7 +413,7 @@ public class SalesInvoicesController(
         {
             SL = (index + 1).ToString(),
             ProductName = string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))),
-            Sku = item.Product?.Sku ?? string.Empty,
+            Category = item.Product?.Category?.Name ?? string.Empty,
             Quantity = $"{item.Quantity:0.##} {item.Product?.UnitOfMeasure?.Symbol}".Trim(),
             UnitPrice = item.UnitPrice.ToString("N2"),
             LineTotal = item.LineTotal.ToString("N2")
@@ -313,7 +432,7 @@ public class SalesInvoicesController(
             CompanyLogo = company.LogoImage ?? SalesInvoiceReportHeader.TransparentPixel,
             CompanyLogoMimeType = company.LogoImage is null ? "image/png" : company.LogoMimeType ?? "image/png",
             InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.Date.ToString("MMM dd, yyyy"),
+            InvoiceDate = invoice.Date.ToDateTimeText(invoice.CreatedAt),
             Status = invoice.Status.ToString(),
             CustomerName = invoice.Customer?.Name ?? string.Empty,
             CustomerAddress = invoice.Customer?.Address ?? string.Empty,
@@ -324,7 +443,9 @@ public class SalesInvoicesController(
             DiscountAmount = invoice.DiscountAmount.ToString("N2"),
             TotalAmount = invoice.TotalAmount.ToString("N2"),
             PaidAmount = paidAmount.ToString("N2"),
-            DueAmount = dueAmount.ToString("N2")
+            DueAmount = dueAmount.ToString("N2"),
+            CustomerOutstandingDue = (await CustomerTotalDueAsync(invoice.CustomerId)).ToString("N2"),
+            AmountInWords = invoice.TotalAmount.ToTakaWords()
         };
 
         var reportPath = Path.Combine(env.ContentRootPath, "Reports", "SalesInvoiceReport.rdlc");
@@ -334,6 +455,26 @@ public class SalesInvoicesController(
 
         var result = report.Execute(RenderType.Pdf, 1, null, string.Empty);
         return File(result.MainStream, "application/pdf", $"{invoice.InvoiceNumber}.pdf");
+    }
+
+    // The customer's whole outstanding balance (all invoices, not just this one) - printed as
+    // "Total Due" on the invoice PDF and the thermal receipt.
+    private async Task<decimal> CustomerTotalDueAsync(int customerId)
+    {
+        // Same invoiced-minus-paid-minus-returned formula as Customer.OutstandingDue / the
+        // Customer Ledger. Must filter Items to IsCurrent (a superseded line from an in-place
+        // Edit would otherwise double-count) and subtract Returns - a sales return credits
+        // Accounts Receivable directly and never creates a refund Payment.
+        return await db.SalesInvoices
+            .Where(s => s.CustomerId == customerId && s.Status == DocumentStatus.Posted)
+            .Select(s => s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare)
+                         - s.Payments.Sum(p => p.Amount)
+                         - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice - ri.DiscountShare)))
+            .SumAsync()
+            // Plus whatever is left of the customer's opening balance (see Customer.OpeningBalance).
+            + await db.Customers.Where(c => c.Id == customerId).Select(c => c.OpeningBalance).FirstAsync()
+            - (await db.Payments.Where(p => p.SalesInvoiceId == null && p.CustomerId == customerId)
+                .SumAsync(p => (decimal?)p.Amount) ?? 0);
     }
 
     public async Task<IActionResult> PrintThermal(int id)
@@ -389,20 +530,7 @@ public class SalesInvoicesController(
         var paidAmount = invoice.Payments.Sum(p => p.Amount);
         var dueAmount = invoice.TotalAmount - paidAmount;
 
-        // Same invoiced-minus-paid-minus-returned formula as Customer.OutstandingDue / the
-        // Customer Ledger. Must filter Items to IsCurrent (a superseded line from an in-place
-        // Edit would otherwise double-count) and subtract Returns - a sales return credits
-        // Accounts Receivable directly and never creates a refund Payment.
-        var customerOutstandingDue = await db.SalesInvoices
-            .Where(s => s.CustomerId == invoice.CustomerId && s.Status == DocumentStatus.Posted)
-            .Select(s => s.Items.Where(i => i.IsCurrent).Sum(i => i.Quantity * i.UnitPrice - i.DiscountShare)
-                         - s.Payments.Sum(p => p.Amount)
-                         - s.Returns.Sum(r => r.Items.Sum(ri => ri.Quantity * ri.UnitPrice - ri.DiscountShare)))
-            .SumAsync()
-            // Plus whatever is left of the customer's opening balance (see Customer.OpeningBalance).
-            + await db.Customers.Where(c => c.Id == invoice.CustomerId).Select(c => c.OpeningBalance).FirstAsync()
-            - (await db.Payments.Where(p => p.SalesInvoiceId == null && p.CustomerId == invoice.CustomerId)
-                .SumAsync(p => (decimal?)p.Amount) ?? 0);
+        var customerOutstandingDue = await CustomerTotalDueAsync(invoice.CustomerId);
 
         var company = await companySettings.GetAsync();
 
@@ -428,7 +556,7 @@ public class SalesInvoicesController(
             CompanyAddress = company.Address ?? string.Empty,
             CompanyPhone = string.IsNullOrWhiteSpace(company.Phone) ? string.Empty : $"Phone: {company.Phone}",
             InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.Date.ToString("MMM dd, yyyy"),
+            InvoiceDate = invoice.Date.ToDateTimeText(invoice.CreatedAt),
             CustomerName = invoice.Customer?.Name ?? string.Empty,
             CustomerAddress = invoice.Customer?.Address ?? string.Empty,
             CustomerPhone = invoice.Customer?.Phone ?? string.Empty,

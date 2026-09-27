@@ -61,7 +61,7 @@
                     <td>@a.Reason.GetDisplayName()</td>
                     <td class="text-end">@a.Items.Count</td>
                     <td>@a.RequestedBy</td>
-                    <td data-date="@a.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd")">@a.RequestedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                    <td data-date="@a.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd")">@a.RequestedAt.ToLocalTime().ToDateTimeText()</td>
                     <td>
                         @switch (a.Status)
                         {

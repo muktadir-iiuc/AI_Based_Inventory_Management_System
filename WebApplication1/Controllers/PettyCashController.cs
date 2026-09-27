@@ -135,6 +135,7 @@ public class PettyCashController(ApplicationDbContext db) : Controller
             sl = index + 1,
             id = l.Entry.Id,
             date = l.Entry.Date.ToString("yyyy-MM-dd"),
+            dateText = l.Entry.Date.ToDateTimeText(l.Entry.CreatedAt),
             warehouseId = l.Entry.WarehouseId,
             warehouse = l.Entry.Warehouse!.Name,
             nameId = l.Entry.PettyCashNameId,

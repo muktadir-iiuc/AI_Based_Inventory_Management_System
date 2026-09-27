@@ -30,6 +30,10 @@ public class Account : BaseEntity
 public static class SystemAccountCodes
 {
     public const string Cash = "1000";
+    public const string BKash = "1010";
+    public const string Rocket = "1020";
+    public const string Nagad = "1030";
+    public const string Bank = "1040";
     public const string Inventory = "1100";
     public const string AccountsReceivable = "1200";
     public const string AccountsPayable = "2000";

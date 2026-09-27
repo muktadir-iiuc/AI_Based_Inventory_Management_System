@@ -1,9 +1,21 @@
 @model SalesInvoice
 @{
     ViewData["Title"] = $"Sales Invoice {Model.InvoiceNumber}";
+    var received = Model.Payments.Sum(p => p.Amount);
+    var returned = Model.Returns.Sum(r => r.TotalAmount);
+    var due = Model.TotalAmount - received - returned;
+    // Same roles as SalesInvoicesController.ReceivePayment.
+    var canReceive = Model.Status == DocumentStatus.Posted && due > 0
+        && (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.Accountant));
 }
 
 @section Toolbar {
+    @if (canReceive)
+    {
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#receivePaymentModal">
+            <i class="fas fa-hand-holding-dollar"></i> Receive Payment
+        </button>
+    }
     <a asp-action="PrintPdf" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm" target="_blank">
         <i class="fas fa-file-pdf"></i> Print PDF
     </a>
@@ -33,7 +45,7 @@
                     <dt class="col-5">Invoice #</dt><dd class="col-7">@Model.InvoiceNumber</dd>
                     <dt class="col-5">Customer</dt><dd class="col-7">@Model.Customer?.Name</dd>
                     <dt class="col-5">Warehouse</dt><dd class="col-7">@Model.Warehouse?.Name</dd>
-                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
+                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToDateTimeText(Model.CreatedAt)</dd>
                     <dt class="col-5">Status</dt>
                     <dd class="col-7">
                         @if (Model.Status == DocumentStatus.Posted) { <span class="badge text-bg-success">Posted</span> }
@@ -46,7 +58,12 @@
                         <dt class="col-5">Discount</dt><dd class="col-7 text-danger">-@Model.DiscountAmount.ToString("C")</dd>
                     }
                     <dt class="col-5">Total</dt><dd class="col-7 fw-bold">@Model.TotalAmount.ToString("C")</dd>
-                    <dt class="col-5">Received</dt><dd class="col-7">@Model.Payments.Sum(p => p.Amount).ToString("C")</dd>
+                    <dt class="col-5">Received</dt><dd class="col-7">@received.ToString("C")</dd>
+                    @if (returned > 0)
+                    {
+                        <dt class="col-5">Returned</dt><dd class="col-7">@returned.ToString("C")</dd>
+                    }
+                    <dt class="col-5">Due</dt><dd class="col-7 fw-bold @(due > 0 ? "text-danger" : "text-success")">@due.ToString("C")</dd>
                 </dl>
             </div>
             <div class="card-footer">
@@ -77,3 +94,68 @@
         </div>
     </div>
 </div>
+
+<div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">Payments</h3></div>
+    <div class="card-body p-0 table-responsive-card">
+        @if (Model.Payments.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">No payments received yet.</p>
+        }
+        else
+        {
+            <table class="table table-striped mb-0">
+                <thead><tr><th>Payment #</th><th>Date</th><th>Method</th><th>Notes</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                @foreach (var p in Model.Payments.OrderBy(p => p.Date).ThenBy(p => p.Id))
+                {
+                    <tr>
+                        <td>@p.PaymentNumber</td>
+                        <td>@p.Date.ToDateTimeText(p.CreatedAt)</td>
+                        <td>@p.MethodText</td>
+                        <td>@p.Notes</td>
+                        <td class="text-end">@p.Amount.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (canReceive)
+{
+    <div class="modal fade" id="receivePaymentModal" tabindex="-1" aria-labelledby="receivePaymentTitle" aria-hidden="true">
+        <div class="modal-dialog">
+            <form asp-action="ReceivePayment" asp-route-id="@Model.Id" method="post" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="receivePaymentTitle">Receive Payment — @Model.InvoiceNumber</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small">@Model.Customer?.Name owes <strong>@due.ToString("C")</strong> on this invoice.</div>
+                    <div class="row">
+                        <div class="col-sm-6 mb-3">
+                            <label for="rpAmount" class="form-label required-asterisk">Amount</label>
+                            <input id="rpAmount" name="amount" type="number" step="0.01" min="0.01" max="@due.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)"
+                                   value="@due.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label for="rpDate" class="form-label required-asterisk">Date</label>
+                            <input id="rpDate" name="date" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control" required />
+                        </div>
+                    </div>
+                    @await Html.PartialAsync("_PaymentMethodFields", new PaymentMethodFieldsModel("method", "bankName", PaymentMethod.Cash, null, "rp", "col-sm-6"))
+                    <div>
+                        <label for="rpNotes" class="form-label">Notes</label>
+                        <input id="rpNotes" name="notes" type="text" maxlength="200" class="form-control" placeholder="Optional (transaction ID, cheque no.…)" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

@@ -24,6 +24,9 @@ public class PartyLedgerRow
 
     public string? Description { get; set; }
 
+    // Payment rows only: "Cash", "bKash", "Bank (DBBL)"… — blank for invoices/returns.
+    public string? PaymentMethod { get; set; }
+
     public decimal Debit { get; set; }
 
     public decimal Credit { get; set; }
@@ -182,6 +185,7 @@ public class PartyLedgerReportLine
     public string DocType { get; set; } = string.Empty;
     public string DocNumber { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string PaymentMethod { get; set; } = string.Empty;
     public string Debit { get; set; } = string.Empty;
     public string Credit { get; set; } = string.Empty;
     public string Balance { get; set; } = string.Empty;

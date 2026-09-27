@@ -61,16 +61,16 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow"><i class="fas fa-plus"></i> Add product line</button>
                 </div>
                 <div class="card-body p-0 table-responsive-card">
-                    <table class="table table-hover align-middle mb-0" id="itemsTable">
+                    <table class="table table-hover align-middle mb-0 line-items-table" id="itemsTable">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 3%">#</th>
+                                <th style="width: 40px">#</th>
                                 <th style="width: 18%">Category</th>
-                                <th style="width: 24%">Product</th>
-                                <th style="width: 12%">Quantity</th>
-                                <th style="width: 14%" class="text-end">Unit Price</th>
-                                <th style="width: 17%" class="text-end">Line Total</th>
-                                <th style="width: 5%"></th>
+                                <th>Product</th>
+                                <th style="width: 100px">Quantity</th>
+                                <th style="width: 120px" class="text-end">Unit Price</th>
+                                <th style="width: 130px" class="text-end">Line Total</th>
+                                <th style="width: 52px"></th>
                             </tr>
                         </thead>
                         <tbody id="itemsBody"></tbody>
@@ -118,6 +118,22 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-bold">Grand Total</span>
                         <span class="fs-3 fw-bold text-primary" id="grandTotal">0.00</span>
+                    </div>
+                    <hr class="my-2" />
+                    <div class="mb-2">
+                        <label asp-for="PaidAmount" class="form-label small text-muted mb-1">Paid now</label>
+                        <div class="input-group input-group-sm">
+                            <input asp-for="PaidAmount" id="paidAmount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" />
+                            <button type="button" class="btn btn-outline-secondary" id="payFullButton" title="Customer pays the whole invoice now">Full</button>
+                        </div>
+                        <span asp-validation-for="PaidAmount" class="text-danger small"></span>
+                    </div>
+                    <div id="paymentMethodBlock" class="small">
+                        @await Html.PartialAsync("_PaymentMethodFields", new PaymentMethodFieldsModel(nameof(Model.PaymentMethod), nameof(Model.BankName), Model.PaymentMethod, Model.BankName, "pay", "col-12"))
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Balance due</span>
+                        <span class="fw-semibold" id="balanceDue">0.00</span>
                     </div>
                     <div class="d-none" id="customerDueSummary">
                         <hr />
@@ -463,9 +479,70 @@
             document.getElementById('subTotal').textContent = grand.toFixed(2);
             document.getElementById('discountPreview').textContent = discount > 0 ? '-' + discount.toFixed(2) : '0.00';
             document.getElementById('grandTotal').textContent = (grand - discount).toFixed(2);
+            updatePayment();
             document.getElementById('summaryLineCount').textContent = rows.length;
             document.getElementById('summaryQty').textContent = totalQty;
         }
+
+        // "Paid now": method/bank fields only matter once something is paid; balance due = total - paid.
+        const paidInput = document.getElementById('paidAmount');
+        function updatePayment() {
+            // Looked up here, not via the const above: recalc() can run before that line does.
+            const paidInput = document.getElementById('paidAmount');
+            const total = parseFloat(document.getElementById('grandTotal').textContent) || 0;
+            const paid = parseFloat(paidInput.value) || 0;
+            const balanceEl = document.getElementById('balanceDue');
+            // Paying more than this invoice clears older dues, so this invoice's own balance stops at 0.
+            balanceEl.textContent = Math.max(0, total - paid).toFixed(2);
+            balanceEl.className = 'fw-semibold ' + (total - paid > 0 ? 'text-danger' : 'text-success');
+            paidInput.classList.toggle('is-invalid', paid > maxPayable() + 0.001 || paid < 0);
+            const block = document.getElementById('paymentMethodBlock');
+            block.classList.toggle('d-none', paid <= 0);
+            // A hidden Bank name box must not block the submit.
+            const bankInput = block.querySelector('[data-bank-name-group] input');
+            const methodSelect = block.querySelector('[data-payment-method]');
+            if (bankInput) bankInput.required = paid > 0 && methodSelect.value === '5';
+        }
+        // No advance payments here: "Paid now" can cover this invoice plus the customer's previous
+        // due, never more than that total due (the server enforces the same cap and applies the
+        // part above the invoice to older dues). Until the customer's due has loaded, the cap is
+        // the invoice total. Clamped on typing only, not in recalc(), so a posted-back amount
+        // isn't wiped while the lines are still being re-priced.
+        function maxPayable() {
+            const total = parseFloat(document.getElementById('grandTotal').textContent) || 0;
+            const previous = typeof customerDueWidget !== 'undefined' ? customerDueWidget.balance() : null;
+            return previous === null ? total : Math.max(0, previous + total);
+        }
+        function capMessage(max) {
+            return `The paid amount cannot be more than the customer's total due (${max.toFixed(2)}).`;
+        }
+        const paidError = document.querySelector('[data-valmsg-for="PaidAmount"]');
+        paidInput.addEventListener('input', () => {
+            const max = maxPayable();
+            if ((parseFloat(paidInput.value) || 0) > max + 0.001) {
+                paidInput.value = max.toFixed(2);
+                if (paidError) paidError.textContent = capMessage(max);
+            } else if (paidError) {
+                paidError.textContent = '';
+            }
+            updatePayment();
+        });
+        document.getElementById('invoiceForm').addEventListener('submit', e => {
+            const max = maxPayable();
+            if ((parseFloat(paidInput.value) || 0) > max + 0.001) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (paidError) paidError.textContent = capMessage(max);
+                paidInput.focus();
+            }
+        });
+        updatePayment();
+        document.querySelector('#paymentMethodBlock [data-payment-method]').addEventListener('change', updatePayment);
+        document.getElementById('payFullButton').addEventListener('click', () => {
+            paidInput.value = (parseFloat(document.getElementById('grandTotal').textContent) || 0).toFixed(2);
+            updatePayment();
+            paidInput.dispatchEvent(new Event('input'));
+        });
 
         document.getElementById('discountValue').addEventListener('input', recalc);
         document.getElementById('discountType').addEventListener('change', recalc);
@@ -607,6 +684,7 @@
             previousEl: document.getElementById('customerPreviousDue'),
             afterEl: document.getElementById('customerDueAfter'),
             grandTotalEl: document.getElementById('grandTotal'),
+            paidEl: document.getElementById('paidAmount'),
             currency: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol)),
             advanceLabel: 'Advance received',
             paidLabel: 'Total received'

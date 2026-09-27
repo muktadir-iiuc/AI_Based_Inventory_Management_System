@@ -8,8 +8,9 @@
         : $"{(Model.From?.ToString("MMM dd, yyyy") ?? "Beginning")} to {(Model.To?.ToString("MMM dd, yyyy") ?? "Today")}";
     var partyLabelLower = Model.PartyLabel.ToLowerInvariant();
     // Recording a payment is an accounting action (same roles as Accounting > New Payment). It
-    // settles the party's *current* total due, whatever date filter the ledger is showing.
-    var canPay = Model.PartyId is > 0 && Model.CurrentBalance > 0
+    // settles the party's *current* total due, whatever date filter the ledger is showing. Any
+    // amount is allowed: a part payment, the full due, or more (the excess is kept as an advance).
+    var canPay = Model.PartyId is > 0
                  && (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.Accountant));
     var payAction = Model.IsCustomer ? "ReceivePayment" : "MakePayment";
     var payController = Model.IsCustomer ? "Customers" : "Suppliers";
@@ -137,6 +138,7 @@
                         <th>Document</th>
                         <th>Type</th>
                         <th>Reference</th>
+                        <th>Payment Method</th>
                         <th class="text-end">Debit</th>
                         <th class="text-end">Credit</th>
                         <th class="text-end">Balance</th>
@@ -146,7 +148,7 @@
                     <tr class="table-secondary fw-semibold">
                         <td></td>
                         <td>@(Model.From?.ToString("MMM dd, yyyy") ?? "—")</td>
-                        <td colspan="3">Opening Balance</td>
+                        <td colspan="4">Opening Balance</td>
                         <td class="text-end">—</td>
                         <td class="text-end">—</td>
                         <td class="text-end">@Model.OpeningBalance.ToString("C")</td>
@@ -157,7 +159,7 @@
                         sl++;
                         <tr>
                             <td class="text-muted">@sl</td>
-                            <td>@row.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@row.Date.ToDateTimeText()</td>
                             <td>
                                 @if (row.LinkController is not null)
                                 {
@@ -170,6 +172,7 @@
                             </td>
                             <td>@row.DocumentType</td>
                             <td class="text-muted">@row.Description</td>
+                            <td>@row.PaymentMethod</td>
                             <td class="text-end">@(row.Debit > 0 ? row.Debit.ToString("C") : "")</td>
                             <td class="text-end">@(row.Credit > 0 ? row.Credit.ToString("C") : "")</td>
                             <td class="text-end fw-semibold">@row.RunningBalance.ToString("C")</td>
@@ -177,12 +180,12 @@
                     }
                     @if (Model.Rows.Count == 0)
                     {
-                        <tr><td colspan="8" class="text-center text-muted py-4">No transactions in this period.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-4">No transactions in this period.</td></tr>
                     }
                 </tbody>
                 <tfoot class="border-top">
                     <tr class="fw-semibold">
-                        <th colspan="5" class="text-end">Period totals</th>
+                        <th colspan="6" class="text-end">Period totals</th>
                         <th class="text-end">@Model.TotalDebit.ToString("C")</th>
                         <th class="text-end">@Model.TotalCredit.ToString("C")</th>
                         <th class="text-end">@Model.ClosingBalance.ToString("C")</th>
@@ -266,21 +269,25 @@ else
                         </div>
                         <div class="mt-1">
                             Not tied to one invoice: the amount is applied automatically, oldest first
-                            (opening balance, then invoices by date).
+                            (opening balance, then invoices by date). Anything beyond the current due is
+                            kept as an advance.
                         </div>
                     </div>
                     <div class="row g-3">
                         <div class="col-sm-6">
                             <label for="ppAmount" class="form-label required-asterisk">Amount</label>
-                            <input id="ppAmount" name="amount" type="number" step="0.01" min="0.01" max="@Model.CurrentBalance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)"
-                                   value="@Model.CurrentBalance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
-                            <div class="form-text">Up to the current due; enter less for a part payment.</div>
+                            <input id="ppAmount" name="amount" type="number" step="0.01" min="0.01"
+                                   value="@(Model.CurrentBalance > 0 ? Model.CurrentBalance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "")" class="form-control" required />
+                            <div class="form-text">Any amount: less for a part payment, more to pay in advance.</div>
                         </div>
                         <div class="col-sm-6">
                             <label for="ppDate" class="form-label required-asterisk">Date</label>
                             <input id="ppDate" name="date" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control" required />
                         </div>
                         <div class="col-12">
+                            @await Html.PartialAsync("_PaymentMethodFields", new PaymentMethodFieldsModel("method", "bankName", PaymentMethod.Cash, null, "pp", "col-sm-6"))
+                        </div>
+                        <div class="col-12 mt-0">
                             <label for="ppNotes" class="form-label">Notes</label>
                             <input id="ppNotes" name="notes" type="text" maxlength="200" class="form-control" placeholder="Optional (cheque no., reference…)" />
                         </div>

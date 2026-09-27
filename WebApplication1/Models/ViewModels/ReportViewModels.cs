@@ -28,6 +28,7 @@ public class StockValuationViewModel
 public class SalesProfitabilityRow
 {
     public DateTime Date { get; set; }
+    public DateTime CreatedAt { get; set; }
     public string InvoiceNumber { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
     public string? BatchNumber { get; set; }

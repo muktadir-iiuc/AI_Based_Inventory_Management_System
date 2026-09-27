@@ -306,7 +306,7 @@
                         <tr>
                             <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@s.Id">@s.InvoiceNumber</a></td>
                             <td>@s.Customer?.Name</td>
-                            <td>@s.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@s.Date.ToDateTimeText(s.CreatedAt)</td>
                             <td class="text-end">@s.TotalAmount.ToString("C")</td>
                         </tr>
                     }
@@ -329,7 +329,7 @@
                         <tr>
                             <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@p.Id">@p.InvoiceNumber</a></td>
                             <td>@p.Supplier?.Name</td>
-                            <td>@p.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@p.Date.ToDateTimeText(p.CreatedAt)</td>
                             <td class="text-end">@p.TotalAmount.ToString("C")</td>
                         </tr>
                     }

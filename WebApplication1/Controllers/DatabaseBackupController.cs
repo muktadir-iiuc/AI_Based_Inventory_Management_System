@@ -71,6 +71,29 @@ public class DatabaseBackupController(ApplicationDbContext db, IDatabaseBackupSe
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunNow()
     {
+        // The page posts via fetch so the browser can then save the file into a folder on the
+        // user's own PC (the server can't write there).
+        if (Request.Headers.XRequestedWith == "XMLHttpRequest")
+        {
+            try
+            {
+                var run = await backups.RunBackupAsync(BackupTrigger.Manual, User.Identity?.Name);
+                var ok = run.Status == BackupStatus.Succeeded;
+                var downloadable = ok && (CanRead(run.FilePath) || (run.CopyPath is not null && CanRead(run.CopyPath)));
+                return Json(new
+                {
+                    ok,
+                    fileName = run.FileName,
+                    downloadUrl = downloadable ? Url.Action(nameof(Download), new { id = run.Id }) : null,
+                    message = ok ? $"Backup created: {run.FileName}." : $"Backup failed: {run.ErrorMessage}"
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Json(new { ok = false, message = ex.Message });
+            }
+        }
+
         try
         {
             var result = await backups.RunBackupAsync(BackupTrigger.Manual, User.Identity?.Name);

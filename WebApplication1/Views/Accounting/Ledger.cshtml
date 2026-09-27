@@ -14,7 +14,7 @@
             @foreach (var line in Model.Rows)
             {
                 <tr>
-                    <td data-date="@line.Date?.ToString("yyyy-MM-dd")">@line.Date?.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@line.Date?.ToString("yyyy-MM-dd")">@line.Date?.ToDateTimeText()</td>
                     <td><a asp-action="JournalEntryDetails" asp-route-id="@line.JournalEntryId" class="fw-semibold">@line.EntryNumber</a></td>
                     <td>@line.Memo</td>
                     <td class="text-end">@(line.Debit > 0 ? line.Debit.ToString("C") : "")</td>

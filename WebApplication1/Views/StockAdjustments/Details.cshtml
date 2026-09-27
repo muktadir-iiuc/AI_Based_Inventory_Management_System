@@ -28,11 +28,11 @@
                         }
                     </dd>
                     <dt class="col-5">Requested by</dt><dd class="col-7">@Model.RequestedBy</dd>
-                    <dt class="col-5">Requested</dt><dd class="col-7">@Model.RequestedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                    <dt class="col-5">Requested</dt><dd class="col-7">@Model.RequestedAt.ToLocalTime().ToDateTimeText()</dd>
                     @if (Model.ReviewedAt.HasValue)
                     {
                         <dt class="col-5">@(Model.Status == StockAdjustmentStatus.Cancelled ? "Cancelled by" : "Reviewed by")</dt><dd class="col-7">@Model.ReviewedBy</dd>
-                        <dt class="col-5">@(Model.Status == StockAdjustmentStatus.Cancelled ? "Cancelled" : "Reviewed")</dt><dd class="col-7">@Model.ReviewedAt.Value.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                        <dt class="col-5">@(Model.Status == StockAdjustmentStatus.Cancelled ? "Cancelled" : "Reviewed")</dt><dd class="col-7">@Model.ReviewedAt.Value.ToLocalTime().ToDateTimeText()</dd>
                     }
                     @if (!string.IsNullOrWhiteSpace(Model.Notes))
                     {

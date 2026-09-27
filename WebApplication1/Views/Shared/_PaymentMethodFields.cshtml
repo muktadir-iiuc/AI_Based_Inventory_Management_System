@@ -1,0 +1,20 @@
+@model PaymentMethodFieldsModel
+@* Payment method + bank name (bank only). Shown/hidden and required-toggled by site.js. *@
+<div class="row" data-payment-method-group>
+    <div class="@Model.ColumnClass mb-3">
+        <label class="form-label required-asterisk" for="@(Model.IdPrefix)Method">Payment Method</label>
+        <select class="form-select" id="@(Model.IdPrefix)Method" name="@Model.MethodField" data-payment-method data-no-select2>
+            @foreach (var method in Enum.GetValues<PaymentMethod>())
+            {
+                <option value="@((int)method)" selected="@(method == Model.Method)">@PaymentMethods.Name(method)</option>
+            }
+        </select>
+        <span class="text-danger small">@ViewData.ModelState[Model.MethodField]?.Errors.FirstOrDefault()?.ErrorMessage</span>
+    </div>
+    <div class="@Model.ColumnClass mb-3 @(Model.Method == PaymentMethod.Bank ? "" : "d-none")" data-bank-name-group>
+        <label class="form-label required-asterisk" for="@(Model.IdPrefix)BankName">Bank Name</label>
+        <input class="form-control" id="@(Model.IdPrefix)BankName" name="@Model.BankField" value="@Model.BankName" maxlength="100"
+               placeholder="e.g. Dutch-Bangla Bank" required="@(Model.Method == PaymentMethod.Bank)" />
+        <span class="text-danger small">@ViewData.ModelState[Model.BankField]?.Errors.FirstOrDefault()?.ErrorMessage</span>
+    </div>
+</div>

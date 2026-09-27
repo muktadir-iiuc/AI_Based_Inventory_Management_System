@@ -184,3 +184,24 @@
 .d-flex > .select2-container ~ .btn {
     flex-shrink: 0;
 }
+
+/* Line-item tables on the invoice/transfer/adjustment Create & Edit pages. Fixed layout means a
+   long product name is truncated inside its Select2 box instead of widening the Product column
+   and squeezing the number columns; below the min-width the card scrolls sideways instead.
+   Product takes whatever width the fixed-width columns leave. */
+.line-items-table {
+    table-layout: fixed;
+    min-width: 760px;
+}
+
+.line-items-table .select2-container {
+    max-width: 100%;
+}
+
+.line-items-table .select2-selection__rendered,
+.line-items-table .line-total,
+.line-items-table .category-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -121,6 +121,7 @@
                             <div class="form-text" id="amountHint">Pre-filled with the selected invoice's due amount — adjust for a partial payment, but it can't exceed what's still due.</div>
                         </div>
                     </div>
+                    @await Html.PartialAsync("_PaymentMethodFields", new PaymentMethodFieldsModel(nameof(Model.Method), nameof(Model.BankName), Model.Method, Model.BankName, "payment"))
                     <div class="mb-0">
                         <label asp-for="Notes" class="form-label"></label>
                         <input asp-for="Notes" class="form-control" placeholder="Optional note for this payment" />

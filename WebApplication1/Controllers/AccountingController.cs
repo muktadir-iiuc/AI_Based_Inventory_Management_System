@@ -199,6 +199,11 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             await ValidateInvoicePaymentAsync(model);
         }
 
+        if (PaymentMethods.Validate(model.Method, model.BankName) is { } methodError)
+        {
+            ModelState.AddModelError(model.Method == PaymentMethod.Bank ? nameof(model.BankName) : nameof(model.Method), methodError);
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateInvoicesAsync();
@@ -214,6 +219,8 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
             Date = model.Date,
             Amount = model.Amount,
             Notes = model.Notes,
+            Method = model.Method,
+            BankName = PaymentMethods.CleanBankName(model.Method, model.BankName),
             PurchaseInvoiceId = isOut && !model.AgainstOpeningBalance ? model.PurchaseInvoiceId : null,
             SalesInvoiceId = !isOut && !model.AgainstOpeningBalance ? model.SalesInvoiceId : null,
             SupplierId = isOut && model.AgainstOpeningBalance ? model.SupplierId : null,
@@ -327,7 +334,7 @@ public class AccountingController(ApplicationDbContext db, IAccountingService ac
         var rows = lines.Select(l =>
         {
             running += normalDebit ? (l.Debit - l.Credit) : (l.Credit - l.Debit);
-            return new LedgerLineRow(l.JournalEntry?.Date, l.JournalEntryId, l.JournalEntry?.EntryNumber, l.Memo, l.Debit, l.Credit, running);
+            return new LedgerLineRow(l.JournalEntry?.Date.WithTime(l.JournalEntry.CreatedAt), l.JournalEntryId, l.JournalEntry?.EntryNumber, l.Memo, l.Debit, l.Credit, running);
         }).ToList();
 
         return View(new LedgerViewModel { Account = account, Rows = rows });

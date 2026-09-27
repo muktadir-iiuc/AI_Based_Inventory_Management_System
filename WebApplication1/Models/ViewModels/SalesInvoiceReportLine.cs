@@ -33,8 +33,11 @@ public class SalesInvoiceReportHeader
     public string DueAmount { get; set; } = string.Empty;
 
     // Customer's total outstanding balance across all their sales invoices (this one included),
-    // shown on the thermal receipt below the per-invoice Balance Due.
+    // shown as "Total Due" below the per-invoice Balance Due on the invoice PDF and thermal receipt.
     public string CustomerOutstandingDue { get; set; } = string.Empty;
+
+    // The invoice total spelled out ("Taka ... Only") — A4 invoice only.
+    public string AmountInWords { get; set; } = string.Empty;
 
     public static readonly byte[] TransparentPixel = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
@@ -49,7 +52,8 @@ public class SalesInvoiceReportLine
     // column would otherwise truncate it off the end of a long name. The A4 invoice puts brand and
     // size straight into ProductName instead.
     public string Details { get; set; } = string.Empty;
-    public string Sku { get; set; } = string.Empty;
+    public string Sku { get; set; } = string.Empty; // thermal receipt
+    public string Category { get; set; } = string.Empty; // A4 invoice
     public string Quantity { get; set; } = string.Empty;
     public string UnitPrice { get; set; } = string.Empty;
     public string LineTotal { get; set; } = string.Empty;

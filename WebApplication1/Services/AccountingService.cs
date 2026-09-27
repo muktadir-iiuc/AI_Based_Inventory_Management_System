@@ -178,7 +178,9 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
 
     public async Task<JournalEntry> PostPaymentAsync(Payment payment)
     {
-        var cash = await GetAccountAsync(SystemAccountCodes.Cash);
+        // Cash, bKash, Rocket, Nagad or Bank — whichever account the money actually moved through.
+        var cash = await GetAccountAsync(PaymentMethods.AccountCode(payment.Method));
+        var via = payment.MethodText;
         JournalEntry entry;
 
         if (payment.Direction == PaymentDirection.Out)
@@ -194,7 +196,7 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
                 Lines =
                 [
                     new JournalEntryLine { AccountId = payable.Id, Debit = payment.Amount, Credit = 0, Memo = "Payable settled" },
-                    new JournalEntryLine { AccountId = cash.Id, Debit = 0, Credit = payment.Amount, Memo = "Cash paid out" }
+                    new JournalEntryLine { AccountId = cash.Id, Debit = 0, Credit = payment.Amount, Memo = $"Paid out ({via})" }
                 ]
             };
         }
@@ -210,7 +212,7 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
                 SourceReference = payment.PaymentNumber,
                 Lines =
                 [
-                    new JournalEntryLine { AccountId = cash.Id, Debit = payment.Amount, Credit = 0, Memo = "Cash received" },
+                    new JournalEntryLine { AccountId = cash.Id, Debit = payment.Amount, Credit = 0, Memo = $"Received ({via})" },
                     new JournalEntryLine { AccountId = receivable.Id, Debit = 0, Credit = payment.Amount, Memo = "Receivable settled" }
                 ]
             };

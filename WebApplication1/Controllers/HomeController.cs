@@ -80,7 +80,12 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
                 .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
         }
 
-        vm.CashBalance = await GetBalanceAsync(SystemAccountCodes.Cash, debitPositive: true);
+        // "Cash & Bank" = all money accounts: cash plus bKash, Rocket, Nagad and bank.
+        vm.CashBalance = 0;
+        foreach (var method in Enum.GetValues<PaymentMethod>())
+        {
+            vm.CashBalance += await GetBalanceAsync(PaymentMethods.AccountCode(method), debitPositive: true);
+        }
         vm.AccountsReceivableBalance = await GetBalanceAsync(SystemAccountCodes.AccountsReceivable, debitPositive: true);
         vm.AccountsPayableBalance = await GetBalanceAsync(SystemAccountCodes.AccountsPayable, debitPositive: false);
 

@@ -91,7 +91,7 @@
                     <td><a asp-action="Details" asp-route-id="@inv.Id" class="fw-semibold">@inv.InvoiceNumber</a></td>
                     <td>@inv.Supplier?.Name</td>
                     <td>@inv.Warehouse?.Name</td>
-                    <td data-date="@inv.Date.ToString("yyyy-MM-dd")">@inv.Date.ToString("MMM dd, yyyy")</td>
+                    <td data-date="@inv.Date.ToString("yyyy-MM-dd")">@inv.Date.ToDateTimeText(inv.CreatedAt)</td>
                     <td>
                         @if (inv.Status == DocumentStatus.Posted)
                         {

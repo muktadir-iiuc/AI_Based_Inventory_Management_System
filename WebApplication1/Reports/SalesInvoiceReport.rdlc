@@ -30,6 +30,8 @@
         <Field Name="TotalAmount"><DataField>TotalAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="PaidAmount"><DataField>PaidAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="DueAmount"><DataField>DueAmount</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="CustomerOutstandingDue"><DataField>CustomerOutstandingDue</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="AmountInWords"><DataField>AmountInWords</DataField><rd:TypeName>System.String</rd:TypeName></Field>
       </Fields>
       <Query>
         <DataSourceName>DataSource1</DataSourceName>
@@ -40,7 +42,7 @@
       <Fields>
         <Field Name="SL"><DataField>SL</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="ProductName"><DataField>ProductName</DataField><rd:TypeName>System.String</rd:TypeName></Field>
-        <Field Name="Sku"><DataField>Sku</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="Category"><DataField>Category</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Quantity"><DataField>Quantity</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="UnitPrice"><DataField>UnitPrice</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="LineTotal"><DataField>LineTotal</DataField><rd:TypeName>System.String</rd:TypeName></Field>
@@ -289,8 +291,8 @@
             <TablixBody>
               <TablixColumns>
                 <TablixColumn><Width>0.5in</Width></TablixColumn>
-                <TablixColumn><Width>2.6in</Width></TablixColumn>
-                <TablixColumn><Width>1.0in</Width></TablixColumn>
+                <TablixColumn><Width>2.3in</Width></TablixColumn>
+                <TablixColumn><Width>1.3in</Width></TablixColumn>
                 <TablixColumn><Width>0.9in</Width></TablixColumn>
                 <TablixColumn><Width>1.3in</Width></TablixColumn>
                 <TablixColumn><Width>1.4in</Width></TablixColumn>
@@ -306,7 +308,7 @@
                       <Textbox Name="HdrProduct"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Product</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="HdrSku"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>SKU</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
+                      <Textbox Name="HdrCategory"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Category</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
                       <Textbox Name="HdrQty"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Qty</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom><VerticalAlign>Middle</VerticalAlign></Style></Textbox>
@@ -329,7 +331,7 @@
                       <Textbox Name="CellProduct"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!ProductName.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
-                      <Textbox Name="CellSku"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Sku.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                      <Textbox Name="CellCategory"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Category.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
                       <Textbox Name="CellQty"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Quantity.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
@@ -442,6 +444,17 @@
                     </CellContents></TablixCell>
                   </TablixCells>
                 </TablixRow>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellCustomerDueCaption"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Total Due</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><TopBorder><Color>#cccccc</Color><Style>Solid</Style><Width>1pt</Width></TopBorder><PaddingTop>4pt</PaddingTop></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="CellCustomerDueValue"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!CustomerOutstandingDue.Value</Value><Style><FontSize>10pt</FontSize><FontWeight>Bold</FontWeight></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border><TopBorder><Color>#cccccc</Color><Style>Solid</Style><Width>1pt</Width></TopBorder><PaddingTop>4pt</PaddingTop></Style></Textbox>
+                    </CellContents></TablixCell>
+                  </TablixCells>
+                </TablixRow>
               </TablixRows>
             </TablixBody>
             <TablixColumnHierarchy><TablixMembers><TablixMember /><TablixMember /></TablixMembers></TablixColumnHierarchy>
@@ -455,6 +468,7 @@
                     <TablixMember />
                     <TablixMember />
                     <TablixMember />
+                    <TablixMember />
                   </TablixMembers>
                 </TablixMember>
               </TablixMembers>
@@ -462,13 +476,34 @@
             <DataSetName>InvoiceHeader</DataSetName>
             <Top>3.21in</Top>
             <Left>4.6in</Left>
-            <Height>1.14in</Height>
+            <Height>1.44in</Height>
             <Width>3.1in</Width>
             <Style><Border><Style>None</Style></Border></Style>
           </Tablix>
 
-          <Textbox Name="LblNotesCaption">
+          <Tablix Name="TablixAmountInWords">
+            <TablixBody>
+              <TablixColumns><TablixColumn><Width>4.2in</Width></TablixColumn></TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.36in</Height>
+                  <TablixCells><TablixCell><CellContents>
+                    <Textbox Name="CellAmountInWords"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Amount in Words: </Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style></TextRun><TextRun><Value>=Fields!AmountInWords.Value</Value><Style><FontSize>9pt</FontSize><FontStyle>Italic</FontStyle></Style></TextRun></TextRuns></Paragraph></Paragraphs><Style><Border><Style>None</Style></Border></Style></Textbox>
+                  </CellContents></TablixCell></TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
+            <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="AmountInWordsGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
+            <DataSetName>InvoiceHeader</DataSetName>
             <Top>3.21in</Top>
+            <Left>0in</Left>
+            <Height>0.36in</Height>
+            <Width>4.2in</Width>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Tablix>
+          <Textbox Name="LblNotesCaption">
+            <Top>3.63in</Top>
             <Left>0in</Left>
             <Height>0.2in</Height>
             <Width>4.2in</Width>
@@ -491,35 +526,57 @@
             <TablixColumnHierarchy><TablixMembers><TablixMember /></TablixMembers></TablixColumnHierarchy>
             <TablixRowHierarchy><TablixMembers><TablixMember><Group Name="NotesGroup" /></TablixMember></TablixMembers></TablixRowHierarchy>
             <DataSetName>InvoiceHeader</DataSetName>
-            <Top>3.43in</Top>
+            <Top>3.85in</Top>
             <Left>0in</Left>
             <Height>0.5in</Height>
             <Width>4.2in</Width>
             <Style><Border><Style>None</Style></Border></Style>
           </Tablix>
 
-          <Line Name="LineSignature">
-            <Top>4.66in</Top>
-            <Left>4.9in</Left>
-            <Height>0in</Height>
-            <Width>2.8in</Width>
-            <Style><Border><Color>#333333</Color><Style>Solid</Style><Width>0.75pt</Width></Border></Style>
-          </Line>
-          <Textbox Name="LblSignature">
-            <Top>4.71in</Top>
-            <Left>4.9in</Left>
-            <Height>0.2in</Height>
-            <Width>2.8in</Width>
-            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Authorized Signature</Value><Style><FontSize>8pt</FontSize><Color>#666666</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
-            <Style><Border><Style>None</Style></Border></Style>
-          </Textbox>
-
         </ReportItems>
-        <Height>5in</Height>
+        <Height>4.75in</Height>
         <Style />
       </Body>
       <Width>7.7in</Width>
       <Page>
+      <PageFooter>
+        <Height>0.75in</Height>
+        <PrintOnFirstPage>true</PrintOnFirstPage>
+        <PrintOnLastPage>true</PrintOnLastPage>
+        <ReportItems>
+          <Line Name="LineCustomerSignature">
+            <Top>0.45in</Top>
+            <Left>0in</Left>
+            <Height>0in</Height>
+            <Width>2.6in</Width>
+            <Style><Border><Color>#333333</Color><Style>Solid</Style><Width>0.75pt</Width></Border></Style>
+          </Line>
+          <Textbox Name="LblCustomerSignature">
+            <Top>0.5in</Top>
+            <Left>0in</Left>
+            <Height>0.2in</Height>
+            <Width>2.6in</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Customer Signature</Value><Style><FontSize>8pt</FontSize><Color>#666666</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+          <Line Name="LineSignature">
+            <Top>0.45in</Top>
+            <Left>5.1in</Left>
+            <Height>0in</Height>
+            <Width>2.6in</Width>
+            <Style><Border><Color>#333333</Color><Style>Solid</Style><Width>0.75pt</Width></Border></Style>
+          </Line>
+          <Textbox Name="LblSignature">
+            <Top>0.5in</Top>
+            <Left>5.1in</Left>
+            <Height>0.2in</Height>
+            <Width>2.6in</Width>
+            <Paragraphs><Paragraph><TextRuns><TextRun><Value>Authorized Signature</Value><Style><FontSize>8pt</FontSize><Color>#666666</Color></Style></TextRun></TextRuns><Style><TextAlign>Center</TextAlign></Style></Paragraph></Paragraphs>
+            <Style><Border><Style>None</Style></Border></Style>
+          </Textbox>
+        </ReportItems>
+        <Style />
+      </PageFooter>
         <PageHeight>11in</PageHeight>
         <PageWidth>8.5in</PageWidth>
         <LeftMargin>0.4in</LeftMargin>

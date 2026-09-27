@@ -46,7 +46,7 @@
                     {
                         <tr>
                             <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@inv.Id">@inv.InvoiceNumber</a></td>
-                            <td>@inv.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@inv.Date.ToDateTimeText(inv.CreatedAt)</td>
                             <td>@inv.Status</td>
                             <td class="text-end">@inv.TotalAmount.ToString("C")</td>
                         </tr>

@@ -29,7 +29,7 @@
                     <dt class="col-5">Transfer #</dt><dd class="col-7">@Model.TransferNumber</dd>
                     <dt class="col-5">From</dt><dd class="col-7">@Model.FromWarehouse?.Name</dd>
                     <dt class="col-5">To</dt><dd class="col-7">@Model.ToWarehouse?.Name</dd>
-                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
+                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToDateTimeText(Model.CreatedAt)</dd>
                     <dt class="col-5">Status</dt>
                     <dd class="col-7">
                         @switch (Model.DisplayStatus)
@@ -42,11 +42,11 @@
                         }
                     </dd>
                     <dt class="col-5">Requested by</dt><dd class="col-7">@Model.CreatedBy</dd>
-                    <dt class="col-5">Requested</dt><dd class="col-7">@Model.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                    <dt class="col-5">Requested</dt><dd class="col-7">@Model.CreatedAt.ToLocalTime().ToDateTimeText()</dd>
                     @if (Model.ReviewedAt.HasValue)
                     {
                         <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Withdrawn ? "Withdrawn by" : "Reviewed by")</dt><dd class="col-7">@Model.ReviewedBy</dd>
-                        <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Withdrawn ? "Withdrawn" : "Reviewed")</dt><dd class="col-7">@Model.ReviewedAt.Value.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                        <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Withdrawn ? "Withdrawn" : "Reviewed")</dt><dd class="col-7">@Model.ReviewedAt.Value.ToLocalTime().ToDateTimeText()</dd>
                     }
                     @if (!string.IsNullOrWhiteSpace(Model.ReviewNote))
                     {

@@ -12,16 +12,21 @@ public class PartyPaymentService(ApplicationDbContext db, IAccountingService acc
     private sealed record Target(string Label, decimal Due, Action<Payment> Assign);
 
     public async Task<PartyPaymentResult> RecordAsync(PartyLedgerType type, int partyId, decimal amount, DateTime date,
-        string? notes, List<int>? warehouseIds, string? createdBy)
+        PaymentMethod method, string? bankName, string? notes, List<int>? warehouseIds, string? createdBy,
+        bool save = true)
     {
         amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
         if (amount <= 0)
         {
             return Fail("Enter an amount greater than zero.");
         }
+        if (PaymentMethods.Validate(method, bankName) is { } methodError)
+        {
+            return Fail(methodError);
+        }
+        bankName = PaymentMethods.CleanBankName(method, bankName);
 
         var isCustomer = type == PartyLedgerType.Customer;
-        var partyName = isCustomer ? "customer" : "supplier";
 
         // Opening balance is signed in the party's natural direction (positive = they owe us / we
         // owe them), and every party-level payment (no invoice) reduces it — see Customer.OpeningBalance.
@@ -80,19 +85,15 @@ public class PartyPaymentService(ApplicationDbContext db, IAccountingService acc
             }
         }
 
-        // What the ledger shows as this party's closing balance: everything still open, net of any
-        // advance (a negative opening balance) that has not been used up yet.
-        var totalDue = targets.Sum(t => t.Due) + Math.Min(openingRemaining, 0);
-        if (totalDue <= 0)
-        {
-            return Fail($"This {partyName} has nothing due, so there is nothing to pay.");
-        }
-        if (amount > totalDue)
-        {
-            return Fail($"The amount cannot exceed the {partyName}'s outstanding due of {totalDue:N2}.");
-        }
+        // No upper limit: whatever is left after every open item is settled (or the whole amount,
+        // when nothing is due) is kept as a party-level payment, which drives the opening balance
+        // negative — the same "advance" representation a negative opening balance already uses.
+        targets.Add(new Target("Advance", decimal.MaxValue,
+            isCustomer ? (Payment p) => p.CustomerId = partyId : (Payment p) => p.SupplierId = partyId));
 
-        var paymentCount = await db.Payments.CountAsync();
+        // Payments the caller has added but not saved yet (save: false) still take a number.
+        var paymentCount = await db.Payments.CountAsync()
+                           + db.ChangeTracker.Entries<Payment>().Count(e => e.State == EntityState.Added);
         var remaining = amount;
         var result = new List<Payment>();
         var applied = new List<string>();
@@ -108,6 +109,8 @@ public class PartyPaymentService(ApplicationDbContext db, IAccountingService acc
                 Direction = isCustomer ? PaymentDirection.In : PaymentDirection.Out,
                 Date = date,
                 Amount = part,
+                Method = method,
+                BankName = bankName,
                 // Ties the pieces of one ledger payment together in the Payments list.
                 Notes = string.IsNullOrWhiteSpace(notes)
                     ? $"Ledger payment of {amount:N2} — applied to {target.Label}"
@@ -123,14 +126,10 @@ public class PartyPaymentService(ApplicationDbContext db, IAccountingService acc
             remaining -= part;
         }
 
-        // Only reachable if an advance (negative opening balance) made totalDue smaller than the
-        // sum of the open items, in which case the amount is always fully placed above; guard anyway.
-        if (remaining > 0)
+        if (save)
         {
-            return Fail("The amount could not be fully applied. Please try a smaller amount.");
+            await db.SaveChangesAsync();
         }
-
-        await db.SaveChangesAsync();
 
         return new PartyPaymentResult
         {
@@ -138,6 +137,26 @@ public class PartyPaymentService(ApplicationDbContext db, IAccountingService acc
             PaymentNumbers = result.Select(p => p.PaymentNumber).ToList(),
             Applied = applied
         };
+    }
+
+    public async Task<decimal> CustomerBalanceAsync(int customerId, List<int>? warehouseIds)
+    {
+        var invoices = db.SalesInvoices.Where(i => i.CustomerId == customerId && i.Status == DocumentStatus.Posted
+                                                   && (warehouseIds == null || warehouseIds.Contains(i.WarehouseId)));
+
+        var invoiced = await db.SalesInvoiceItems.Where(i => i.IsCurrent && invoices.Any(s => s.Id == i.SalesInvoiceId))
+            .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice - i.DiscountShare)) ?? 0;
+        var paid = await db.Payments.Where(p => invoices.Any(s => s.Id == p.SalesInvoiceId))
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+        var returned = await db.SalesReturnItems.Where(r => invoices.Any(s => s.Id == r.SalesReturn!.SalesInvoiceId))
+            .SumAsync(r => (decimal?)(r.Quantity * r.UnitPrice - r.DiscountShare)) ?? 0;
+
+        // Opening balances and the payments against them aren't warehouse-scoped — see the ledger.
+        var opening = await db.Customers.Where(c => c.Id == customerId).Select(c => c.OpeningBalance).FirstOrDefaultAsync();
+        var openingPaid = await db.Payments.Where(p => p.SalesInvoiceId == null && p.CustomerId == customerId)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
+        return opening - openingPaid + invoiced - paid - returned;
     }
 
     private static PartyPaymentResult Fail(string error) => new() { Ok = false, Error = error };

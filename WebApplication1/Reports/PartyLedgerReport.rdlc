@@ -42,6 +42,7 @@
         <Field Name="DocType"><DataField>DocType</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="DocNumber"><DataField>DocNumber</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Description"><DataField>Description</DataField><rd:TypeName>System.String</rd:TypeName></Field>
+        <Field Name="PaymentMethod"><DataField>PaymentMethod</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Debit"><DataField>Debit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Credit"><DataField>Credit</DataField><rd:TypeName>System.String</rd:TypeName></Field>
         <Field Name="Balance"><DataField>Balance</DataField><rd:TypeName>System.String</rd:TypeName></Field>
@@ -278,13 +279,14 @@
           <Tablix Name="TablixLedger">
             <TablixBody>
               <TablixColumns>
-                <TablixColumn><Width>0.85in</Width></TablixColumn>
-                <TablixColumn><Width>1.15in</Width></TablixColumn>
+                <TablixColumn><Width>0.8in</Width></TablixColumn>
                 <TablixColumn><Width>1.0in</Width></TablixColumn>
-                <TablixColumn><Width>1.6in</Width></TablixColumn>
-                <TablixColumn><Width>0.95in</Width></TablixColumn>
                 <TablixColumn><Width>0.95in</Width></TablixColumn>
                 <TablixColumn><Width>1.2in</Width></TablixColumn>
+                <TablixColumn><Width>1.15in</Width></TablixColumn>
+                <TablixColumn><Width>0.85in</Width></TablixColumn>
+                <TablixColumn><Width>0.85in</Width></TablixColumn>
+                <TablixColumn><Width>0.9in</Width></TablixColumn>
               </TablixColumns>
               <TablixRows>
                 <TablixRow>
@@ -301,6 +303,9 @@
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
                       <Textbox Name="Hdr3"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Description</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
+                      <Textbox Name="HdrMethod"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Payment Method</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
                       <Textbox Name="Hdr4"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>Debit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style></Textbox>
@@ -329,6 +334,9 @@
                       <Textbox Name="Cell3"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Description.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
+                      <Textbox Name="CellMethod"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!PaymentMethod.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
+                    </CellContents></TablixCell>
+                    <TablixCell><CellContents>
                       <Textbox Name="Cell4"><CanGrow>true</CanGrow><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Debit.Value</Value><Style><FontSize>9pt</FontSize></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs><Style><Border><Style>Solid</Style><Color>#dddddd</Color></Border><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>2pt</PaddingTop><PaddingBottom>2pt</PaddingBottom></Style></Textbox>
                     </CellContents></TablixCell>
                     <TablixCell><CellContents>
@@ -343,6 +351,7 @@
             </TablixBody>
             <TablixColumnHierarchy>
               <TablixMembers>
+                <TablixMember />
                 <TablixMember />
                 <TablixMember />
                 <TablixMember />
@@ -485,61 +494,70 @@
               <Top>0in</Top>
               <Left>0.00in</Left>
               <Height>0.3in</Height>
-              <Width>0.85in</Width>
+              <Width>0.8in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Date</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr1">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>0.85in</Left>
+              <Left>0.80in</Left>
               <Height>0.3in</Height>
-              <Width>1.15in</Width>
+              <Width>1.0in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Document</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr2">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>2.00in</Left>
+              <Left>1.80in</Left>
               <Height>0.3in</Height>
-              <Width>1.0in</Width>
+              <Width>0.95in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Number</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr3">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>3.00in</Left>
+              <Left>2.75in</Left>
               <Height>0.3in</Height>
-              <Width>1.6in</Width>
+              <Width>1.2in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Description</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
+              <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
+            </Textbox>
+            <Textbox Name="PgHdrMethod">
+              <CanGrow>false</CanGrow>
+              <Top>0in</Top>
+              <Left>3.95in</Left>
+              <Height>0.3in</Height>
+              <Width>1.15in</Width>
+              <Paragraphs><Paragraph><TextRuns><TextRun><Value>Payment Method</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Left</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr4">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>4.60in</Left>
+              <Left>5.10in</Left>
               <Height>0.3in</Height>
-              <Width>0.95in</Width>
+              <Width>0.85in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Debit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr5">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>5.55in</Left>
+              <Left>5.95in</Left>
               <Height>0.3in</Height>
-              <Width>0.95in</Width>
+              <Width>0.85in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Credit</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>
             <Textbox Name="PgHdr6">
               <CanGrow>false</CanGrow>
               <Top>0in</Top>
-              <Left>6.50in</Left>
+              <Left>6.80in</Left>
               <Height>0.3in</Height>
-              <Width>1.2in</Width>
+              <Width>0.9in</Width>
               <Paragraphs><Paragraph><TextRuns><TextRun><Value>Balance</Value><Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize><Color>White</Color></Style></TextRun></TextRuns><Style><TextAlign>Right</TextAlign></Style></Paragraph></Paragraphs>
               <Style><Border><Style>Solid</Style></Border><BackgroundColor>#0d3b66</BackgroundColor><PaddingLeft>3pt</PaddingLeft><PaddingRight>3pt</PaddingRight><PaddingTop>3pt</PaddingTop><PaddingBottom>3pt</PaddingBottom></Style>
             </Textbox>

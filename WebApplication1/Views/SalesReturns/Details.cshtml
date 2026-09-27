@@ -13,7 +13,7 @@
                     <dt class="col-5">Invoice</dt>
                     <dd class="col-7"><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@Model.SalesInvoiceId">@Model.SalesInvoice?.InvoiceNumber</a></dd>
                     <dt class="col-5">Customer</dt><dd class="col-7">@Model.SalesInvoice?.Customer?.Name</dd>
-                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToString("MMM dd, yyyy")</dd>
+                    <dt class="col-5">Date</dt><dd class="col-7">@Model.Date.ToDateTimeText(Model.CreatedAt)</dd>
                     <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
                     <dt class="col-5">Total</dt><dd class="col-7 fw-bold">@Model.TotalAmount.ToString("C")</dd>
                 </dl>

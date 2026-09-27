@@ -20,7 +20,7 @@
 {
     <div class="alert alert-danger py-2">
         <i class="fas fa-triangle-exclamation me-1"></i>
-        The most recent backup (@latest.StartedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")) failed: @latest.ErrorMessage
+        The most recent backup (@latest.StartedAt.ToLocalTime().ToDateTimeText()) failed: @latest.ErrorMessage
     </div>
 }
 
@@ -33,6 +33,19 @@
                 <dl class="row small mb-3">
                     <dt class="col-4 text-muted fw-normal">Saved to</dt>
                     <dd class="col-8 text-break">@(string.IsNullOrWhiteSpace(Model.EffectiveDirectory) ? "— (set a backup folder in the schedule settings)" : Model.EffectiveDirectory)</dd>
+                </dl>
+                <dl class="row small mb-3">
+                    <dt class="col-4 text-muted fw-normal">Copy on this PC</dt>
+                    <dd class="col-8">
+                        <span id="localFolderName" class="text-break">—</span>
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="chooseFolderButton"><i class="fas fa-folder-open"></i> Choose folder…</button>
+                            <button type="button" class="btn btn-sm btn-link text-danger d-none" id="clearFolderButton">Stop saving here</button>
+                        </div>
+                        <div class="form-text" id="localFolderHelp">
+                            Pick a folder on your computer (e.g. <strong>D:\Backup</strong>) and every manual backup is saved there as well.
+                        </div>
+                    </dd>
                 </dl>
                 <form asp-action="RunNow" method="post" id="runNowForm">
                     <button type="submit" class="btn btn-primary" id="runNowButton"><i class="fas fa-database"></i> Back up now</button>
@@ -86,7 +99,7 @@
                     </div>
                     @if (Model.NextRunLocal is { } next)
                     {
-                        <div class="alert alert-info py-2 small"><i class="fas fa-clock me-1"></i> Next automatic backup: <strong>@next.ToString("ddd, dd MMM yyyy HH:mm")</strong></div>
+                        <div class="alert alert-info py-2 small"><i class="fas fa-clock me-1"></i> Next automatic backup: <strong>@next.ToDateTimeText()</strong></div>
                     }
                     <button type="submit" class="btn btn-primary">Save schedule</button>
                 </form>
@@ -114,7 +127,7 @@
             @foreach (var b in Model.Backups)
             {
                 <tr>
-                    <td data-order="@b.StartedAt.ToString("yyyyMMddHHmmss")">@b.StartedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                    <td data-order="@b.StartedAt.ToString("yyyyMMddHHmmss")">@b.StartedAt.ToLocalTime().ToDateTimeText()</td>
                     <td>@b.Trigger</td>
                     <td>
                         @if (b.Status == BackupStatus.Succeeded) { <span class="badge text-bg-success">Succeeded</span> }
@@ -173,11 +186,129 @@
             if (typeof jQuery !== 'undefined') { jQuery(frequency).on('select2:select', sync); }
             sync();
 
-            // A backup runs inside this request; stop a second click from queueing another one.
-            document.getElementById('runNowForm').addEventListener('submit', function () {
-                var button = document.getElementById('runNowButton');
+        })();
+
+        // Manual backups are also saved on the user's own PC. The server can't write to the
+        // browser's machine, so the browser does it: with the File System Access API (Chrome/Edge)
+        // into a folder picked once and remembered in IndexedDB; elsewhere as a normal download.
+        (function () {
+            var form = document.getElementById('runNowForm');
+            var button = document.getElementById('runNowButton');
+            var folderName = document.getElementById('localFolderName');
+            var chooseButton = document.getElementById('chooseFolderButton');
+            var clearButton = document.getElementById('clearFolderButton');
+            var help = document.getElementById('localFolderHelp');
+            var supported = 'showDirectoryPicker' in window && 'indexedDB' in window;
+            var folder = null;
+
+            function idb(mode, fn) {
+                return new Promise(function (resolve, reject) {
+                    var open = indexedDB.open('db-backup', 1);
+                    open.onupgradeneeded = function () { open.result.createObjectStore('kv'); };
+                    open.onerror = function () { reject(open.error); };
+                    open.onsuccess = function () {
+                        var tx = open.result.transaction('kv', mode);
+                        var req = fn(tx.objectStore('kv'));
+                        tx.oncomplete = function () { resolve(req.result); };
+                        tx.onerror = function () { reject(tx.error); };
+                    };
+                });
+            }
+            var loadFolder = function () { return idb('readonly', function (s) { return s.get('folder'); }); };
+            var saveFolder = function (h) { return idb('readwrite', function (s) { return h ? s.put(h, 'folder') : s.delete('folder'); }); };
+
+            function render() {
+                folderName.textContent = folder ? folder.name : (supported ? 'Not chosen — the file downloads to your Downloads folder' : 'Your browser\'s Downloads folder');
+                clearButton.classList.toggle('d-none', !folder);
+                if (!supported) {
+                    chooseButton.classList.add('d-none');
+                    help.textContent = 'To save straight into a folder such as D:\\Backup, open this page in Chrome or Edge.';
+                }
+            }
+
+            if (supported) {
+                loadFolder().then(function (h) { folder = h || null; render(); }).catch(render);
+                chooseButton.addEventListener('click', async function () {
+                    try {
+                        var h = await window.showDirectoryPicker({ id: 'db-backup', mode: 'readwrite', startIn: folder || 'documents' });
+                        folder = h;
+                        await saveFolder(h);
+                        render();
+                    } catch (e) { if (e.name !== 'AbortError') alert(e.message); }
+                });
+                clearButton.addEventListener('click', async function () {
+                    folder = null;
+                    try { await saveFolder(null); } catch (e) { }
+                    render();
+                });
+            }
+            render();
+
+            // Results are shown after the reload that refreshes the history table.
+            var results = [];
+            function showResult(ok, message) { results.push({ ok: ok, message: message }); }
+            try {
+                JSON.parse(sessionStorage.getItem('dbBackupResult') || '[]').forEach(function (r) {
+                    var el = document.createElement('div');
+                    el.className = 'alert py-2 ' + (r.ok ? 'alert-success' : 'alert-danger');
+                    el.textContent = r.message;
+                    form.parentNode.insertBefore(el, form);
+                });
+                sessionStorage.removeItem('dbBackupResult');
+            } catch (e) { }
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                // A backup runs inside this request; stop a second click from queueing another one.
                 button.disabled = true;
                 button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Backing up…';
+
+                // Ask for folder access now, while the click still counts as a user gesture —
+                // after the (possibly long) backup the browser would refuse to show the prompt.
+                var target = folder;
+                if (target) {
+                    try {
+                        var opts = { mode: 'readwrite' };
+                        if (await target.queryPermission(opts) !== 'granted' && await target.requestPermission(opts) !== 'granted') target = null;
+                    } catch (err) { target = null; }
+                }
+
+                try {
+                    var response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (!response.ok) throw new Error('The server returned ' + response.status + '.');
+                    var result = await response.json();
+                    if (!result.ok) {
+                        showResult(false, result.message);
+                    } else if (!result.downloadUrl) {
+                        showResult(true, result.message + ' It stays on the server — the web server can\'t read the file to send it to this PC.');
+                    } else if (target) {
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving to ' + target.name + '…';
+                        var file = await fetch(result.downloadUrl);
+                        if (!file.ok) throw new Error('Downloading the backup failed (' + file.status + ').');
+                        var handle = await target.getFileHandle(result.fileName, { create: true });
+                        var writable = await handle.createWritable();
+                        await file.body.pipeTo(writable);
+                        showResult(true, result.message + ' Saved to ' + target.name + '\\' + result.fileName + ' on this PC.');
+                    } else {
+                        var a = document.createElement('a');
+                        a.href = result.downloadUrl;
+                        a.download = result.fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        showResult(true, result.message + ' Downloading to this PC…');
+                    }
+                } catch (err) {
+                    showResult(false, 'Saving the backup on this PC failed: ' + err.message);
+                }
+
+                try { sessionStorage.setItem('dbBackupResult', JSON.stringify(results)); } catch (e) { }
+                // Refresh the history table (give a plain download a moment to start first).
+                setTimeout(function () { location.reload(); }, 1500);
             });
         })();
     </script>
