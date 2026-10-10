@@ -292,12 +292,15 @@
                                 <p>Role Permissions</p>
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a asp-controller="CompanySettings" asp-action="Index" class="nav-link @(InController("CompanySettings") ? "active" : "")">
-                                <i class="nav-icon fas fa-building"></i>
-                                <p>Company Settings</p>
-                            </a>
-                        </li>
+                        @if (User.IsInRole(Roles.Admin))
+                        {
+                            <li class="nav-item">
+                                <a asp-controller="CompanySettings" asp-action="Index" class="nav-link @(InController("CompanySettings") ? "active" : "")">
+                                    <i class="nav-icon fas fa-building"></i>
+                                    <p>Company Settings</p>
+                                </a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a asp-controller="DatabaseBackup" asp-action="Index" class="nav-link @(InController("DatabaseBackup") ? "active" : "")">
                                 <i class="nav-icon fas fa-database"></i>

@@ -7,7 +7,7 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
-[Authorize(Roles = Roles.AdminManagers)]
+[Authorize(Roles = Roles.Admin)]
 public class CompanySettingsController(ICompanySettingsService companySettings) : Controller
 {
     private const int MaxLogoBytes = 1024 * 1024;
