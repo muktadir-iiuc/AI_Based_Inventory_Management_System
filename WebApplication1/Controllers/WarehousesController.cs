@@ -5,6 +5,7 @@ using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.ViewModels;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
@@ -25,6 +26,7 @@ public class WarehousesController(ApplicationDbContext db) : Controller
     [HttpPost]
     [Authorize(Roles = $"{Roles.Admin},{Roles.Manager}")]
     [ValidateAntiForgeryToken]
+    [EnforceLimit(LimitKind.Warehouses)]
     public async Task<IActionResult> Create(Warehouse model)
     {
         ModelState.Remove(nameof(Warehouse.Code)); // auto-generated below, not user input

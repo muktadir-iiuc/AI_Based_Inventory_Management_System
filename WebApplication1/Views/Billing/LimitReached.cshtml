@@ -1,0 +1,10 @@
+@model string?
+@{ ViewData["Title"] = "Plan limit reached"; }
+<div class="card" style="max-width: 760px;">
+    <div class="card-body">
+        <h4><i class="fas fa-gauge-high me-2"></i>Plan limit reached</h4>
+        <p>Your plan's limit for <strong>@(Model?.ToLowerInvariant())</strong> has been reached. Upgrade your plan to add more.</p>
+        @if (User.IsInRole(Roles.Admin)) { <a asp-action="Plans" class="btn btn-primary">See plans</a> }
+        else { <p class="text-muted mb-0">Ask your account administrator to upgrade.</p> }
+    </div>
+</div>

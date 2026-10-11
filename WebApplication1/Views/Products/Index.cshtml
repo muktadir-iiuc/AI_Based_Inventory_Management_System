@@ -4,6 +4,7 @@
     var categoryList = (SelectList)ViewData["CategoryId"]!;
     var warehouses = (List<Warehouse>)ViewData["Warehouses"]!;
     var warehouseScoped = ViewData["WarehouseScoped"] is true;
+    var canSeeCost = User.CanSeePurchasePrice();
 }
 
 @section Toolbar {
@@ -38,8 +39,11 @@
             <thead>
                 <tr>
                     <th>SKU</th><th>Name</th><th>Brand</th><th>Size</th><th data-filter="select">Category</th><th>Unit</th>
-                    <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Last Cost</th>
-                    <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Default Price</th>
+                    @if (canSeeCost)
+                    {
+                        <th class="text-end" title="Default suggestion for the next purchase — actual cost/price live per batch">Last Cost</th>
+                    }
+                    <th class="text-end" title="Default selling price — the actual selling price is set per batch">Default Sale Price</th>
                     <th data-filter="false">Warehouse</th>
                     <th class="text-end" data-filter="false">Stock</th><th data-filter="false"></th>
                 </tr>
@@ -58,7 +62,10 @@
                     <td>@p.Size</td>
                     <td>@p.Category?.Name</td>
                     <td>@p.UnitOfMeasure?.Symbol</td>
-                    <td class="text-end">@p.CostPrice.ToString("C")</td>
+                    @if (canSeeCost)
+                    {
+                        <td class="text-end">@p.CostPrice.ToString("C")</td>
+                    }
                     <td class="text-end price-value">@p.SalePrice.ToString("C")</td>
                     <td>
                         <select class="form-select form-select-sm warehouse-select" data-reorder-level="@p.ReorderLevel" data-stocks='@Html.Raw(stocksJson)'>

@@ -6,6 +6,7 @@
     var isRequester = ViewData["IsRequester"] is true;
     var available = (Dictionary<int, decimal>)ViewData["Available"]!;
     var isPending = Model.Status == StockAdjustmentStatus.Pending;
+    var showCost = User.CanSeePurchasePrice();
 }
 
 <div class="row g-3">
@@ -90,7 +91,10 @@
                         <tr>
                             <th>Product</th><th>Adjustment</th><th class="text-end">Qty</th>
                             @if (isPending) { <th class="text-end">FIFO Available Now</th> }
-                            <th class="text-end">@(Model.Status == StockAdjustmentStatus.Approved ? "Cost Applied" : "Unit Cost")</th>
+                            @if (showCost)
+                            {
+                                <th class="text-end">@(Model.Status == StockAdjustmentStatus.Approved ? "Cost Applied" : "Unit Cost")</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -110,6 +114,8 @@
                             {
                                 <td class="text-end @(short_ ? "fw-semibold text-danger" : "")">@stock.ToString("0.##")</td>
                             }
+                            @if (showCost)
+                            {
                             <td class="text-end">
                                 @if (Model.Status == StockAdjustmentStatus.Approved)
                                 {
@@ -117,13 +123,21 @@
                                 }
                                 else if (!isDecrease)
                                 {
-                                    @item.UnitCost?.ToString("C")
+                                    @if (item.UnitCost.HasValue)
+                                    {
+                                        @item.UnitCost.Value.ToString("C")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small" title="Requested by someone who can't see costs">Last cost: @(item.Product?.CostPrice.ToString("C"))</span>
+                                    }
                                 }
                                 else
                                 {
                                     <span class="text-muted small">FIFO batch cost</span>
                                 }
                             </td>
+                            }
                         </tr>
                     }
                     </tbody>

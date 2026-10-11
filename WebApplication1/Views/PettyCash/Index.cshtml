@@ -225,7 +225,15 @@
                             </tr>
                         </thead>
                         <tbody id="entryTableBody">
-                            <tr><td colspan="@colspan" class="text-center text-muted py-3">Loading…</td></tr>
+                            @for (var r = 0; r < 6; r++)
+                            {
+                                <tr class="skeleton-row" aria-hidden="true">
+                                    @for (var c = 0; c < colspan; c++)
+                                    {
+                                        <td><span class="skeleton"></span></td>
+                                    }
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -481,6 +489,7 @@
                 if (filterName.value) params.set('nameId', filterName.value);
                 if (filterType.value !== '') params.set('type', filterType.value);
 
+                skeletonRows(tableBody, colspan, 6);
                 const res = await fetch('@Url.Action("Entries", "PettyCash")?' + params.toString());
                 const data = await res.json();
 

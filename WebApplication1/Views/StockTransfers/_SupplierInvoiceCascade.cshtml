@@ -1,0 +1,33 @@
+<script>
+    // Cascading dropdown: picking a Supplier reloads the Purchase Invoices list with only that
+    // supplier's invoices. Bound to select2:select/clear as well as native change (Select2 gotcha).
+    (function () {
+        if (typeof jQuery === 'undefined') return;
+        var $supplier = jQuery('#supplierId');
+        var $invoices = jQuery('#PurchaseInvoiceIds');
+        if (!$supplier.length || !$invoices.length) return;
+
+        var lastRequest = 0;
+
+        function load() {
+            var supplierId = $supplier.val();
+            $invoices.empty();
+            if (!supplierId) {
+                $invoices.trigger('change');
+                return;
+            }
+            var requestId = ++lastRequest;
+            jQuery.getJSON('@Url.Action("InvoicesBySupplier", "StockTransfers")', { supplierId: supplierId }, function (items) {
+                // change + select2:select both fire load(); only the latest response may fill the list.
+                if (requestId !== lastRequest) return;
+                $invoices.empty();
+                items.forEach(function (i) {
+                    $invoices.append(new Option(i.text, i.id, false, false));
+                });
+                $invoices.trigger('change');
+            });
+        }
+
+        $supplier.on('change select2:select select2:clear', load);
+    })();
+</script>

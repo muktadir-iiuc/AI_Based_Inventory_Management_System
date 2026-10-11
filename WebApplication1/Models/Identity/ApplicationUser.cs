@@ -6,6 +6,15 @@ public class ApplicationUser : IdentityUser
 {
     public string FullName { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Set when a platform admin issued a temporary password: the user must choose their own before doing anything else.</summary>
+    public bool MustChangePassword { get; set; }
+
+    /// <summary>Owning tenant. Null only for platform staff (PlatformAdmin / PlatformBilling).</summary>
+    public int? TenantId { get; set; }
+    /// <summary>Interface language the user chose: "en" or "bn". Null = never chose (English).</summary>
+    public string? PreferredLanguage { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>UTC time of the most recent successful sign-in.</summary>

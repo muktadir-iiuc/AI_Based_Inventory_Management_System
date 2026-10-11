@@ -90,6 +90,10 @@ public class PartyLedgerViewModel
     /// payment made from the ledger settles.</summary>
     public decimal CurrentBalance { get; set; }
 
+    /// <summary>How much of the party's advance can be refunded right now (0 = none) — see
+    /// IPartyPaymentService.RefundableAdvanceAsync. Drives the ledger's "Refund Advance" button.</summary>
+    public decimal RefundableAdvance { get; set; }
+
     public List<PartyLedgerRow> Rows { get; set; } = [];
 
     /// <summary>Populated only when no party is selected — the landing state of the page.</summary>

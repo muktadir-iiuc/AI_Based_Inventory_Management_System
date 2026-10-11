@@ -19,9 +19,18 @@
     <a asp-action="PrintPdf" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm" target="_blank">
         <i class="fas fa-file-pdf"></i> Print PDF
     </a>
-    <a asp-action="PrintThermal" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm" target="_blank">
-        <i class="fas fa-receipt"></i> Print Receipt
-    </a>
+    <div class="btn-group">
+        <a asp-action="PrintThermal" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm" target="_blank">
+            <i class="fas fa-receipt"></i> Print Receipt
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="Receipt language">
+            <span class="visually-hidden">Choose receipt language</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" asp-action="PrintThermal" asp-route-id="@Model.Id" asp-route-lang="en" target="_blank">Receipt in English</a></li>
+            <li><a class="dropdown-item" asp-action="PrintThermal" asp-route-id="@Model.Id" asp-route-lang="bn" target="_blank">রসিদ বাংলায় (Bangla)</a></li>
+        </ul>
+    </div>
     @if (Model.Status == DocumentStatus.Posted && (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer)))
     {
         <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm">

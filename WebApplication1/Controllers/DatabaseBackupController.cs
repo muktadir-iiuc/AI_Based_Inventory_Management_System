@@ -11,7 +11,8 @@ namespace WebApplication1.Controllers;
 
 // A database backup contains everything (users, password hashes, every transaction), so the whole
 // controller is limited to Admin and Manager.
-[Authorize(Roles = Roles.AdminManagers)]
+// Whole-database backups span every tenant, so only the platform operator may run or download them.
+[Authorize(Roles = Roles.PlatformAdmin)]
 public class DatabaseBackupController(ApplicationDbContext db, IDatabaseBackupService backups) : Controller
 {
     public async Task<IActionResult> Index()
@@ -67,6 +68,10 @@ public class DatabaseBackupController(ApplicationDbContext db, IDatabaseBackupSe
         return RedirectToAction(nameof(Index));
     }
 
+    // A successful backup's ErrorMessage holds a note (e.g. why a .bacpac was exported instead).
+    private static string Note(DatabaseBackup backup) =>
+        string.IsNullOrWhiteSpace(backup.ErrorMessage) ? string.Empty : " " + backup.ErrorMessage;
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunNow()
@@ -85,7 +90,7 @@ public class DatabaseBackupController(ApplicationDbContext db, IDatabaseBackupSe
                     ok,
                     fileName = run.FileName,
                     downloadUrl = downloadable ? Url.Action(nameof(Download), new { id = run.Id }) : null,
-                    message = ok ? $"Backup created: {run.FileName}." : $"Backup failed: {run.ErrorMessage}"
+                    message = ok ? $"Backup created: {run.FileName}.{Note(run)}" : $"Backup failed: {run.ErrorMessage}"
                 });
             }
             catch (InvalidOperationException ex)
@@ -99,7 +104,7 @@ public class DatabaseBackupController(ApplicationDbContext db, IDatabaseBackupSe
             var result = await backups.RunBackupAsync(BackupTrigger.Manual, User.Identity?.Name);
             if (result.Status == BackupStatus.Succeeded)
             {
-                TempData["Success"] = $"Backup created: {result.FileName}.";
+                TempData["Success"] = $"Backup created: {result.FileName}.{Note(result)}";
             }
             else
             {

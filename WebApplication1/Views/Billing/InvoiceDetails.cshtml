@@ -1,0 +1,161 @@
+@using WebApplication1.Models.Saas
+@model SaasInvoice
+@{
+    ViewData["Title"] = $"Invoice {Model.InvoiceNumber}";
+    var balance = Model.Total - Model.AmountPaid;
+}
+
+@section Toolbar {
+    <a asp-action="InvoicePdf" asp-route-id="@Model.Id" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-pdf"></i> Print / Save PDF</a>
+    <a asp-action="Invoices" class="btn btn-outline-secondary btn-sm">Back</a>
+}
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-md-6">
+                <h4 class="mb-1">Invoice @Model.InvoiceNumber</h4>
+                <partial name="_InvoiceBadge" model="Model.Status" />
+                <div class="text-muted mt-2">Issued @Model.IssueDate.ToLocalTime().ToString("dd MMM yyyy") &middot; Due @Model.DueDate.ToLocalTime().ToString("dd MMM yyyy")</div>
+                <div class="text-muted">Service period @Model.PeriodStart.ToLocalTime().ToString("dd MMM yyyy") - @Model.PeriodEnd.ToLocalTime().ToString("dd MMM yyyy")</div>
+            </div>
+            <div class="col-12 col-md-6 text-md-end">
+                <div class="fw-semibold">@Model.BillToName</div>
+                <div>@Model.BillToEmail</div>
+                <div>@Model.BillToAddress</div>
+                @if (!string.IsNullOrWhiteSpace(Model.BillToTaxId)) { <div>Tax/BIN: @Model.BillToTaxId</div> }
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th>Description</th><th class="text-end">Amount (@Model.Currency)</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.Items.OrderBy(i => i.ItemType))
+                {
+                    <tr><td>@item.Description</td><td class="text-end">@item.Amount.ToString("0.00")</td></tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><th class="text-end">Total</th><th class="text-end">@Model.Total.ToString("0.00")</th></tr>
+                    <tr><td class="text-end">Paid</td><td class="text-end">@Model.AmountPaid.ToString("0.00")</td></tr>
+                    <tr><th class="text-end">Balance due</th><th class="text-end">@balance.ToString("0.00")</th></tr>
+                </tfoot>
+            </table>
+        </div>
+
+        @if (Model.Payments.Count > 0)
+        {
+            <h6 class="mt-4">Payments</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Receipt</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in Model.Payments.OrderBy(p => p.ReceivedAt))
+                    {
+                        <tr>
+                            <td>@p.ReceivedAt.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td>
+                            <td>@p.Method</td>
+                            <td>@(p.ProviderTransactionId ?? p.Reference)</td>
+                            <td>@p.ReceiptNumber</td>
+                            <td>@p.Status</td>
+                            <td class="text-end">@p.Amount.ToString("0.00")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (balance > 0 && Model.Status is InvoiceStatus.Pending or InvoiceStatus.PartiallyPaid or InvoiceStatus.Overdue)
+        {
+            var online = (List<PaymentProviderConfig>)ViewData["OnlineProviders"]!;
+            var manualEnabled = (bool)ViewData["ManualEnabled"]!;
+            var attempts = (List<PaymentAttempt>)ViewData["RecentAttempts"]!;
+            <div class="d-print-none mt-4">
+                <h5>Pay this invoice</h5>
+                <div class="row g-3">
+                    @foreach (var p in online)
+                    {
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">@p.DisplayName</h6>
+                                    @if (!string.IsNullOrWhiteSpace(p.SupportedMethods)) { <p class="text-muted small mb-2">@p.SupportedMethods</p> }
+                                    <p class="mb-3">You will be redirected to the secure payment page to pay <strong>@balance.ToString("0.00") @Model.Currency</strong>. Your invoice updates automatically once the payment is confirmed.</p>
+                                    <form asp-action="Pay" method="post">
+                                        <input type="hidden" name="invoiceId" value="@Model.Id" />
+                                        <input type="hidden" name="provider" value="@p.Code" />
+                                        <button class="btn btn-primary w-100 w-sm-auto">Pay @balance.ToString("0.00") @Model.Currency</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    @if (manualEnabled)
+                    {
+                        <div class="col-12 col-lg-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">Bank transfer / cash / mobile wallet</h6>
+                                    <p class="small text-muted">@ViewData["ManualInstructions"]</p>
+                                    <form asp-action="SubmitManualPayment" method="post" class="row g-2">
+                                        <input type="hidden" name="invoiceId" value="@Model.Id" />
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label small mb-0">Method</label>
+                                            <select name="method" class="form-select form-select-sm">
+                                                <option value="BankTransfer">Bank transfer</option>
+                                                <option value="bKash">bKash</option>
+                                                <option value="Nagad">Nagad</option>
+                                                <option value="Rocket">Rocket</option>
+                                                <option value="Cash">Cash</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label small mb-0">Amount (@Model.Currency)</label>
+                                            <input name="amount" type="number" step="0.01" min="0.01" max="@balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" value="@balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" inputmode="decimal" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small mb-0">Transaction / transfer reference</label>
+                                            <input name="reference" maxlength="200" class="form-control form-control-sm" placeholder="e.g. TrxID or bank slip no." />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small mb-0">Note (optional)</label>
+                                            <input name="note" maxlength="400" class="form-control form-control-sm" />
+                                        </div>
+                                        <div class="col-12"><button class="btn btn-outline-primary btn-sm">Report payment</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    @if (online.Count == 0 && !manualEnabled)
+                    {
+                        <div class="col-12"><div class="alert alert-warning mb-0">No payment method is available right now. Contact support.</div></div>
+                    }
+                </div>
+
+                @if (attempts.Count > 0)
+                {
+                    <h6 class="mt-4">Recent online payment attempts</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>Started</th><th>Reference</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                            <tbody>
+                            @foreach (var a in attempts)
+                            {
+                                <tr>
+                                    <td>@a.CreatedAt.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td>
+                                    <td><a asp-action="PaymentResult" asp-route-reference="@a.Reference">@a.Reference</a></td>
+                                    <td>@a.Status</td>
+                                    <td class="text-end">@a.Amount.ToString("0.00") @a.Currency</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

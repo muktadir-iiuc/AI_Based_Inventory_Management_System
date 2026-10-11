@@ -1,0 +1,28 @@
+@model WebApplication1.Models.ViewModels.PagerInfo
+@{
+    string PageUrl(int p)
+    {
+        var query = Context.Request.Query.Where(kv => kv.Key != "page").Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value.ToString())}").Append($"page={p}");
+        return Context.Request.Path + "?" + string.Join("&", query);
+    }
+    var first = Math.Max(1, Model.Page - 2);
+    var last = Math.Min(Model.TotalPages, Model.Page + 2);
+}
+@if (Model.TotalPages > 1)
+{
+    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-2" aria-label="Pages">
+        <small class="text-muted">@Model.Total result@(Model.Total == 1 ? "" : "s"), page @Model.Page of @Model.TotalPages</small>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item @(Model.Page == 1 ? "disabled" : "")"><a class="page-link" href="@PageUrl(Model.Page - 1)">&laquo;</a></li>
+            @for (var p = first; p <= last; p++)
+            {
+                <li class="page-item @(p == Model.Page ? "active" : "")"><a class="page-link" href="@PageUrl(p)">@p</a></li>
+            }
+            <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")"><a class="page-link" href="@PageUrl(Model.Page + 1)">&raquo;</a></li>
+        </ul>
+    </nav>
+}
+else if (Model.Total > 0)
+{
+    <div class="p-2"><small class="text-muted">@Model.Total result@(Model.Total == 1 ? "" : "s")</small></div>
+}

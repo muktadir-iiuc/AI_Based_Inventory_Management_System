@@ -1,18 +1,111 @@
-@model List<ReorderSuggestion>
+@model ReorderSuggestionsViewModel
 @{
     ViewData["Title"] = "AI Reorder Suggestions";
-    var toReorder = (int)ViewData["ReorderCount"]!;
+    var f = Model.Forecast;
+    var toReorder = f.Suggestions.Count(r => r.ShouldReorder);
+    var hasFilters = Model.WarehouseId.HasValue || f.HorizonClamped || Context.Request.Query.ContainsKey("days");
+}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Warehouse</label>
+                <select name="warehouseId" asp-items="Model.Warehouses" class="form-select form-select-sm" style="min-width: 220px;">
+                    <option value="">@(Model.WarehouseScoped ? "All my warehouses" : "All warehouses")</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1" for="forecastDays">Forecast days</label>
+                @if (f.MaxHorizonDays is { } max)
+                {
+                    <input type="number" id="forecastDays" name="days" min="1" max="@max" step="1" value="@f.HorizonDays"
+                           class="form-control form-control-sm" style="width: 8rem;" />
+                }
+                else
+                {
+                    <input type="number" id="forecastDays" value="@f.HorizonDays" class="form-control form-control-sm" style="width: 8rem;" disabled
+                           title="@(f.NoAccurateHorizon ? "Fixed at the most accurate horizon the backtest found" : "Not enough sales history to test other horizons")" />
+                }
+            </div>
+            <div class="col-auto">
+                <span class="badge text-bg-primary fs-6 fw-normal" title="Longest horizon the model forecast accurately when tested on your own past sales">
+                    <i class="fas fa-robot me-1"></i>AI max:
+                    @(f.MaxHorizonDays is { } m ? $"{m} days" : f.NoAccurateHorizon ? "none within accuracy limit" : "not enough history")
+                </span>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-filter"></i> Forecast</button>
+                @if (hasFilters)
+                {
+                    <a asp-action="ReorderSuggestions" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-xmark"></i> Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (f.HorizonClamped)
+{
+    <div class="alert alert-warning py-2">
+        <i class="fas fa-triangle-exclamation me-1"></i>
+        The requested horizon is longer than the model can forecast accurately for this selection, so it was
+        limited to the AI-suggested maximum of <strong>@f.MaxHorizonDays days</strong>.
+    </div>
 }
 
 <div class="alert alert-info">
     <i class="fas fa-robot me-1"></i>
-    Demand is forecast per product from up to 90 days of sales history using an ML.NET SSA (Singular Spectrum Analysis) time-series
-    model, falling back to a 14-day moving average when a product doesn't yet have enough history.
-    <strong>@toReorder</strong> product(s) currently need reordering.
-    @if (User.GetWarehouseIds() is not null)
+    Demand is forecast per product from up to a year of sales history (net of returns), using either an ML.NET SSA
+    (Singular Spectrum Analysis) time-series model or a 14-day moving average, whichever backtests as more accurate.
+    A product without enough history for SSA always uses the moving average.
+    <strong>@toReorder</strong> product(s) need reordering to cover the next <strong>@f.HorizonDays days</strong>.
+    @if (Model.WarehouseScoped)
     {
         <span>Figures are scoped to your assigned warehouse(s).</span>
     }
+    <div class="mt-2 small">
+        @if (f.MaxHorizonDays is not null || f.NoAccurateHorizon)
+        {
+            <div>
+                <strong>How the maximum is chosen:</strong> both models were tested on the last @f.HistoryDays days of real
+                sales for this selection. Each test hid the most recent days, forecast them from the history before, and
+                compared the forecast with what was actually sold, averaged over 3 start points a week apart. The longest
+                horizon where the better model's error stayed within @f.AccuracyLimitPercent.ToString("0")% is the maximum.
+                @if (f.ChosenModel is not null)
+                {
+                    <span>At @f.HorizonDays days the more accurate model was <strong>@f.ChosenModel</strong>, so it is used below.</span>
+                }
+            </div>
+            @if (f.NoAccurateHorizon)
+            {
+                <div class="text-warning-emphasis mt-1">
+                    <i class="fas fa-triangle-exclamation me-1"></i>
+                    No horizon met the @f.AccuracyLimitPercent.ToString("0")% accuracy limit on this sales history, so the forecast
+                    is fixed at <strong>@f.HorizonDays days</strong>, where the backtest error was lowest. Treat these
+                    figures as rough; they become more reliable as more sales history builds up.
+                </div>
+            }
+        }
+        else
+        {
+            <span>
+                <strong>No AI-suggested maximum yet:</strong> there isn't enough sales history for this selection to test the
+                model's accuracy, so the standard @f.HorizonDays-day horizon is used and can't be changed.
+            </span>
+        }
+        @if (f.Checks.Count > 0)
+        {
+            <div class="mt-1">
+                Backtest error by horizon (SSA / moving average):
+                @foreach (var c in f.Checks)
+                {
+                    <span class="badge @(c.Accurate ? "text-bg-success" : "text-bg-secondary") fw-normal me-1"
+                          title="Error over @c.Days days: SSA @c.SsaErrorPercent.ToString("0.#")%, moving average @c.MovingAverageErrorPercent.ToString("0.#")%">@c.Days d: @c.SsaErrorPercent.ToString("0.#")% / @c.MovingAverageErrorPercent.ToString("0.#")%</span>
+                }
+            </div>
+        }
+    </div>
 </div>
 
 <div class="card">
@@ -22,20 +115,20 @@
                 <tr>
                     <th>SKU</th><th>Product</th>
                     <th class="text-end">Current Stock</th><th class="text-end">Reorder Level</th>
-                    <th class="text-end">Forecasted 30-day Demand</th>
+                    <th class="text-end">Forecasted @f.HorizonDays-day Demand</th>
                     <th class="text-end">Suggested Reorder Qty</th>
                     <th data-filter="select">Method</th><th data-filter="select">Action</th>
                 </tr>
             </thead>
             <tbody>
-            @foreach (var r in Model)
+            @foreach (var r in f.Suggestions)
             {
                 <tr class="clickable-row @(r.ShouldReorder ? "table-warning" : "")" data-href="@Url.Action("Details", "Products", new { id = r.ProductId })">
                     <td>@r.Sku</td>
                     <td><a asp-controller="Products" asp-action="Details" asp-route-id="@r.ProductId" class="fw-semibold">@r.ProductName</a></td>
                     <td class="text-end">@r.CurrentStock.ToString("0.##")</td>
                     <td class="text-end">@r.ReorderLevel.ToString("0.##")</td>
-                    <td class="text-end">@r.Forecasted30DayDemand.ToString("0.#")</td>
+                    <td class="text-end">@r.ForecastedDemand.ToString("0.#")</td>
                     <td class="text-end">@(r.SuggestedReorderQty > 0 ? r.SuggestedReorderQty.ToString("0.##") : "-")</td>
                     <td><span class="badge text-bg-light border">@r.Method</span></td>
                     <td>

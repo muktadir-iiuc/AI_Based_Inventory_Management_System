@@ -1,7 +1,7 @@
 @model SalesHistoryViewModel
 @{
     ViewData["Title"] = "Sales History";
-    var hasFilters = Model.CustomerId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
+    var hasFilters = Model.CustomerId.HasValue || Model.ProductId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
 }
 
 @if (Model.WarehouseScoped)
@@ -19,6 +19,12 @@
                 <label class="form-label small text-muted mb-1">Customer</label>
                 <select name="customerId" asp-items="Model.Customers" class="form-select form-select-sm" style="min-width: 240px;">
                     <option value="">All customers</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Product</label>
+                <select name="productId" asp-items="Model.Products" class="form-select form-select-sm" style="min-width: 260px;">
+                    <option value="">All products</option>
                 </select>
             </div>
             <div class="col-auto">

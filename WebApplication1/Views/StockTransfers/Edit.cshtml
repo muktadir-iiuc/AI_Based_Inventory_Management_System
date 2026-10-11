@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = $"Edit Stock Transfer {ViewData["TransferNumber"]}";
     var warehouseList = (SelectList)ViewData["Warehouses"]!;
+    var purchaseInvoiceList = (MultiSelectList)ViewData["PurchaseInvoices"]!;
+    var supplierList = (SelectList)ViewData["Suppliers"]!;
 }
 
 <div class="alert alert-info py-2 small mb-3">
@@ -37,9 +39,22 @@
                             <label asp-for="Date" class="form-label required-asterisk"></label>
                             <input asp-for="Date" class="form-control" type="date" />
                         </div>
-                        <div class="col-12 mb-0">
+                        <div class="col-12 mb-3">
                             <label asp-for="Notes" class="form-label"></label>
                             <input asp-for="Notes" class="form-control" placeholder="Optional note for this transfer" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="supplierId" class="form-label">Supplier</label>
+                            <select asp-for="SupplierId" asp-items="supplierList" id="supplierId" class="form-select"
+                                    data-placeholder="Optional — select a supplier">
+                                <option value="">-- select supplier --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label asp-for="PurchaseInvoiceIds" class="form-label">Purchase Invoices</label>
+                            <select asp-for="PurchaseInvoiceIds" asp-items="purchaseInvoiceList" class="form-select" multiple
+                                    data-placeholder="Select a supplier first, then one or more purchase invoices"></select>
+                            <div class="form-text">For reference only, like the note — does not change which stock batches move.</div>
                         </div>
                     </div>
                 </div>
@@ -260,5 +275,6 @@
             addRow(null);
         }
     </script>
+    <partial name="_SupplierInvoiceCascade" />
     <partial name="_ValidationScriptsPartial" />
 }

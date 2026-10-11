@@ -22,7 +22,6 @@ public class SalesReturnLineInput
     public string? BatchNumber { get; set; }
     public decimal MaxReturnable { get; set; }
     public decimal UnitPrice { get; set; }
-    public decimal UnitCost { get; set; }
 
     // Credit per returned unit after the invoice discount's share (display only).
     public decimal CreditPerUnit { get; set; }

@@ -1,0 +1,100 @@
+@using WebApplication1.Models.Saas
+@using WebApplication1.Services.Saas
+@{
+    ViewData["Title"] = "Billing reports";
+    var year = (int)ViewData["Year"]!;
+    var view = (string)ViewData["View"]!;
+    var revenue = (List<RevenuePoint>)ViewData["Revenue"]!;
+    var outstanding = (IReadOnlyList<OutstandingRow>)ViewData["Outstanding"]!;
+    var failed = (List<PaymentAttempt>)ViewData["FailedAttempts"]!;
+    var rejected = (List<SaasAuditLog>)ViewData["RejectedPayments"]!;
+    var names = (Dictionary<int, string>)ViewData["TenantNames"]!;
+    string TName(int? id) => id is int i ? names.GetValueOrDefault(i, $"Tenant {i}") : "-";
+}
+
+@section Toolbar {
+    <a href="/Platform/Reports/Revenue.csv?year=@year" class="btn btn-outline-secondary btn-sm"><i class="fas fa-download"></i> Revenue CSV</a>
+    <a href="/Platform/Reports/Outstanding.csv" class="btn btn-outline-secondary btn-sm"><i class="fas fa-download"></i> Outstanding CSV</a>
+}
+
+<div class="card mb-3">
+    <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <h3 class="card-title mb-0">Revenue (@(view == "yearly" ? "by year" : "by month, " + year))</h3>
+        <form method="get" class="d-flex gap-2">
+            <select name="view" class="form-select form-select-sm"><option value="monthly" selected="@(view == "monthly")">Monthly</option><option value="yearly" selected="@(view == "yearly")">Yearly</option></select>
+            <input name="year" type="number" value="@year" class="form-control form-control-sm" style="width: 6rem;" />
+            <button class="btn btn-primary btn-sm">Show</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <div style="height: 260px;"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Period</th><th class="text-end">Payments</th><th class="text-end">Collected</th><th class="text-end">Refunded</th><th class="text-end">Net</th></tr></thead>
+            <tbody>
+            @foreach (var r in revenue) { <tr><td>@r.Period</td><td class="text-end">@r.Payments</td><td class="text-end">@r.Collected.ToString("#,0.00")</td><td class="text-end">@r.Refunded.ToString("#,0.00")</td><td class="text-end fw-semibold">@r.Net.ToString("#,0.00")</td></tr> }
+            </tbody>
+            <tfoot><tr class="fw-semibold"><td>Total</td><td class="text-end">@revenue.Sum(r => r.Payments)</td><td class="text-end">@revenue.Sum(r => r.Collected).ToString("#,0.00")</td><td class="text-end">@revenue.Sum(r => r.Refunded).ToString("#,0.00")</td><td class="text-end">@revenue.Sum(r => r.Net).ToString("#,0.00")</td></tr></tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header"><h3 class="card-title mb-0">Outstanding balances</h3></div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Tenant</th><th class="text-end">Open invoices</th><th class="text-end">Overdue</th><th>Oldest due</th><th class="text-end">Balance</th></tr></thead>
+            <tbody>
+            @foreach (var o in outstanding)
+            {
+                <tr class="@(o.OverdueInvoices > 0 ? "table-warning" : "")"><td><a href="/Platform/Tenants/@o.TenantId">@o.TenantName</a></td><td class="text-end">@o.Invoices</td><td class="text-end">@o.OverdueInvoices</td><td>@o.OldestDue.ToLocalTime().ToString("dd MMM yyyy")</td><td class="text-end">@o.Balance.ToString("#,0.00") @o.Currency</td></tr>
+            }
+            @if (outstanding.Count == 0) { <tr><td colspan="5" class="text-center text-muted p-3">Nothing outstanding.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-xl-7"><div class="card h-100">
+        <div class="card-header"><h3 class="card-title mb-0">Failed online payments (90 days)</h3></div>
+        <div class="card-body p-0 table-responsive"><table class="table table-sm table-striped mb-0">
+            <thead><tr><th>When</th><th>Tenant</th><th>Status</th><th class="text-end">Amount</th><th>Reason</th></tr></thead>
+            <tbody>
+            @foreach (var a in failed) { <tr><td class="text-nowrap">@a.CreatedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@TName(a.TenantId)</td><td>@a.Status</td><td class="text-end">@a.Amount.ToString("0.00")</td><td class="small">@a.FailureReason</td></tr> }
+            @if (failed.Count == 0) { <tr><td colspan="5" class="text-center text-muted p-3">None.</td></tr> }
+            </tbody>
+        </table></div>
+    </div></div>
+    <div class="col-12 col-xl-5"><div class="card h-100">
+        <div class="card-header"><h3 class="card-title mb-0">Rejected payment notifications (90 days)</h3></div>
+        <div class="card-body p-0 table-responsive"><table class="table table-sm table-striped mb-0">
+            <thead><tr><th>When</th><th>Tenant</th><th>Why</th></tr></thead>
+            <tbody>
+            @foreach (var a in rejected) { <tr><td class="text-nowrap">@a.At.ToLocalTime().ToString("dd MMM yy")</td><td>@TName(a.TenantId)</td><td class="small">@a.Details</td></tr> }
+            @if (rejected.Count == 0) { <tr><td colspan="3" class="text-center text-muted p-3">None.</td></tr> }
+            </tbody>
+        </table></div>
+    </div></div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var el = document.getElementById('revenueChart');
+            if (!el || typeof Chart === 'undefined') return;
+            new Chart(el, {
+                type: 'bar',
+                data: {
+                    labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(revenue.Select(r => r.Period))),
+                    datasets: [
+                        { label: 'Collected', data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(revenue.Select(r => r.Collected))), backgroundColor: '#198754' },
+                        { label: 'Refunded', data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(revenue.Select(r => r.Refunded))), backgroundColor: '#dc3545' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        })();
+    </script>
+}

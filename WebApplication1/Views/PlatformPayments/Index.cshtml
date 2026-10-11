@@ -1,0 +1,80 @@
+@using WebApplication1.Models.Saas
+@model PaymentsListViewModel
+@{
+    ViewData["Title"] = "Payments";
+    string Tenant(int id) => Model.TenantNames.GetValueOrDefault(id, $"Tenant {id}");
+    var status = ViewData["Status"] as string;
+}
+
+<ul class="nav nav-pills mb-3 flex-wrap gap-1">
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "payments" ? "active" : "")" href="/Platform/Payments">All payments</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "awaiting" ? "active" : "")" href="/Platform/Payments?tab=awaiting">Awaiting confirmation @if (Model.AwaitingCount > 0) { <span class="badge text-bg-warning">@Model.AwaitingCount</span> }</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "review" ? "active" : "")" href="/Platform/Payments?tab=review">Needs review @if (Model.ReviewCount > 0) { <span class="badge text-bg-danger">@Model.ReviewCount</span> }</a></li>
+    <li class="nav-item"><a class="nav-link @(Model.Tab == "attempts" ? "active" : "")" href="/Platform/Payments?tab=attempts">Online attempts</a></li>
+</ul>
+
+@if (Model.Tab is "attempts" or "review")
+{
+    @if (Model.Tab == "review")
+    {
+        <div class="alert alert-info small">"Under review": the gateway flagged the payment as risky; releasing it re-verifies with the gateway first. "Needs review": the gateway took the money but our records could not apply it (for example the invoice was already paid) - refund it or fix the invoice, then follow up with the tenant.</div>
+    }
+    <div class="card"><div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Started</th><th>Tenant</th><th>Reference</th><th>Provider</th><th>Status</th><th>Gateway txn</th><th class="text-end">Amount</th><th>Note</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var a in Model.Attempts.Items)
+            {
+                <tr>
+                    <td class="text-nowrap">@a.CreatedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td>
+                    <td><a href="/Platform/Tenants/@a.TenantId">@Tenant(a.TenantId)</a></td>
+                    <td><a href="/Platform/Invoices/@a.InvoiceId">@a.Reference</a></td>
+                    <td>@a.Provider</td>
+                    <td>@a.Status</td>
+                    <td>@a.ProviderTransactionId</td>
+                    <td class="text-end">@a.Amount.ToString("0.00") @a.Currency</td>
+                    <td class="small">@a.FailureReason</td>
+                    <td class="text-end">
+                        @if (a.Status == PaymentAttemptStatus.UnderReview && Model.IsAdmin)
+                        {
+                            <form action="/Platform/Payments/Attempts/@a.Id/Release" method="post">@Html.AntiForgeryToken()<button class="btn btn-sm btn-success" onclick="return confirm('Release this payment?');">Release</button></form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Attempts.Items.Count == 0) { <tr><td colspan="9" class="text-center text-muted p-4">Nothing here.</td></tr> }
+            </tbody>
+        </table>
+    </div><partial name="_Pager" model="Model.Attempts.Pager" /></div>
+}
+else
+{
+    <div class="card"><div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Date</th><th>Tenant</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Receipt</th><th>Status</th><th class="text-end">Amount</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Payments.Items)
+            {
+                <tr>
+                    <td class="text-nowrap">@p.ReceivedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td>
+                    <td><a href="/Platform/Tenants/@p.TenantId">@Tenant(p.TenantId)</a></td>
+                    <td><a href="/Platform/Invoices/@p.InvoiceId">@p.Invoice?.InvoiceNumber</a></td>
+                    <td>@p.Method (@p.Provider)</td>
+                    <td>@(p.ProviderTransactionId ?? p.Reference)</td>
+                    <td>@p.ReceiptNumber</td>
+                    <td>@p.Status</td>
+                    <td class="text-end">@p.Amount.ToString("0.00") @p.Currency</td>
+                    <td class="text-end text-nowrap">
+                        @if (p.Status == SaasPaymentStatus.AwaitingConfirmation)
+                        {
+                            <form action="/Platform/Payments/@p.Id/Confirm" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-success">Confirm</button></form>
+                            <form action="/Platform/Payments/@p.Id/Reject" method="post" class="d-inline-flex gap-1">@Html.AntiForgeryToken()<input name="reason" class="form-control form-control-sm" placeholder="Reason" required style="width: 8rem;" /><button class="btn btn-sm btn-outline-danger">Reject</button></form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Payments.Items.Count == 0) { <tr><td colspan="9" class="text-center text-muted p-4">Nothing here.</td></tr> }
+            </tbody>
+        </table>
+    </div><partial name="_Pager" model="Model.Payments.Pager" /></div>
+}

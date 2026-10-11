@@ -1,0 +1,27 @@
+@using WebApplication1.Models.Saas
+@model List<SaasInvoice>
+@{ ViewData["Title"] = "Invoices"; }
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-striped table-hover mb-0">
+            <thead><tr><th>Invoice</th><th>Plan</th><th>Period</th><th>Due</th><th class="text-end">Total</th><th class="text-end">Paid</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var i in Model)
+            {
+                <tr>
+                    <td>@i.InvoiceNumber</td>
+                    <td>@i.PlanName</td>
+                    <td>@i.PeriodStart.ToLocalTime().ToString("dd MMM yy") - @i.PeriodEnd.ToLocalTime().ToString("dd MMM yy")</td>
+                    <td>@i.DueDate.ToLocalTime().ToString("dd MMM yyyy")</td>
+                    <td class="text-end">@i.Total.ToString("0.00") @i.Currency</td>
+                    <td class="text-end">@i.AmountPaid.ToString("0.00")</td>
+                    <td><partial name="_InvoiceBadge" model="i.Status" /></td>
+                    <td class="text-end"><a asp-action="InvoiceDetails" asp-route-id="@i.Id" class="btn btn-sm btn-outline-primary">Open</a></td>
+                </tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="8" class="text-center text-muted p-4">No invoices yet.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

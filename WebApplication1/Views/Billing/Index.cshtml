@@ -1,0 +1,176 @@
+@using WebApplication1.Models.Saas
+@using WebApplication1.Services.Saas
+@model BillingIndexViewModel
+@{
+    ViewData["Title"] = "Billing & Subscription";
+    var sub = Model.Subscription;
+    string Limit(int? max, int used) => max is null ? $"{used} / unlimited" : $"{used} / {max}";
+}
+
+@section Toolbar {
+    <a asp-action="Invoices" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-invoice"></i> Invoices</a>
+    <a asp-action="Payments" class="btn btn-outline-secondary btn-sm"><i class="fas fa-money-bill-wave"></i> Payments</a>
+    <a href="/Billing/Data" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-export"></i> Data &amp; agreement</a>
+    <a asp-action="Plans" class="btn btn-primary btn-sm"><i class="fas fa-layer-group"></i> Plans</a>
+}
+
+@if (ViewData["AgreementPending"] is true)
+{
+    <div class="alert alert-warning py-2">Please review and accept the <a href="/Billing/Data">data agreement</a>.</div>
+}
+
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title mb-0">Subscription</h3></div>
+            <div class="card-body">
+                @if (sub is null)
+                {
+                    <p class="mb-0">No subscription. <a asp-action="Plans">Choose a plan</a>.</p>
+                }
+                else
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-5">Plan</dt><dd class="col-7">@Model.Plan?.Name</dd>
+                        <dt class="col-5">Status</dt><dd class="col-7"><partial name="_SubscriptionBadge" model="sub.Status" /></dd>
+                        <dt class="col-5">Price</dt><dd class="col-7">@sub.Price.ToString("0.00") @sub.Currency / @BillingMath.DescribeInterval(sub.IntervalCount, sub.IntervalUnit)</dd>
+                        @if (sub.TrialEndsAt is not null)
+                        {
+                            <dt class="col-5">Trial ends</dt><dd class="col-7">@sub.TrialEndsAt.Value.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</dd>
+                        }
+                        @if (sub.CurrentPeriodEnd is not null)
+                        {
+                            <dt class="col-5">@(sub.CancelAtPeriodEnd ? "Ends on" : "Next renewal")</dt>
+                            <dd class="col-7">@sub.CurrentPeriodEnd.Value.ToLocalTime().ToString("dd MMM yyyy")</dd>
+                        }
+                        @if (sub.GraceEndsAt is not null)
+                        {
+                            <dt class="col-5">Grace ends</dt><dd class="col-7 text-danger">@sub.GraceEndsAt.Value.ToLocalTime().ToString("dd MMM yyyy")</dd>
+                        }
+                        @if (Model.PendingPlan is not null)
+                        {
+                            <dt class="col-5">Next plan</dt><dd class="col-7">@Model.PendingPlan.Name (from next renewal)</dd>
+                        }
+                        <dt class="col-5">Auto-renew</dt><dd class="col-7">@(sub.AutoRenew && !sub.CancelAtPeriodEnd ? "On" : "Off")</dd>
+                    </dl>
+                    @if (!Model.Access.IsFull)
+                    {
+                        <div class="alert alert-danger mt-3 mb-0">@Model.Access.Message</div>
+                    }
+                }
+            </div>
+            @if (sub is not null && sub.Status != SubscriptionStatus.Cancelled)
+            {
+                <div class="card-footer d-flex flex-wrap gap-2">
+                    @if (sub.CancelAtPeriodEnd)
+                    {
+                        <form asp-action="Resume" method="post"><button class="btn btn-sm btn-outline-success">Keep my subscription</button></form>
+                    }
+                    else if (Model.IsOwner)
+                    {
+                        <form asp-action="Cancel" method="post" onsubmit="return confirm('Stop renewing at the end of the paid term?');">
+                            <input type="hidden" name="immediate" value="false" />
+                            <label class="form-check small d-block mb-1"><input type="checkbox" class="form-check-input" name="requestData" value="true" /> also send me a copy of my data</label>
+                            <button class="btn btn-sm btn-outline-danger">Cancel at end of term</button>
+                        </form>
+                        <form asp-action="Cancel" method="post" onsubmit="return confirm('Cancel now? Access to the system ends immediately; your data is kept.');">
+                            <input type="hidden" name="immediate" value="true" />
+                            <label class="form-check small d-block mb-1"><input type="checkbox" class="form-check-input" name="requestData" value="true" /> also send me a copy of my data</label>
+                            <button class="btn btn-sm btn-danger">Cancel now</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title mb-0">Usage and limits</h3></div>
+            <div class="card-body">
+                <dl class="row mb-3">
+                    <dt class="col-5">Users</dt><dd class="col-7">@Limit(Model.Limits.MaxUsers, Model.Usage.Users)</dd>
+                    <dt class="col-5">Products</dt><dd class="col-7">@Limit(Model.Limits.MaxProducts, Model.Usage.Products)</dd>
+                    <dt class="col-5">Warehouses</dt><dd class="col-7">@Limit(Model.Limits.MaxWarehouses, Model.Usage.Warehouses)</dd>
+                </dl>
+                <h6>Included modules</h6>
+                <ul class="list-unstyled mb-0">
+                    @foreach (var (key, label) in Features.All)
+                    {
+                        <li>@if (Model.Features.Contains(key)) { <i class="fas fa-check text-success me-1"></i> } else { <i class="fas fa-xmark text-muted me-1"></i> }<span class="@(Model.Features.Contains(key) ? "" : "text-muted")">@label</span></li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">Outstanding invoices</h3></div>
+            <div class="card-body p-0">
+                @if (Model.OutstandingInvoices.Count == 0)
+                {
+                    <p class="p-3 mb-0 text-muted">Nothing to pay.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead><tr><th>Invoice</th><th>Due</th><th class="text-end">Balance</th><th>Status</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (var i in Model.OutstandingInvoices)
+                            {
+                                <tr>
+                                    <td>@i.InvoiceNumber</td>
+                                    <td>@i.DueDate.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td class="text-end">@((i.Total - i.AmountPaid).ToString("0.00")) @i.Currency</td>
+                                    <td><partial name="_InvoiceBadge" model="i.Status" /></td>
+                                    <td class="text-end"><a asp-action="InvoiceDetails" asp-route-id="@i.Id" class="btn btn-sm btn-primary">View / Pay</a></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Billing details</h3>
+                <a asp-action="Profile" class="btn btn-sm btn-outline-primary">Edit</a>
+            </div>
+            <div class="card-body">
+                <div class="fw-semibold">@Model.Tenant.Name</div>
+                <div>@(Model.Tenant.BillingEmail ?? Model.Tenant.ContactEmail)</div>
+                <div>@Model.Tenant.ContactPhone</div>
+                <div>@string.Join(", ", new[] { Model.Tenant.Address, Model.Tenant.City, Model.Tenant.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))</div>
+                @if (!string.IsNullOrWhiteSpace(Model.Tenant.TaxId)) { <div>Tax/BIN: @Model.Tenant.TaxId</div> }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Notifications</h3>
+                <form asp-action="MarkNotificationsRead" method="post"><button class="btn btn-sm btn-outline-secondary">Mark all read</button></form>
+            </div>
+            <ul class="list-group list-group-flush">
+                @if (Model.Notifications.Count == 0)
+                {
+                    <li class="list-group-item text-muted">No notifications.</li>
+                }
+                @foreach (var n in Model.Notifications)
+                {
+                    <li class="list-group-item @(n.ReadAt is null ? "fw-semibold" : "")">
+                        <div>@n.Subject</div>
+                        <small class="text-muted">@n.CreatedAt.ToLocalTime().ToString("dd MMM yyyy hh:mm tt") - @n.Body</small>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,10 @@
+@model string?
+@{ ViewData["Title"] = "Not in your plan"; }
+<div class="card" style="max-width: 760px;">
+    <div class="card-body">
+        <h4><i class="fas fa-puzzle-piece me-2"></i>This module is not included in your plan</h4>
+        <p>Your current subscription does not include this feature. Upgrade your plan to use it.</p>
+        @if (User.IsInRole(Roles.Admin)) { <a asp-action="Plans" class="btn btn-primary">See plans</a> }
+        else { <p class="text-muted mb-0">Ask your account administrator to upgrade.</p> }
+    </div>
+</div>

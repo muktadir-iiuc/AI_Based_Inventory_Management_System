@@ -1,0 +1,39 @@
+@using WebApplication1.Models.Saas
+@model InvoiceListViewModel
+@{ ViewData["Title"] = "Invoices"; }
+
+<div class="card mb-3"><div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-3"><label class="form-label small mb-0">Search</label><input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="Invoice no. or tenant" /></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Status</label><select name="status" class="form-select form-select-sm"><option value="">All</option>@foreach (var s in Enum.GetValues<InvoiceStatus>()) { <option value="@s" selected="@(Model.Status == s.ToString())">@s</option> }</select></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">From</label><input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" /></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">To</label><input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" /></div>
+        <div class="col-6 col-md-1"><label class="form-label small mb-0">Tenant id</label><input name="tenantId" value="@Model.TenantId" class="form-control form-control-sm" inputmode="numeric" /></div>
+        <div class="col-12 col-md-2 d-flex gap-2"><button class="btn btn-primary btn-sm flex-grow-1">Filter</button><a href="/Platform/Invoices" class="btn btn-outline-secondary btn-sm">Reset</a></div>
+    </form>
+</div></div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-striped table-hover mb-0">
+            <thead><tr><th>Invoice</th><th>Tenant</th><th>Plan</th><th>Issued</th><th>Due</th><th class="text-end">Total</th><th class="text-end">Paid</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var i in Model.Page.Items)
+            {
+                <tr>
+                    <td><a href="/Platform/Invoices/@i.Id">@i.InvoiceNumber</a></td>
+                    <td><a href="/Platform/Tenants/@i.TenantId">@i.Tenant?.Name</a></td>
+                    <td>@i.PlanName</td>
+                    <td>@i.IssueDate.ToLocalTime().ToString("dd MMM yy")</td>
+                    <td>@i.DueDate.ToLocalTime().ToString("dd MMM yy")</td>
+                    <td class="text-end">@i.Total.ToString("0.00") @i.Currency</td>
+                    <td class="text-end">@i.AmountPaid.ToString("0.00")</td>
+                    <td><partial name="_InvoiceBadge" model="i.Status" /></td>
+                </tr>
+            }
+            @if (Model.Page.Items.Count == 0) { <tr><td colspan="8" class="text-center text-muted p-4">No invoices match.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Page.Pager" />
+</div>

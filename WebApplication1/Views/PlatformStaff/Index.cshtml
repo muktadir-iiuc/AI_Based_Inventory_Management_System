@@ -1,0 +1,33 @@
+@model StaffCreateViewModel
+@{
+    ViewData["Title"] = "Platform users";
+    var rows = (List<(ApplicationUser User, string Roles)>)ViewData["Rows"]!;
+}
+
+<div class="alert alert-info small">Platform Administrators manage everything. Billing staff can view tenants and billing, record and confirm payments, and read reports - but cannot change plans, settings, tenant status or issue refunds.</div>
+
+<div class="card mb-3"><div class="card-body p-0 table-responsive">
+    <table class="table table-striped mb-0">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var (user, roles) in rows)
+        {
+            <tr>
+                <td>@user.FullName</td><td>@user.Email</td><td>@roles</td><td>@(user.IsActive ? "Active" : "Deactivated")</td><td>@user.LastLoginAt?.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td>
+                <td class="text-end"><form asp-action="Toggle" asp-route-id="@user.Id" method="post"><button class="btn btn-sm btn-outline-@(user.IsActive ? "warning" : "success")">@(user.IsActive ? "Deactivate" : "Activate")</button></form></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div></div>
+
+<div class="card" style="max-width: 720px;"><div class="card-body">
+    <h6>Add a platform user</h6>
+    <form asp-action="Create" method="post" class="row g-2">
+        <div class="col-12 col-md-6"><input asp-for="FullName" class="form-control form-control-sm" placeholder="Full name" required /></div>
+        <div class="col-12 col-md-6"><input asp-for="Email" type="email" class="form-control form-control-sm" placeholder="Email" required autocomplete="off" /></div>
+        <div class="col-12 col-md-6"><input asp-for="Password" class="form-control form-control-sm" placeholder="Initial password" required autocomplete="new-password" /></div>
+        <div class="col-12 col-md-6"><select asp-for="Role" class="form-select form-select-sm"><option value="PlatformBilling">Billing staff</option><option value="PlatformAdmin">Platform administrator</option></select></div>
+        <div class="col-12"><button class="btn btn-primary btn-sm">Create</button></div>
+    </form>
+</div></div>

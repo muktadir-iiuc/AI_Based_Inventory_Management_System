@@ -1,0 +1,461 @@
+@using WebApplication1.Models.Saas
+@using WebApplication1.Models.Tenancy
+@using WebApplication1.Services.Saas
+@model TenantDetailsViewModel
+@{
+    var t = Model.Tenant;
+    var sub = Model.Subscription;
+    ViewData["Title"] = t.Name;
+    string Lim(int? v) => v?.ToString() ?? "unlimited";
+    var terminated = t.Status == TenantStatus.Terminated;
+}
+
+@section Toolbar {
+    <a href="/Platform/Tenants" class="btn btn-outline-secondary btn-sm">Back</a> <a href="/Platform/DataExports?tenantId=@t.Id" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-export"></i> Data exports</a>
+    @if (Model.IsAdmin && !terminated) { <a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-outline-primary btn-sm"><i class="fas fa-pen"></i> Edit</a> <a href="/Platform/Company/@t.Id" class="btn btn-outline-primary btn-sm"><i class="fas fa-id-card"></i> Company settings</a> }
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <h4 class="mb-0 me-2">@t.Name</h4>
+            <partial name="_TenantBadge" model="t" />
+            @if (sub is not null) { <partial name="_SubscriptionBadge" model="sub.Status" /> }
+            <span class="badge text-bg-light border">@Model.Access.Level: @Model.Access.Code</span>
+        </div>
+        <div class="row g-2 small text-muted">
+            <div class="col-12 col-md-4">Code: <strong>@t.Code</strong></div>
+            <div class="col-12 col-md-4">Contact: @t.ContactName @t.ContactEmail @t.ContactPhone</div>
+            <div class="col-12 col-md-4">Created @t.CreatedAt.ToLocalTime().ToString("dd MMM yyyy") by @(t.CreatedBy ?? "-")</div>
+            @if (t.IsAdminHold) { <div class="col-12 text-danger">Administrative hold: @t.AdminHoldReason</div> }
+            @if (t.DeletedAt is not null) { <div class="col-12">Terminated @t.DeletedAt.Value.ToLocalTime().ToString("dd MMM yyyy")@(Model.PurgeEligibleOn is { } p ? $"; data may be erased from {p.ToLocalTime():dd MMM yyyy}" : "")</div> }
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist" id="tenantTabs">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sub" type="button">Subscription</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button">Billing</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-users" type="button">Users</button></li>
+    @if (Model.IsAdmin) { <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-access" type="button">Access &amp; URL</button></li> }
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button">Activity</button></li>
+    @if (Model.IsAdmin) { <li class="nav-item"><button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#tab-danger" type="button">Lifecycle</button></li> }
+</ul>
+
+<div class="tab-content">
+    @* ---------------------------------------------------------------- overview *@
+    <div class="tab-pane fade show active" id="tab-overview">
+        <div class="row g-3">
+            <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-header"><h3 class="card-title mb-0">Subscription</h3></div><div class="card-body">
+                @if (sub is null) { <p class="mb-0">No subscription.</p> }
+                else
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-5">Plan</dt><dd class="col-7">@Model.Plan?.Name</dd>
+                        <dt class="col-5">Price</dt><dd class="col-7">@sub.Price.ToString("0.00") @sub.Currency / @BillingMath.DescribeInterval(sub.IntervalCount, sub.IntervalUnit)@(sub.DiscountPercent > 0 ? $", {sub.DiscountPercent:0.##}% off" : "")@(sub.TaxPercent > 0 ? $", {sub.TaxPercent:0.##}% tax" : "")</dd>
+                        <dt class="col-5">Started</dt><dd class="col-7">@sub.StartedAt.ToLocalTime().ToString("dd MMM yyyy")</dd>
+                        @if (sub.TrialEndsAt is not null) { <dt class="col-5">Trial ends</dt><dd class="col-7">@sub.TrialEndsAt.Value.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</dd> }
+                        @if (sub.CurrentPeriodEnd is not null) { <dt class="col-5">Paid until</dt><dd class="col-7">@sub.CurrentPeriodEnd.Value.ToLocalTime().ToString("dd MMM yyyy")</dd> }
+                        @if (sub.GraceEndsAt is not null) { <dt class="col-5">Grace ends</dt><dd class="col-7 text-danger">@sub.GraceEndsAt.Value.ToLocalTime().ToString("dd MMM yyyy")</dd> }
+                        <dt class="col-5">Auto-renew</dt><dd class="col-7">@(sub.AutoRenew && !sub.CancelAtPeriodEnd ? "yes" : "no")@(sub.CancelAtPeriodEnd ? " (ends at term end)" : "")</dd>
+                        <dt class="col-5">Grace days</dt><dd class="col-7">@sub.GraceDays</dd>
+                    </dl>
+                }
+                <div class="alert alert-light border mt-3 mb-0 small">@Model.Access.Message</div>
+            </div></div></div>
+            <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-header"><h3 class="card-title mb-0">Usage vs limits</h3></div><div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Users</dt><dd class="col-7">@Model.Usage.Users / @Lim(Model.Limits.MaxUsers)</dd>
+                    <dt class="col-5">Products</dt><dd class="col-7">@Model.Usage.Products / @Lim(Model.Limits.MaxProducts)</dd>
+                    <dt class="col-5">Warehouses</dt><dd class="col-7">@Model.Usage.Warehouses / @Lim(Model.Limits.MaxWarehouses)</dd>
+                </dl>
+                <p class="small text-muted mt-3 mb-0">Counts only. Platform staff cannot open a tenant's stock, sales or accounting data.</p>
+            </div></div></div>
+        </div>
+    </div>
+
+    @* ---------------------------------------------------------------- subscription admin *@
+    <div class="tab-pane fade" id="tab-sub">
+        @if (sub is null)
+        {
+            @if (Model.IsAdmin && !terminated)
+            {
+                <div class="card" style="max-width: 640px;"><div class="card-body">
+                    <h6>Start a subscription</h6>
+                    <form asp-action="Subscribe" asp-route-id="@t.Id" method="post" class="row g-2">
+                        <div class="col-12 col-md-6"><select name="planId" class="form-select form-select-sm">@foreach (var p in Model.AllPlans) { <option value="@p.Id">@p.Name</option> }</select></div>
+                        <div class="col-12 col-md-6"><select name="mode" class="form-select form-select-sm"><option value="Trial">Trial</option><option value="InvoiceFirst">Invoice first</option><option value="ActivateNow">Activate now</option></select></div>
+                        <div class="col-12"><button class="btn btn-primary btn-sm">Start</button></div>
+                    </form>
+                </div></div>
+            }
+        }
+        else if (!Model.IsAdmin)
+        {
+            <div class="alert alert-info">Only a platform administrator can change subscription terms.</div>
+        }
+        else if (!terminated)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                    <h6>Change plan now</h6>
+                    <p class="small text-muted">Switches the plan immediately and copies its terms. No invoice is raised.</p>
+                    <form asp-action="AssignPlan" asp-route-id="@t.Id" method="post" class="d-flex gap-2">
+                        <select name="planId" class="form-select form-select-sm">@foreach (var p in Model.AllPlans) { <option value="@p.Id" selected="@(p.Id == sub.PlanId)">@p.Name</option> }</select>
+                        <button class="btn btn-primary btn-sm">Apply</button>
+                    </form>
+                </div></div></div>
+
+                <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                    <h6>Trial end</h6>
+                    <p class="small text-muted">Extend or shorten the free trial (only before the first payment).</p>
+                    <form asp-action="Trial" asp-route-id="@t.Id" method="post" class="d-flex gap-2">
+                        <input type="datetime-local" name="trialEnds" class="form-control form-control-sm" value="@((sub.TrialEndsAt ?? DateTime.UtcNow.AddDays(14)).ToLocalTime().ToString("yyyy-MM-ddTHH:mm"))" />
+                        <button class="btn btn-primary btn-sm">Save</button>
+                    </form>
+                </div></div></div>
+
+                <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                    <h6>Custom billing terms (this tenant only)</h6>
+                    <p class="small text-muted">For negotiated / enterprise contracts. Applies from the next invoice.</p>
+                    <form asp-action="Terms" asp-route-id="@t.Id" method="post" class="row g-2">
+                        <div class="col-6"><label class="form-label small mb-0">Price (@sub.Currency)</label><input name="price" type="number" step="0.01" min="0" value="@sub.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" /></div>
+                        <div class="col-3"><label class="form-label small mb-0">Every</label><input name="intervalCount" type="number" min="1" value="@sub.IntervalCount" class="form-control form-control-sm" /></div>
+                        <div class="col-3"><label class="form-label small mb-0">Unit</label><select name="unit" class="form-select form-select-sm"><option value="Month" selected="@(sub.IntervalUnit == BillingIntervalUnit.Month)">months</option><option value="Day" selected="@(sub.IntervalUnit == BillingIntervalUnit.Day)">days</option></select></div>
+                        <div class="col-4"><label class="form-label small mb-0">Grace days</label><input name="graceDays" type="number" min="0" value="@sub.GraceDays" class="form-control form-control-sm" /></div>
+                        <div class="col-4"><label class="form-label small mb-0">Tax %</label><input name="taxPercent" type="number" step="0.01" min="0" max="100" value="@sub.TaxPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" /></div>
+                        <div class="col-4"><label class="form-label small mb-0">Discount %</label><input name="discountPercent" type="number" step="0.01" min="0" max="100" value="@sub.DiscountPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" /></div>
+                        <div class="col-12"><div class="form-check"><input type="checkbox" name="autoRenew" value="true" class="form-check-input" id="ar" checked="@sub.AutoRenew" /><label class="form-check-label" for="ar">Auto-renew (issue renewal invoices)</label></div></div>
+                        <div class="col-12"><button class="btn btn-primary btn-sm">Save terms</button></div>
+                    </form>
+                </div></div></div>
+
+                <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                    <h6>Limits (override the plan)</h6>
+                    <p class="small text-muted">Leave blank to use the plan's limit.</p>
+                    <form asp-action="Limits" asp-route-id="@t.Id" method="post" class="row g-2">
+                        <div class="col-6"><label class="form-label small mb-0">Users (plan: @Lim(Model.Plan?.MaxUsers))</label><input name="users" type="number" min="0" value="@sub.MaxUsersOverride" class="form-control form-control-sm" /></div>
+                        <div class="col-6"><label class="form-label small mb-0">Products (plan: @Lim(Model.Plan?.MaxProducts))</label><input name="products" type="number" min="0" value="@sub.MaxProductsOverride" class="form-control form-control-sm" /></div>
+                        <div class="col-6"><label class="form-label small mb-0">Warehouses (plan: @Lim(Model.Plan?.MaxWarehouses))</label><input name="warehouses" type="number" min="0" value="@sub.MaxWarehousesOverride" class="form-control form-control-sm" /></div>
+                        <div class="col-6"><label class="form-label small mb-0">Storage MB</label><input name="storageMb" type="number" min="0" value="@sub.MaxStorageMbOverride" class="form-control form-control-sm" /></div>
+                        <div class="col-12"><button class="btn btn-primary btn-sm">Save limits</button></div>
+                    </form>
+                </div></div></div>
+
+                <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                    <h6>Module access</h6>
+                    <form asp-action="FeatureOverrides" asp-route-id="@t.Id" method="post">
+                        <div class="table-responsive"><table class="table table-sm align-middle mb-2">
+                            @foreach (var (key, label) in Features.All)
+                            {
+                                var current = Model.FeatureOverrides.TryGetValue(key, out var on) ? (on ? "on" : "off") : "default";
+                                <tr>
+                                    <td>@label<div class="small text-muted">Plan: @(Model.PlanFeatures.Contains(key) ? "included" : "not included")</div></td>
+                                    <td style="width: 9rem;"><select name="f_@key" class="form-select form-select-sm">
+                                        <option value="default" selected="@(current == "default")">Plan default</option>
+                                        <option value="on" selected="@(current == "on")">Force on</option>
+                                        <option value="off" selected="@(current == "off")">Force off</option>
+                                    </select></td>
+                                </tr>
+                            }
+                        </table></div>
+                        <button class="btn btn-primary btn-sm">Save access</button>
+                    </form>
+                </div></div></div>
+
+                <div class="col-12"><div class="card"><div class="card-body d-flex flex-wrap gap-2 align-items-center">
+                    <strong class="me-2">Cancellation:</strong>
+                    @if (sub.CancelAtPeriodEnd)
+                    {
+                        <form asp-action="Resume" asp-route-id="@t.Id" method="post"><button class="btn btn-outline-success btn-sm">Resume renewals</button></form>
+                    }
+                    else if (sub.Status != SubscriptionStatus.Cancelled)
+                    {
+                        <form asp-action="Cancel" asp-route-id="@t.Id" method="post"><input type="hidden" name="immediate" value="false" /><button class="btn btn-outline-danger btn-sm">Cancel at term end</button></form>
+                        <form asp-action="Cancel" asp-route-id="@t.Id" method="post" onsubmit="return confirm('Cancel the subscription immediately? Access ends now; data is kept.');"><input type="hidden" name="immediate" value="true" /><button class="btn btn-danger btn-sm">Cancel now</button></form>
+                    }
+                    else { <span class="text-muted">Subscription is cancelled.</span> }
+                </div></div></div>
+            </div>
+        }
+
+        <div class="card mt-3">
+            <div class="card-header"><h3 class="card-title mb-0">Subscription history</h3></div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>When</th><th>Event</th><th>Change</th><th>Note</th><th>By</th></tr></thead>
+                    <tbody>
+                    @foreach (var h in Model.History)
+                    {
+                        <tr><td class="text-nowrap">@h.CreatedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@h.Event</td><td>@h.FromStatus &rarr; @h.ToStatus</td><td class="small">@h.Note</td><td>@h.Actor</td></tr>
+                    }
+                    @if (Model.History.Count == 0) { <tr><td colspan="5" class="text-muted text-center p-3">No history.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ---------------------------------------------------------------- billing *@
+    <div class="tab-pane fade" id="tab-billing">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between"><h3 class="card-title mb-0">Invoices</h3><a href="/Platform/Invoices?tenantId=@t.Id" class="btn btn-sm btn-outline-secondary">All</a></div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>Invoice</th><th>Period</th><th>Due</th><th class="text-end">Total</th><th class="text-end">Paid</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var i in Model.Invoices)
+                    {
+                        <tr><td><a href="/Platform/Invoices/@i.Id">@i.InvoiceNumber</a></td><td>@i.PeriodStart.ToLocalTime().ToString("dd MMM yy") - @i.PeriodEnd.ToLocalTime().ToString("dd MMM yy")</td><td>@i.DueDate.ToLocalTime().ToString("dd MMM yy")</td><td class="text-end">@i.Total.ToString("0.00")</td><td class="text-end">@i.AmountPaid.ToString("0.00")</td><td><partial name="_InvoiceBadge" model="i.Status" /></td></tr>
+                    }
+                    @if (Model.Invoices.Count == 0) { <tr><td colspan="6" class="text-muted text-center p-3">No invoices.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">Payments</h3></div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    @foreach (var p in Model.Payments)
+                    {
+                        <tr><td>@p.ReceivedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@p.Invoice?.InvoiceNumber</td><td>@p.Method (@p.Provider)</td><td>@(p.ProviderTransactionId ?? p.Reference)</td><td>@p.Status</td><td class="text-end">@p.Amount.ToString("0.00") @p.Currency</td></tr>
+                    }
+                    @if (Model.Payments.Count == 0) { <tr><td colspan="6" class="text-muted text-center p-3">No payments.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ---------------------------------------------------------------- users *@
+    <div class="tab-pane fade" id="tab-users">
+        <div class="card mb-3">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var u in Model.Users)
+                    {
+                        <tr>
+                            <td>@u.User.FullName @if (u.IsOwner) { <span class="badge text-bg-primary">Owner</span> }</td>
+                            <td>@u.User.Email</td>
+                            <td>@string.Join(", ", u.Roles)</td>
+                            <td>@(u.User.IsActive ? "Active" : "Inactive")</td>
+                            <td>@(u.User.LastLoginAt?.ToLocalTime().ToString("dd MMM yy hh:mm tt"))</td>
+                            <td class="text-end">
+                                @if (Model.IsAdmin && !u.IsOwner && u.Roles.Contains(Roles.Admin) && !terminated)
+                                {
+                                    <form asp-action="Owner" asp-route-id="@t.Id" method="post"><input type="hidden" name="userId" value="@u.User.Id" /><button class="btn btn-outline-primary btn-sm">Make owner</button></form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if (Model.IsAdmin && !terminated)
+        {
+            <div class="card" style="max-width: 720px;"><div class="card-body">
+                <h6>Add a tenant administrator</h6>
+                <form asp-action="AddAdmin" asp-route-id="@t.Id" method="post" class="row g-2">
+                    <div class="col-12 col-md-4"><input name="fullName" class="form-control form-control-sm" placeholder="Full name" required /></div>
+                    <div class="col-12 col-md-4"><input name="email" type="email" class="form-control form-control-sm" placeholder="Email" required autocomplete="off" /></div>
+                    <div class="col-12 col-md-4"><input name="password" class="form-control form-control-sm" placeholder="Initial password" required autocomplete="new-password" /></div>
+                    <div class="col-12"><button class="btn btn-primary btn-sm">Add administrator</button></div>
+                </form>
+            </div></div>
+        }
+    </div>
+
+    @* ---------------------------------------------------------------- access: sign-in URLs and user credentials *@
+    @if (Model.IsAdmin)
+    {
+        <div class="tab-pane fade" id="tab-access">
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-xl-7"><div class="card h-100"><div class="card-body">
+                    <h6>Sign-in addresses for this tenant</h6>
+                    <label class="form-label small mb-0">Tenant sign-in link <span class="text-muted">(branded page; only this tenant's users can sign in)</span></label>
+                    <div class="input-group input-group-sm mb-3">
+                        <input id="lnkTenant" class="form-control" readonly value="@Model.Links.TenantSignIn" />
+                        <button type="button" class="btn btn-outline-secondary" data-copy="#lnkTenant"><i class="fas fa-copy"></i></button>
+                        <a class="btn btn-outline-primary" href="@Model.Links.TenantSignIn" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                    </div>
+                    <label class="form-label small mb-0">Main sign-in page <span class="text-muted">(shared by every tenant)</span></label>
+                    <div class="input-group input-group-sm mb-3">
+                        <input id="lnkMain" class="form-control" readonly value="@Model.Links.MainSignIn" />
+                        <button type="button" class="btn btn-outline-secondary" data-copy="#lnkMain"><i class="fas fa-copy"></i></button>
+                    </div>
+                    @if (!Model.Links.BaseUrlConfigured)
+                    {
+                        <div class="alert alert-warning small mb-0">These links use the address you are browsing from. Set the <a href="/Platform/Settings">Public URL</a> so they show the real public address.</div>
+                    }
+                </div></div></div>
+
+                <div class="col-12 col-xl-5"><div class="card h-100"><div class="card-body">
+                    <h6>Tenant's own web address</h6>
+                    <p class="small text-muted">Optional, for example <code>https://shop.example.com</code>. When that domain is routed to this application, its sign-in page is limited to this tenant. DNS and the reverse proxy are set up outside the application.</p>
+                    <form asp-action="PortalUrl" asp-route-id="@t.Id" method="post" class="d-flex gap-2">
+                        <input name="url" value="@t.PortalUrl" class="form-control form-control-sm" placeholder="https://shop.example.com" maxlength="300" />
+                        <button class="btn btn-primary btn-sm">Save</button>
+                    </form>
+                    @if (!string.IsNullOrEmpty(t.PortalUrl)) { <p class="small mt-2 mb-0">Current: <a href="@t.PortalUrl" target="_blank" rel="noopener">@t.PortalUrl</a></p> }
+                </div></div></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3 class="card-title mb-0">Sign-in accounts</h3></div>
+                <div class="card-body p-0 table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>User</th><th>Roles</th><th>Status</th><th style="min-width: 22rem;">Actions</th></tr></thead>
+                        <tbody>
+                        @foreach (var u in Model.Users)
+                        {
+                            <tr>
+                                <td>
+                                    @u.User.FullName @if (u.IsOwner) { <span class="badge text-bg-primary">Owner</span> }
+                                    <div class="small text-muted">@u.User.Email</div>
+                                    @if (u.User.MustChangePassword) { <div class="small text-warning">Must change password at next sign-in</div> }
+                                </td>
+                                <td class="small">@string.Join(", ", u.Roles)</td>
+                                <td class="small">@(u.User.IsActive ? "Active" : "Deactivated")@(u.User.LockoutEnd > DateTimeOffset.UtcNow ? ", locked out" : "")<div class="text-muted">@(u.User.LastLoginAt is null ? "never signed in" : "last " + u.User.LastLoginAt.Value.ToLocalTime().ToString("dd MMM yy hh:mm tt"))</div></td>
+                                <td>
+                                    @if (!terminated)
+                                    {
+                                        <form asp-action="ResetPassword" asp-route-id="@t.Id" asp-route-userId="@u.User.Id" method="post" class="d-flex gap-1 mb-1" onsubmit="return confirm('Reset the password for @u.User.Email? They will be signed out.');">
+                                            <input name="newPassword" class="form-control form-control-sm" placeholder="New password (blank = generate)" autocomplete="new-password" />
+                                            <button class="btn btn-warning btn-sm text-nowrap"><i class="fas fa-key"></i> Reset</button>
+                                        </form>
+                                        <form asp-action="ChangeUserEmail" asp-route-id="@t.Id" asp-route-userId="@u.User.Id" method="post" class="d-flex gap-1 mb-1">
+                                            <input name="email" type="email" class="form-control form-control-sm" placeholder="Change sign-in email" autocomplete="off" />
+                                            <button class="btn btn-outline-primary btn-sm text-nowrap">Change</button>
+                                        </form>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <form asp-action="ToggleUser" asp-route-id="@t.Id" asp-route-userId="@u.User.Id" method="post"><button class="btn btn-sm btn-outline-@(u.User.IsActive ? "secondary" : "success")">@(u.User.IsActive ? "Deactivate" : "Activate")</button></form>
+                                            <form asp-action="UnlockUser" asp-route-id="@t.Id" asp-route-userId="@u.User.Id" method="post"><button class="btn btn-sm btn-outline-secondary">Unlock</button></form>
+                                            <form asp-action="SignOutUser" asp-route-id="@t.Id" asp-route-userId="@u.User.Id" method="post"><button class="btn btn-sm btn-outline-secondary">Sign out everywhere</button></form>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer small text-muted">Passwords are never displayed or stored in clear text. A reset shows the temporary password once, signs the user out everywhere and forces them to choose their own at next sign-in. Every change is audited.</div>
+            </div>
+        </div>
+    }
+
+    @* ---------------------------------------------------------------- activity *@
+    <div class="tab-pane fade" id="tab-activity">
+        <div class="card"><div class="card-body p-0 table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <thead><tr><th>Time</th><th>Who</th><th>Action</th><th>Result</th><th>Details</th></tr></thead>
+                <tbody>
+                @foreach (var a in Model.Audit)
+                {
+                    <tr><td class="text-nowrap">@a.At.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@a.ActorName</td><td>@a.Action</td><td>@a.Result</td><td class="small">@a.Details</td></tr>
+                }
+                @if (Model.Audit.Count == 0) { <tr><td colspan="5" class="text-muted text-center p-3">No activity.</td></tr> }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+
+    @* ---------------------------------------------------------------- lifecycle *@
+    @if (Model.IsAdmin)
+    {
+        <div class="tab-pane fade" id="tab-danger">
+            <div class="alert alert-info small">
+                <strong>Suspend</strong> = administrative hold; payment never lifts it. <strong>Disable</strong> = users cannot sign in. <strong>Terminate</strong> = soft delete, data kept for the retention period.
+                A suspension for non-payment is applied and removed automatically by the billing job and is separate from these.
+            </div>
+            <div class="row g-3">
+                @if (!terminated)
+                {
+                    <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                        <h6>Administrative suspension</h6>
+                        @if (t.IsAdminHold)
+                        {
+                            <p class="small">Held: @t.AdminHoldReason</p>
+                            <form asp-action="Reactivate" asp-route-id="@t.Id" method="post"><button class="btn btn-success btn-sm">Lift suspension</button></form>
+                        }
+                        else
+                        {
+                            <form asp-action="Suspend" asp-route-id="@t.Id" method="post" class="d-flex flex-wrap gap-2">
+                                <input name="reason" class="form-control form-control-sm" placeholder="Reason (required)" required style="max-width: 22rem;" />
+                                <button class="btn btn-warning btn-sm">Suspend</button>
+                            </form>
+                        }
+                    </div></div></div>
+                    <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                        <h6>Disable / enable</h6>
+                        @if (t.Status == TenantStatus.Disabled)
+                        {
+                            <form asp-action="Enable" asp-route-id="@t.Id" method="post"><button class="btn btn-success btn-sm">Enable tenant</button></form>
+                        }
+                        else
+                        {
+                            <form asp-action="Disable" asp-route-id="@t.Id" method="post" class="d-flex flex-wrap gap-2">
+                                <input name="reason" class="form-control form-control-sm" placeholder="Reason (required)" required style="max-width: 22rem;" />
+                                <button class="btn btn-secondary btn-sm">Disable</button>
+                            </form>
+                        }
+                    </div></div></div>
+                    <div class="col-12"><div class="card border-danger"><div class="card-body">
+                        <h6 class="text-danger">Terminate tenant</h6>
+                        <p class="small">Ends access and cancels the subscription. Data is kept for the retention period and can then be erased.</p>
+                        <form asp-action="Terminate" asp-route-id="@t.Id" method="post" class="row g-2">
+                            <div class="col-12 col-md-5"><input name="reason" class="form-control form-control-sm" placeholder="Reason" required /></div>
+                            <div class="col-12 col-md-4"><input name="confirmCode" class="form-control form-control-sm" placeholder="Type @t.Code to confirm" required autocomplete="off" /></div>
+                            <div class="col-12 col-md-3"><button class="btn btn-danger btn-sm w-100">Terminate</button></div>
+                        </form>
+                    </div></div></div>
+                }
+                else if (t.PurgedAt is null)
+                {
+                    <div class="col-12"><div class="card border-danger"><div class="card-body">
+                        <h6 class="text-danger">Permanently erase business data</h6>
+                        <p class="small">Irreversible. Deletes this tenant's products, stock, sales, purchases, accounts, settings and users. Invoices, payments, refunds and the audit log are kept.
+                            @if (Model.PurgeEligibleOn is { } eligible && eligible > DateTime.UtcNow) { <strong>Not allowed before @eligible.ToLocalTime().ToString("dd MMM yyyy").</strong> }
+                        </p>
+                        <form asp-action="Purge" asp-route-id="@t.Id" method="post" class="row g-2" onsubmit="return confirm('Erase all business data of this tenant permanently?');">
+                            <div class="col-12 col-md-5"><input name="confirmCode" class="form-control form-control-sm" placeholder="Type @t.Code to confirm" required autocomplete="off" /></div>
+                            <div class="col-12 col-md-3"><button class="btn btn-danger btn-sm w-100">Erase permanently</button></div>
+                        </form>
+                    </div></div></div>
+                }
+                else
+                {
+                    <div class="col-12"><div class="alert alert-secondary mb-0">Business data was erased on @t.PurgedAt.Value.ToLocalTime().ToString("dd MMM yyyy"). Financial records remain.</div></div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('[data-copy]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var el = document.querySelector(b.getAttribute('data-copy'));
+                el.select();
+                if (navigator.clipboard) { navigator.clipboard.writeText(el.value); } else { document.execCommand('copy'); }
+            });
+        });
+        // Remember the open tab, so a form action (which reloads the page) returns to the same tab.
+        var key = 'tenantTab:' + location.pathname;
+        try {
+            var saved = sessionStorage.getItem(key);
+            if (saved) { var st = document.querySelector('[data-bs-target="' + saved + '"]'); if (st) { new bootstrap.Tab(st).show(); } }
+        } catch (e) { }
+        document.querySelectorAll('#tenantTabs [data-bs-toggle="tab"]').forEach(function (b) {
+            b.addEventListener('shown.bs.tab', function () { try { sessionStorage.setItem(key, b.getAttribute('data-bs-target')); } catch (e) { } });
+        });
+    </script>
+}

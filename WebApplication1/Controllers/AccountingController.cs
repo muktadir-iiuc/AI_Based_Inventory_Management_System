@@ -8,9 +8,12 @@ using WebApplication1.Models.Accounting;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+[RequireFeature(Features.Accounting)]
 public class AccountingController(ApplicationDbContext db, IAccountingService accountingService) : Controller
 {
     // ---- Chart of Accounts ----

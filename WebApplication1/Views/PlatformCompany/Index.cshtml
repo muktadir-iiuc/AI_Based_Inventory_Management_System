@@ -1,0 +1,41 @@
+@using WebApplication1.Models.Tenancy
+@model PagedResult<Tenant>
+@{
+    ViewData["Title"] = "Company settings of tenants";
+    var profiles = (Dictionary<int, (string Company, string Short, bool Logo)>)ViewData["Profiles"]!;
+}
+
+@section Toolbar { <a href="/Platform/Tenants/Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New tenant</a> }
+
+<p class="text-muted">Each business's company name, short name, address, phone and logo - printed on its invoices and shown across its screens. The business's own Admin can also edit these under <em>Company Settings</em>.</p>
+
+<div class="card mb-3"><div class="card-body">
+    <form method="get" class="d-flex flex-wrap gap-2">
+        <input name="q" value="@ViewData["Q"]" class="form-control form-control-sm" style="max-width: 22rem;" placeholder="Search business name or code" />
+        <button class="btn btn-primary btn-sm">Search</button><a href="/Platform/Company" class="btn btn-outline-secondary btn-sm">Reset</a>
+    </form>
+</div></div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-striped table-hover mb-0 align-middle">
+            <thead><tr><th style="width: 5rem;">Logo</th><th>Business (platform record)</th><th>Company name</th><th>Short name</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var t in Model.Items)
+            {
+                var has = profiles.TryGetValue(t.Id, out var p);
+                <tr>
+                    <td>@if (has && p.Logo) { <img src="/CompanySettings/Logo?tenant=@t.Code" alt="" style="max-height: 36px; max-width: 64px;" class="border rounded bg-white p-1" /> } else { <span class="text-muted small">none</span> }</td>
+                    <td><a href="/Platform/Tenants/@t.Id" class="fw-semibold">@t.Name</a><div class="small text-muted">@t.Code</div></td>
+                    <td>@(has ? p.Company : "-")</td>
+                    <td>@(has ? p.Short : "-")</td>
+                    <td><partial name="_TenantBadge" model="t" /></td>
+                    <td class="text-end"><a href="/Platform/Company/@t.Id" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i> Edit</a></td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0) { <tr><td colspan="6" class="text-center text-muted p-4">No tenants.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Pager" />
+</div>

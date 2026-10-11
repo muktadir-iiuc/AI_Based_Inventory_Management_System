@@ -56,6 +56,19 @@ public class StockTransfer
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<StockTransferItem> Items { get; set; } = [];
+
+    // Purchase invoices the user tagged this transfer with, for reference only (like Notes) —
+    // they do not affect which FIFO batches move.
+    public ICollection<StockTransferPurchaseInvoice> PurchaseInvoiceLinks { get; set; } = [];
+}
+
+public class StockTransferPurchaseInvoice
+{
+    public int StockTransferId { get; set; }
+    public StockTransfer? StockTransfer { get; set; }
+
+    public int PurchaseInvoiceId { get; set; }
+    public PurchaseInvoice? PurchaseInvoice { get; set; }
 }
 
 public class StockTransferItem

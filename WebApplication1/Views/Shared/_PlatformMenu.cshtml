@@ -1,0 +1,23 @@
+﻿@{
+    var pc = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string Active(params string[] controllers) => controllers.Any(c => string.Equals(c, pc, StringComparison.OrdinalIgnoreCase)) ? "active" : "";
+}
+<li class="nav-header">PLATFORM</li>
+<li class="nav-item"><a href="/Platform" class="nav-link @Active("Platform")"><i class="nav-icon fas fa-gauge"></i><p>Dashboard</p></a></li>
+<li class="nav-item"><a href="/Platform/Tenants" class="nav-link @Active("PlatformTenants")"><i class="nav-icon fas fa-building"></i><p>Tenants</p></a></li>
+<li class="nav-item"><a href="/Platform/Company" class="nav-link @Active("PlatformCompany")"><i class="nav-icon fas fa-id-card"></i><p>Company Settings</p></a></li>
+<li class="nav-item"><a href="/Platform/Plans" class="nav-link @Active("PlatformPlans")"><i class="nav-icon fas fa-layer-group"></i><p>Subscription Plans</p></a></li>
+<li class="nav-item"><a href="/Platform/Subscriptions" class="nav-link @Active("PlatformSubscriptions")"><i class="nav-icon fas fa-repeat"></i><p>Subscriptions</p></a></li>
+<li class="nav-item"><a href="/Platform/Invoices" class="nav-link @Active("PlatformInvoices")"><i class="nav-icon fas fa-file-invoice-dollar"></i><p>Invoices</p></a></li>
+<li class="nav-item"><a href="/Platform/Payments" class="nav-link @Active("PlatformPayments")"><i class="nav-icon fas fa-money-bill-wave"></i><p>Payments</p></a></li>
+<li class="nav-item"><a href="/Platform/Reports" class="nav-link @Active("PlatformReports")"><i class="nav-icon fas fa-chart-line"></i><p>Reports</p></a></li>
+<li class="nav-item"><a href="/Platform/DataExports" class="nav-link @Active("PlatformDataExports")"><i class="nav-icon fas fa-file-export"></i><p>Data Exports</p></a></li>
+<li class="nav-item"><a href="/Platform/AuditLogs" class="nav-link @Active("PlatformAudit")"><i class="nav-icon fas fa-clipboard-list"></i><p>Audit Logs</p></a></li>
+@if (User.IsInRole(Roles.PlatformAdmin))
+{
+    <li class="nav-header">SYSTEM</li>
+    <li class="nav-item"><a href="/Platform/Settings" class="nav-link @Active("PlatformSettings")"><i class="nav-icon fas fa-gear"></i><p>Platform Settings</p></a></li>
+    <li class="nav-item"><a href="/Platform/Staff" class="nav-link @Active("PlatformStaff")"><i class="nav-icon fas fa-users-gear"></i><p>Platform Users</p></a></li>
+    <li class="nav-item"><a href="/Platform/Providers" class="nav-link @Active("PlatformProviders")"><i class="nav-icon fas fa-plug"></i><p>Payment Providers</p></a></li>
+    <li class="nav-item"><a asp-controller="DatabaseBackup" asp-action="Index" class="nav-link @Active("DatabaseBackup")"><i class="nav-icon fas fa-database"></i><p>Database Backup</p></a></li>
+}

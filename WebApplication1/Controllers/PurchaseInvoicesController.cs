@@ -9,9 +9,16 @@ using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+// Purchase invoices are all purchase prices, so Sales Officers and Viewers can't open them at all,
+// and everyone else also needs the Purchase Invoices page assigned (Page Permissions).
+[Authorize(Roles = Roles.PurchasePriceViewers)]
+[Authorize(Policy = Permissions.PurchaseInvoice)]
+[RequireFeature(Features.Purchasing)]
 public class PurchaseInvoicesController(
     ApplicationDbContext db,
     IStockService stockService,
@@ -166,7 +173,8 @@ public class PurchaseInvoicesController(
             "Purchase Invoice Posted",
             $"{invoice.InvoiceNumber} — {invoice.Items.Count} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
             "fas fa-truck-loading text-info",
-            [invoice.WarehouseId]);
+            [invoice.WarehouseId],
+            mentionsPurchasePrices: true);
 
         TempData["Success"] = $"Purchase invoice {invoice.InvoiceNumber} posted.";
         return RedirectToAction(nameof(Details), new { id = invoice.Id });
@@ -215,7 +223,8 @@ public class PurchaseInvoicesController(
             "Purchase Invoice Cancelled",
             $"{invoice.InvoiceNumber} was cancelled and reversed.",
             "fas fa-ban text-danger",
-            [invoice.WarehouseId]);
+            [invoice.WarehouseId],
+            mentionsPurchasePrices: true);
 
         TempData["Success"] = $"Purchase invoice {invoice.InvoiceNumber} cancelled and reversed.";
         return RedirectToAction(nameof(Details), new { id });
@@ -362,7 +371,8 @@ public class PurchaseInvoicesController(
             "Purchase Invoice Edited",
             $"{invoice.InvoiceNumber} was edited — {invoice.Items.Count(i => i.IsCurrent)} line(s) at {warehouseName} ({invoice.TotalAmount:C})",
             "fas fa-pen text-info",
-            [invoice.WarehouseId]);
+            [invoice.WarehouseId],
+            mentionsPurchasePrices: true);
 
         TempData["Success"] = $"Purchase invoice {invoice.InvoiceNumber} updated.";
         return RedirectToAction(nameof(Details), new { id });

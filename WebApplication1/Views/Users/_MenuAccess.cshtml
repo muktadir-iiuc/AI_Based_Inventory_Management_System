@@ -1,0 +1,14 @@
+@model List<string>
+@* Per-user menu access (Stock Transfers / Stock Adjustments). Hidden for Admin/Manager, who always have it. *@
+<div class="mb-3" id="permissionGroup">
+    <label class="form-label">Menu Access <small class="text-muted fw-normal">(also on Administration → Page Permissions)</small></label>
+    @foreach (var p in Permissions.All)
+    {
+        var inputId = "perm_" + p.Key.Replace(".", "_");
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="PermissionKeys" value="@p.Key" id="@inputId" checked="@Model.Contains(p.Key)" />
+            <label class="form-check-label" for="@inputId">@p.Label</label>
+            <div class="form-text mt-0">@p.Description</div>
+        </div>
+    }
+</div>

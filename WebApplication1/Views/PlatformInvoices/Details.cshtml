@@ -1,0 +1,132 @@
+@using WebApplication1.Models.Saas
+@model SaasInvoice
+@{
+    ViewData["Title"] = $"Invoice {Model.InvoiceNumber}";
+    var balance = Model.Total - Model.AmountPaid;
+    var isAdmin = (bool)ViewData["IsAdmin"]!;
+    var audit = (List<SaasAuditLog>)ViewData["Audit"]!;
+    var refunds = (List<SaasRefund>)ViewData["Refunds"]!;
+    var open = Model.Status is InvoiceStatus.Pending or InvoiceStatus.PartiallyPaid or InvoiceStatus.Overdue;
+}
+
+@section Toolbar {
+    <a href="/Platform/Invoices/@Model.Id/Pdf" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-pdf"></i> Print / Save PDF</a>
+    <a href="/Platform/Invoices" class="btn btn-outline-secondary btn-sm">Back</a>
+}
+
+<div class="card mb-3"><div class="card-body">
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <h4 class="mb-1">@Model.InvoiceNumber <partial name="_InvoiceBadge" model="Model.Status" /></h4>
+            <div>Tenant: <a href="/Platform/Tenants/@Model.TenantId">@Model.Tenant?.Name</a></div>
+            <div class="text-muted">Plan @Model.PlanName &middot; @Model.Purpose</div>
+            <div class="text-muted">Issued @Model.IssueDate.ToLocalTime().ToString("dd MMM yyyy") &middot; Due @Model.DueDate.ToLocalTime().ToString("dd MMM yyyy")</div>
+            <div class="text-muted">Period @Model.PeriodStart.ToLocalTime().ToString("dd MMM yyyy") - @Model.PeriodEnd.ToLocalTime().ToString("dd MMM yyyy")</div>
+        </div>
+        <div class="col-12 col-md-6 text-md-end"><div class="fw-semibold">@Model.BillToName</div><div>@Model.BillToEmail</div><div>@Model.BillToAddress</div>@if (!string.IsNullOrWhiteSpace(Model.BillToTaxId)) { <div>Tax/BIN: @Model.BillToTaxId</div> }</div>
+    </div>
+    <div class="table-responsive mt-3"><table class="table">
+        <thead><tr><th>Description</th><th class="text-end">Amount (@Model.Currency)</th></tr></thead>
+        <tbody>@foreach (var item in Model.Items.OrderBy(i => i.ItemType)) { <tr><td>@item.Description</td><td class="text-end">@item.Amount.ToString("0.00")</td></tr> }</tbody>
+        <tfoot>
+            <tr><th class="text-end">Total</th><th class="text-end">@Model.Total.ToString("0.00")</th></tr>
+            <tr><td class="text-end">Paid</td><td class="text-end">@Model.AmountPaid.ToString("0.00")</td></tr>
+            <tr><th class="text-end">Balance</th><th class="text-end">@balance.ToString("0.00")</th></tr>
+        </tfoot>
+    </table></div>
+</div></div>
+
+<div class="card mb-3">
+    <div class="card-header"><h3 class="card-title mb-0">Payments</h3></div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Receipt</th><th>Status</th><th class="text-end">Amount</th><th class="text-end">Refunded</th><th class="d-print-none"></th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Payments.OrderBy(p => p.ReceivedAt))
+            {
+                <tr>
+                    <td>@p.ReceivedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td>
+                    <td>@p.Method (@p.Provider)</td>
+                    <td>@(p.ProviderTransactionId ?? p.Reference)</td>
+                    <td>@p.ReceiptNumber</td>
+                    <td>@p.Status</td>
+                    <td class="text-end">@p.Amount.ToString("0.00")</td>
+                    <td class="text-end">@p.RefundedAmount.ToString("0.00")</td>
+                    <td class="text-end d-print-none">
+                        @if (p.Status == SaasPaymentStatus.AwaitingConfirmation)
+                        {
+                            <form action="/Platform/Payments/@p.Id/Confirm" method="post" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-success">Confirm</button></form>
+                        }
+                        else if (isAdmin && p.Status == SaasPaymentStatus.Succeeded && p.Amount - p.RefundedAmount > 0)
+                        {
+                            <form action="/Platform/Payments/@p.Id/Refund" method="post" class="d-inline-flex gap-1">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="invoiceId" value="@Model.Id" />
+                                <input name="amount" type="number" step="0.01" min="0.01" max="@((p.Amount - p.RefundedAmount).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))" value="@((p.Amount - p.RefundedAmount).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))" class="form-control form-control-sm" style="width: 6.5rem;" />
+                                <input name="reason" placeholder="Reason" required class="form-control form-control-sm" style="width: 9rem;" />
+                                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Refund this payment?');">Refund</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Payments.Count == 0) { <tr><td colspan="8" class="text-center text-muted p-3">No payments.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (refunds.Count > 0)
+{
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title mb-0">Refunds</h3></div>
+        <div class="card-body p-0 table-responsive"><table class="table table-sm mb-0">
+            <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th>Reason</th><th>By</th></tr></thead>
+            <tbody>@foreach (var r in refunds) { <tr><td>@r.CreatedAt.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@r.Amount.ToString("0.00")</td><td>@r.Status</td><td>@r.Reason</td><td>@r.CreatedBy</td></tr> }</tbody>
+        </table></div>
+    </div>
+}
+
+@if (open)
+{
+    <div class="row g-3 mb-3 d-print-none">
+        <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+            <h6>Record a payment received by our staff</h6>
+            <form asp-controller="PlatformInvoices" asp-action="RecordPayment" asp-route-id="@Model.Id" method="post" class="row g-2">
+                <div class="col-6"><select name="method" class="form-select form-select-sm"><option value="Cash">Cash</option><option value="BankTransfer">Bank transfer</option><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="Rocket">Rocket</option></select></div>
+                <div class="col-6"><input name="amount" type="number" step="0.01" min="0.01" max="@balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" value="@balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" required /></div>
+                <div class="col-12"><input name="reference" class="form-control form-control-sm" placeholder="Receipt / transfer reference" /></div>
+                <div class="col-12"><input name="note" class="form-control form-control-sm" placeholder="Note (optional)" /></div>
+                <div class="col-12"><button class="btn btn-primary btn-sm">Record payment</button> <span class="small text-muted ms-2">Counts immediately and updates the subscription.</span></div>
+            </form>
+        </div></div></div>
+        @if (isAdmin)
+        {
+            <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-body">
+                @if (Model.AmountPaid == 0)
+                {
+                    <h6>Adjust invoice</h6>
+                    <form asp-controller="PlatformInvoices" asp-action="Adjust" asp-route-id="@Model.Id" method="post" class="row g-2">
+                        <div class="col-12 col-md-7"><input name="description" class="form-control form-control-sm" placeholder="e.g. Goodwill credit" required /></div>
+                        <div class="col-8 col-md-3"><input name="amount" type="number" step="0.01" class="form-control form-control-sm" placeholder="-100 or 50" required /></div>
+                        <div class="col-4 col-md-2"><button class="btn btn-outline-primary btn-sm w-100">Add</button></div>
+                    </form>
+                    <hr />
+                    <form asp-controller="PlatformInvoices" asp-action="CancelInvoice" asp-route-id="@Model.Id" method="post" class="d-flex gap-2" onsubmit="return confirm('Cancel this invoice?');">
+                        <input name="reason" class="form-control form-control-sm" placeholder="Reason for cancelling" required />
+                        <button class="btn btn-outline-danger btn-sm">Cancel invoice</button>
+                    </form>
+                }
+                else { <p class="text-muted mb-0">Invoices with payments cannot be adjusted or cancelled. Refund a payment instead.</p> }
+            </div></div></div>
+        }
+    </div>
+}
+
+<div class="card d-print-none">
+    <div class="card-header"><h3 class="card-title mb-0">Audit trail</h3></div>
+    <div class="card-body p-0 table-responsive"><table class="table table-sm table-striped mb-0">
+        <thead><tr><th>Time</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody>@foreach (var a in audit) { <tr><td class="text-nowrap">@a.At.ToLocalTime().ToString("dd MMM yy hh:mm tt")</td><td>@a.ActorName</td><td>@a.Action</td><td class="small">@a.Details</td></tr> }</tbody>
+    </table></div>
+</div>

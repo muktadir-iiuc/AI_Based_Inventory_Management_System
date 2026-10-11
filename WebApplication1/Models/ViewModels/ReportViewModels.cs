@@ -73,10 +73,47 @@ public class SalesHistoryViewModel
 {
     public Microsoft.AspNetCore.Mvc.Rendering.SelectList Customers { get; set; } = null!;
     public int? CustomerId { get; set; }
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Products { get; set; } = null!;
+    public int? ProductId { get; set; }
     public DateTime? FromDate { get; set; }
     public DateTime? ToDate { get; set; }
     public bool WarehouseScoped { get; set; }
     public List<SalesHistoryInvoice> Invoices { get; set; } = [];
+}
+
+// One breakdown line of a purchase invoice: a product received into a batch at its purchase price.
+public class PurchaseHistoryLine
+{
+    public string Product { get; set; } = string.Empty;
+    public string? BatchNumber { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalPrice => Quantity * UnitPrice;
+}
+
+// Master row of the Purchase History report: one per posted purchase invoice, lines as detail.
+public class PurchaseHistoryInvoice
+{
+    public int Id { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public DateTime Date { get; set; }
+    public string SupplierName { get; set; } = string.Empty;
+    public string WarehouseName { get; set; } = string.Empty;
+    public decimal Quantity => Lines.Sum(l => l.Quantity);
+    public decimal Total => Lines.Sum(l => l.TotalPrice);
+    public List<PurchaseHistoryLine> Lines { get; set; } = [];
+}
+
+public class PurchaseHistoryViewModel
+{
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Suppliers { get; set; } = null!;
+    public int? SupplierId { get; set; }
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Products { get; set; } = null!;
+    public int? ProductId { get; set; }
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
+    public bool WarehouseScoped { get; set; }
+    public List<PurchaseHistoryInvoice> Invoices { get; set; } = [];
 }
 
 public class SalesProfitabilityViewModel
@@ -84,10 +121,20 @@ public class SalesProfitabilityViewModel
     public bool WarehouseScoped { get; set; }
     public Microsoft.AspNetCore.Mvc.Rendering.SelectList Warehouses { get; set; } = null!;
     public int? WarehouseId { get; set; }
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Products { get; set; } = null!;
+    public int? ProductId { get; set; }
     public DateTime? FromDate { get; set; }
     public DateTime? ToDate { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalCost { get; set; }
     public decimal TotalProfit { get; set; }
     public List<SalesProfitabilityRow> Rows { get; set; } = null!;
+}
+
+public class ReorderSuggestionsViewModel
+{
+    public WebApplication1.Services.ReorderForecast Forecast { get; set; } = null!;
+    public Microsoft.AspNetCore.Mvc.Rendering.SelectList Warehouses { get; set; } = null!;
+    public int? WarehouseId { get; set; }
+    public bool WarehouseScoped { get; set; }
 }

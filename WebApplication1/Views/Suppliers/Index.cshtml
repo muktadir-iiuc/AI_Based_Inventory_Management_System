@@ -34,7 +34,10 @@
                     </td>
                     <td class="text-end">
                         <div class="table-actions">
-                            <a asp-action="Ledger" asp-route-partyId="@s.Id" class="btn btn-sm btn-outline-secondary" title="View supplier ledger"><i class="fas fa-book"></i></a>
+                            @if (User.CanSeeSupplierLedger())
+                            {
+                                <a asp-action="Ledger" asp-route-partyId="@s.Id" class="btn btn-sm btn-outline-secondary" title="View supplier ledger"><i class="fas fa-book"></i></a>
+                            }
                             @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer))
                             {
                                 <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary" title="Edit supplier"><i class="fas fa-pen"></i></a>

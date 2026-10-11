@@ -6,6 +6,8 @@ using WebApplication1.Extensions;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.PettyCash;
 using WebApplication1.Models.ViewModels;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
@@ -13,6 +15,7 @@ namespace WebApplication1.Controllers;
 // sign-in); only non-Viewer roles can change it. Entries are kept per warehouse and scoped the
 // same way as the rest of the app: a warehouse-restricted user only sees and records entries for
 // their assigned warehouse(s). The Names list is shared across all warehouses.
+[RequireFeature(Features.PettyCash)]
 public class PettyCashController(ApplicationDbContext db) : Controller
 {
     public async Task<IActionResult> Index()

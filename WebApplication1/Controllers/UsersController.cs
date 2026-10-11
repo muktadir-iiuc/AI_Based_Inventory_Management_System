@@ -4,8 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.Extensions;
+using WebApplication1.Services.Tenancy;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.ViewModels;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
@@ -13,7 +16,8 @@ namespace WebApplication1.Controllers;
 public class UsersController(
     UserManager<ApplicationUser> userManager,
     RoleManager<ApplicationRole> roleManager,
-    ApplicationDbContext db) : Controller
+    ApplicationDbContext db,
+    ITenantContext tenant) : Controller
 {
     private static readonly string[] UnrestrictedRoles = [Roles.Admin, Roles.Manager];
 
@@ -34,7 +38,7 @@ public class UsersController(
     {
         var now = DateTime.UtcNow;
         var currentUserId = userManager.GetUserId(User);
-        var users = await userManager.Users
+        var users = await userManager.TenantUsers(tenant)
             .Where(u => u.IsActive)
             .Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse)
             .ToListAsync();
@@ -85,7 +89,7 @@ public class UsersController(
 
     public async Task<IActionResult> Index()
     {
-        var users = await userManager.Users.Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email).ToListAsync();
+        var users = await userManager.TenantUsers(tenant).Include(u => u.UserWarehouses).ThenInclude(uw => uw.Warehouse).OrderBy(u => u.Email).ToListAsync();
 
         var items = new List<UserListItem>();
         foreach (var user in users)
@@ -113,6 +117,7 @@ public class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnforceLimit(LimitKind.Users)]
     public async Task<IActionResult> Create(UserCreateViewModel model)
     {
         model.Roles = model.Roles.Distinct().ToList();
@@ -131,7 +136,8 @@ public class UsersController(
             Email = model.Email,
             FullName = model.FullName,
             EmailConfirmed = true,
-            IsActive = true
+            IsActive = true,
+            TenantId = tenant.TenantId
         };
 
         var result = await userManager.CreateAsync(user, model.Password);
@@ -150,6 +156,7 @@ public class UsersController(
         if (!IsUnrestricted(model.Roles))
         {
             db.UserWarehouses.AddRange(model.WarehouseIds.Select(id => new UserWarehouse { UserId = user.Id, WarehouseId = id }));
+            db.UserPermissions.AddRange(ValidPermissionKeys(model.PermissionKeys, model.Roles).Select(k => new UserPermission { UserId = user.Id, PermissionKey = k }));
             await db.SaveChangesAsync();
         }
 
@@ -159,7 +166,7 @@ public class UsersController(
 
     public async Task<IActionResult> Edit(string id)
     {
-        var user = await userManager.Users.Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
+        var user = await userManager.TenantUsers(tenant).Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
 
         var roles = await userManager.GetRolesAsync(user);
@@ -171,7 +178,8 @@ public class UsersController(
             FullName = user.FullName,
             IsActive = user.IsActive,
             Roles = roles.ToList(),
-            WarehouseIds = user.UserWarehouses.Select(uw => uw.WarehouseId).ToList()
+            WarehouseIds = user.UserWarehouses.Select(uw => uw.WarehouseId).ToList(),
+            PermissionKeys = await db.UserPermissions.Where(p => p.UserId == user.Id).Select(p => p.PermissionKey).ToListAsync()
         });
     }
 
@@ -191,7 +199,7 @@ public class UsersController(
             return View(model);
         }
 
-        var user = await userManager.Users.Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
+        var user = await userManager.TenantUsers(tenant).Include(u => u.UserWarehouses).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
 
         user.FullName = model.FullName;
@@ -221,11 +229,22 @@ public class UsersController(
 
         db.UserWarehouses.RemoveRange(warehousesToRemove);
         db.UserWarehouses.AddRange(warehousesToAdd);
+
+        // Admin/Manager have every permission implicitly, so nothing is stored for them.
+        List<string> desiredPermissions = IsUnrestricted(model.Roles) ? [] : ValidPermissionKeys(model.PermissionKeys, model.Roles);
+        var currentPermissions = await db.UserPermissions.Where(p => p.UserId == user.Id).ToListAsync();
+        db.UserPermissions.RemoveRange(currentPermissions.Where(p => !desiredPermissions.Contains(p.PermissionKey)));
+        db.UserPermissions.AddRange(desiredPermissions
+            .Where(k => currentPermissions.All(p => p.PermissionKey != k))
+            .Select(k => new UserPermission { UserId = user.Id, PermissionKey = k }));
         await db.SaveChangesAsync();
 
         TempData["Success"] = "User updated.";
         return RedirectToAction(nameof(Index));
     }
+
+    private static List<string> ValidPermissionKeys(List<string> keys, List<string> roles) =>
+        keys.Where(k => Permissions.All.Any(p => p.Key == k) && Permissions.IsGrantable(k, roles)).Distinct().ToList();
 
     private static bool IsUnrestricted(List<string> roles) => roles.Any(UnrestrictedRoles.Contains);
 
@@ -234,6 +253,13 @@ public class UsersController(
         if (roles.Count == 0)
         {
             ModelState.AddModelError(nameof(UserCreateViewModel.Roles), "Select at least one role.");
+            return;
+        }
+
+        // Tenant admins may only hand out tenant roles - never the platform ones.
+        if (roles.Any(r => !Roles.All.Contains(r)))
+        {
+            ModelState.AddModelError(nameof(UserCreateViewModel.Roles), "Invalid role selected.");
             return;
         }
 

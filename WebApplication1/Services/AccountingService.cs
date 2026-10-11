@@ -178,12 +178,65 @@ public class AccountingService(ApplicationDbContext db) : IAccountingService
 
     public async Task<JournalEntry> PostPaymentAsync(Payment payment)
     {
+        // Customer discount: no money moves — Dr Discount Allowed, Cr Receivable.
+        if (payment.IsDiscount)
+        {
+            var discountAccount = await GetAccountAsync(SystemAccountCodes.DiscountAllowed);
+            var ar = await GetAccountAsync(SystemAccountCodes.AccountsReceivable);
+            var discountEntry = new JournalEntry
+            {
+                EntryNumber = await NextEntryNumberAsync(),
+                Date = payment.Date,
+                Description = $"Discount {payment.PaymentNumber} allowed to customer",
+                Source = JournalSource.Payment,
+                SourceReference = payment.PaymentNumber,
+                Lines =
+                [
+                    new JournalEntryLine { AccountId = discountAccount.Id, Debit = payment.Amount, Credit = 0, Memo = "Discount allowed" },
+                    new JournalEntryLine { AccountId = ar.Id, Debit = 0, Credit = payment.Amount, Memo = "Receivable settled by discount" }
+                ]
+            };
+            db.JournalEntries.Add(discountEntry);
+            return discountEntry;
+        }
+
         // Cash, bKash, Rocket, Nagad or Bank — whichever account the money actually moved through.
         var cash = await GetAccountAsync(PaymentMethods.AccountCode(payment.Method));
         var via = payment.MethodText;
         JournalEntry entry;
 
-        if (payment.Direction == PaymentDirection.Out)
+        // A negative amount is an advance refund (see IPartyPaymentService.RefundAdvanceAsync):
+        // the reverse of the usual entry, so the money and the party's advance both go back.
+        if (payment.Amount < 0)
+        {
+            var refund = -payment.Amount;
+            var control = await GetAccountAsync(payment.Direction == PaymentDirection.Out
+                ? SystemAccountCodes.AccountsPayable
+                : SystemAccountCodes.AccountsReceivable);
+            var toCustomer = payment.Direction == PaymentDirection.In;
+            entry = new JournalEntry
+            {
+                EntryNumber = await NextEntryNumberAsync(),
+                Date = payment.Date,
+                Description = toCustomer
+                    ? $"Refund {payment.PaymentNumber} of customer advance"
+                    : $"Refund {payment.PaymentNumber} of supplier advance received",
+                Source = JournalSource.Payment,
+                SourceReference = payment.PaymentNumber,
+                Lines = toCustomer
+                    ?
+                    [
+                        new JournalEntryLine { AccountId = control.Id, Debit = refund, Credit = 0, Memo = "Customer advance refunded" },
+                        new JournalEntryLine { AccountId = cash.Id, Debit = 0, Credit = refund, Memo = $"Refunded ({via})" }
+                    ]
+                    :
+                    [
+                        new JournalEntryLine { AccountId = cash.Id, Debit = refund, Credit = 0, Memo = $"Refund received ({via})" },
+                        new JournalEntryLine { AccountId = control.Id, Debit = 0, Credit = refund, Memo = "Supplier advance refunded" }
+                    ]
+            };
+        }
+        else if (payment.Direction == PaymentDirection.Out)
         {
             var payable = await GetAccountAsync(SystemAccountCodes.AccountsPayable);
             entry = new JournalEntry

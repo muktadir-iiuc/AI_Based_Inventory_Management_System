@@ -67,4 +67,4 @@ public class SalesInvoiceThermalLine
     public string Text { get; set; } = string.Empty;
 }
 
-public record ThermalReceiptPreviewViewModel(int SalesInvoiceId, string InvoiceNumber);
+public record ThermalReceiptPreviewViewModel(int SalesInvoiceId, string InvoiceNumber, string Language = "en");

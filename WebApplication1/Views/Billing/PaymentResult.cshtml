@@ -1,0 +1,49 @@
+@using WebApplication1.Models.Saas
+@model PaymentAttempt
+@{
+    ViewData["Title"] = "Payment status";
+    var inProgress = Model.Status is PaymentAttemptStatus.Initiated or PaymentAttemptStatus.Pending;
+}
+
+@if (inProgress)
+{
+    @* The gateway redirect proves nothing; the result arrives from the provider server. Re-check every few seconds. *@
+    <meta http-equiv="refresh" content="6" />
+}
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body">
+        @switch (Model.Status)
+        {
+            case PaymentAttemptStatus.Succeeded:
+                <h4 class="text-success"><i class="fas fa-circle-check me-2"></i>Payment received</h4>
+                <p>Thank you. We verified your payment of <strong>@Model.Amount.ToString("0.00") @Model.Currency</strong> with the payment provider and updated your invoice.</p>
+                break;
+            case PaymentAttemptStatus.Cancelled:
+                <h4 class="text-secondary"><i class="fas fa-ban me-2"></i>Payment cancelled</h4>
+                <p>No money was taken. You can try again from the invoice.</p>
+                break;
+            case PaymentAttemptStatus.Failed:
+            case PaymentAttemptStatus.Expired:
+                <h4 class="text-danger"><i class="fas fa-circle-xmark me-2"></i>Payment did not go through</h4>
+                <p>No money was taken for this attempt. You can try again from the invoice.</p>
+                break;
+            case PaymentAttemptStatus.UnderReview:
+            case PaymentAttemptStatus.NeedsReview:
+                <h4 class="text-warning"><i class="fas fa-hourglass-half me-2"></i>Payment is being reviewed</h4>
+                <p>Your payment needs a quick manual check by our team. We will update your invoice or contact you. Quote reference <strong>@Model.Reference</strong>.</p>
+                break;
+            default:
+                <h4><span class="spinner-border spinner-border-sm me-2"></span>Confirming your payment...</h4>
+                <p>We are waiting for the payment provider to confirm. This page refreshes automatically. Do not pay again.</p>
+                break;
+        }
+        <dl class="row mb-3">
+            <dt class="col-5">Reference</dt><dd class="col-7">@Model.Reference</dd>
+            <dt class="col-5">Invoice</dt><dd class="col-7">@Model.Invoice?.InvoiceNumber</dd>
+            <dt class="col-5">Amount</dt><dd class="col-7">@Model.Amount.ToString("0.00") @Model.Currency</dd>
+        </dl>
+        <a asp-action="InvoiceDetails" asp-route-id="@Model.InvoiceId" class="btn btn-primary">Back to invoice</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Billing</a>
+    </div>
+</div>

@@ -7,12 +7,45 @@ using WebApplication1.Models.Inventory;
 using WebApplication1.Models.PettyCash;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
+using WebApplication1.Models.Saas;
+using WebApplication1.Models.Tenancy;
+using WebApplication1.Services.Tenancy;
 
 namespace WebApplication1.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantContext? tenant = null)
     : IdentityDbContext<ApplicationUser, ApplicationRole, string>(options)
 {
+    public const string TenantIdProperty = "TenantId";
+
+    // Entities that carry a shadow TenantId and are filtered/stamped per tenant. Everything the
+    // business owns is here; platform-wide tables (Tenants, plans, billing, backups, roles) are not.
+    // The filters read these two members, which EF turns into per-query parameters.
+    private int CurrentTenantId => tenant?.TenantId ?? 0;
+    // A context built without a tenant context (unit tests, design-time tooling) is unfiltered.
+    private bool FiltersBypassed => tenant is null || tenant.IsFilterBypassed;
+
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    // SaaS billing (platform-level tables: scoped by an explicit TenantId column, not the tenant filter).
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<PlanFeature> PlanFeatures => Set<PlanFeature>();
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<TenantFeatureOverride> TenantFeatureOverrides => Set<TenantFeatureOverride>();
+    public DbSet<SubscriptionHistory> SubscriptionHistories => Set<SubscriptionHistory>();
+    public DbSet<SaasInvoice> SaasInvoices => Set<SaasInvoice>();
+    public DbSet<SaasInvoiceItem> SaasInvoiceItems => Set<SaasInvoiceItem>();
+    public DbSet<SaasPayment> SaasPayments => Set<SaasPayment>();
+    public DbSet<SaasAuditLog> SaasAuditLogs => Set<SaasAuditLog>();
+    public DbSet<SaasNotification> SaasNotifications => Set<SaasNotification>();
+    public DbSet<PlatformSetting> PlatformSettings => Set<PlatformSetting>();
+    public DbSet<DataExportRequest> DataExportRequests => Set<DataExportRequest>();
+    public DbSet<DataAgreementAcceptance> DataAgreementAcceptances => Set<DataAgreementAcceptance>();
+    public DbSet<PaymentProviderConfig> PaymentProviders => Set<PaymentProviderConfig>();
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
+    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<SaasRefund> SaasRefunds => Set<SaasRefund>();
+
     public DbSet<CompanySetting> CompanySettings => Set<CompanySetting>();
     public DbSet<BackupSetting> BackupSettings => Set<BackupSetting>();
     public DbSet<DatabaseBackup> DatabaseBackups => Set<DatabaseBackup>();
@@ -25,9 +58,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ProductWarehouseStock> ProductWarehouseStocks => Set<ProductWarehouseStock>();
     public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
+    public DbSet<StockTransferPurchaseInvoice> StockTransferPurchaseInvoices => Set<StockTransferPurchaseInvoice>();
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
     public DbSet<StockAdjustmentItem> StockAdjustmentItems => Set<StockAdjustmentItem>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<UserWarehouse> UserWarehouses => Set<UserWarehouse>();
 
     public DbSet<Supplier> Suppliers => Set<Supplier>();
@@ -57,8 +92,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     {
         base.OnModelCreating(builder);
 
+        // First: declares the shadow TenantId on every tenant entity, which the per-tenant
+        // unique indexes below refer to.
+        ConfigureTenancy(builder);
+
         builder.Entity<Product>()
-            .HasIndex(p => p.Sku).IsUnique();
+            .HasIndex(TenantIdProperty, "Sku").IsUnique();
 
         builder.Entity<Product>()
             .HasOne(p => p.Category)
@@ -115,7 +154,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Warehouse>()
-            .HasIndex(w => w.Code).IsUnique();
+            .HasIndex(TenantIdProperty, "Code").IsUnique();
 
         builder.Entity<ProductWarehouseStock>()
             .HasIndex(s => new { s.ProductId, s.WarehouseId }).IsUnique();
@@ -148,7 +187,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<StockTransfer>()
-            .HasIndex(t => t.TransferNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "TransferNumber").IsUnique();
 
         builder.Entity<StockTransfer>()
             .HasOne(t => t.FromWarehouse)
@@ -168,6 +207,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(i => i.StockTransferId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Entity<StockTransferPurchaseInvoice>()
+            .HasKey(l => new { l.StockTransferId, l.PurchaseInvoiceId });
+
+        builder.Entity<StockTransferPurchaseInvoice>()
+            .HasOne(l => l.StockTransfer)
+            .WithMany(t => t.PurchaseInvoiceLinks)
+            .HasForeignKey(l => l.StockTransferId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<StockTransferPurchaseInvoice>()
+            .HasOne(l => l.PurchaseInvoice)
+            .WithMany()
+            .HasForeignKey(l => l.PurchaseInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<StockTransferItem>()
             .HasOne(i => i.Product)
             .WithMany()
@@ -175,7 +229,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<StockAdjustment>()
-            .HasIndex(a => a.AdjustmentNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "AdjustmentNumber").IsUnique();
 
         builder.Entity<StockAdjustment>()
             .HasOne(a => a.Warehouse)
@@ -198,8 +252,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<RolePermission>()
             .HasIndex(p => new { p.RoleName, p.PermissionKey }).IsUnique();
 
+        builder.Entity<UserPermission>()
+            .HasIndex(p => new { p.UserId, p.PermissionKey }).IsUnique();
+
+        builder.Entity<UserPermission>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Entity<PurchaseInvoice>()
-            .HasIndex(p => p.InvoiceNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "InvoiceNumber").IsUnique();
 
         builder.Entity<PurchaseInvoice>()
             .HasOne(p => p.Supplier)
@@ -226,7 +289,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<SalesInvoice>()
-            .HasIndex(s => s.InvoiceNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "InvoiceNumber").IsUnique();
 
         builder.Entity<SalesInvoice>()
             .HasOne(s => s.Customer)
@@ -259,7 +322,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<SalesReturn>()
-            .HasIndex(r => r.ReturnNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "ReturnNumber").IsUnique();
 
         builder.Entity<SalesReturn>()
             .HasOne(r => r.SalesInvoice)
@@ -280,7 +343,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<PurchaseReturn>()
-            .HasIndex(r => r.ReturnNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "ReturnNumber").IsUnique();
 
         builder.Entity<PurchaseReturn>()
             .HasOne(r => r.PurchaseInvoice)
@@ -301,10 +364,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Account>()
-            .HasIndex(a => a.Code).IsUnique();
+            .HasIndex(TenantIdProperty, "Code").IsUnique();
 
         builder.Entity<JournalEntry>()
-            .HasIndex(j => j.EntryNumber).IsUnique();
+            .HasIndex(TenantIdProperty, "EntryNumber").IsUnique();
 
         builder.Entity<JournalEntryLine>()
             .HasOne(l => l.JournalEntry)
@@ -360,7 +423,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<PettyCashName>()
-            .HasIndex(n => n.Name).IsUnique();
+            .HasIndex(TenantIdProperty, "Name").IsUnique();
 
         builder.Entity<PettyCashEntry>()
             .HasIndex(e => e.Date);
@@ -376,5 +439,181 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(e => e.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
+
+    }
+
+    private static readonly Type[] TenantEntityTypes =
+    [
+        typeof(CompanySetting), typeof(Category), typeof(UnitOfMeasure), typeof(Product), typeof(StockTransaction),
+        typeof(Warehouse), typeof(ProductWarehouseStock), typeof(StockTransfer), typeof(StockTransferItem),
+        typeof(StockTransferPurchaseInvoice), typeof(StockAdjustment), typeof(StockAdjustmentItem),
+        typeof(UserPermission), typeof(UserWarehouse), typeof(Supplier), typeof(PurchaseInvoice),
+        typeof(PurchaseInvoiceItem), typeof(PurchaseReturn), typeof(PurchaseReturnItem), typeof(Customer),
+        typeof(SalesInvoice), typeof(SalesInvoiceItem), typeof(SalesReturn), typeof(SalesReturnItem),
+        typeof(ProductBatch), typeof(ProductPriceHistory), typeof(Account), typeof(JournalEntry),
+        typeof(JournalEntryLine), typeof(Payment), typeof(PettyCashName), typeof(PettyCashEntry)
+    ];
+
+    private static readonly HashSet<Type> TenantEntityTypeSet = [.. TenantEntityTypes];
+
+    /// <summary>True for entities that carry a TenantId and are filtered per tenant.</summary>
+    public static bool IsTenantEntity(Type clrType) => TenantEntityTypeSet.Contains(clrType);
+
+    private void ConfigureTenancy(ModelBuilder builder)
+    {
+        builder.Entity<Tenant>(t =>
+        {
+            t.HasIndex(x => x.Code).IsUnique();
+            t.HasIndex(x => x.Status);
+            t.HasIndex(x => x.PortalHost).IsUnique().HasFilter("[PortalHost] IS NOT NULL");
+        });
+
+        builder.Entity<SubscriptionPlan>(p =>
+        {
+            p.HasIndex(x => x.Code).IsUnique();
+            p.HasMany(x => x.Features).WithOne(f => f.Plan).HasForeignKey(f => f.PlanId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<PlanFeature>().HasIndex(f => new { f.PlanId, f.FeatureKey }).IsUnique();
+
+        builder.Entity<TenantSubscription>(s =>
+        {
+            s.HasIndex(x => x.TenantId).IsUnique();
+            s.HasIndex(x => x.Status);
+            s.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+            s.HasOne(x => x.Plan).WithMany().HasForeignKey(x => x.PlanId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<TenantFeatureOverride>().HasIndex(o => new { o.TenantId, o.FeatureKey }).IsUnique();
+        builder.Entity<SubscriptionHistory>().HasIndex(h => new { h.TenantId, h.CreatedAt });
+
+        builder.Entity<SaasInvoice>(i =>
+        {
+            i.HasIndex(x => x.InvoiceNumber).IsUnique();
+            i.HasIndex(x => new { x.TenantId, x.Status });
+            // One live invoice per subscription billing period: duplicate generation is rejected by the database.
+            i.HasIndex(x => new { x.SubscriptionId, x.PeriodStart }).IsUnique().HasFilter("[Status] <> 5 AND [SubscriptionId] IS NOT NULL");
+            i.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+            i.HasMany(x => x.Items).WithOne(x => x.Invoice).HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+            i.HasMany(x => x.Payments).WithOne(x => x.Invoice).HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<SaasPayment>(p =>
+        {
+            p.HasIndex(x => new { x.Provider, x.ProviderTransactionId }).IsUnique().HasFilter("[ProviderTransactionId] IS NOT NULL");
+            p.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
+            p.HasIndex(x => x.TenantId);
+        });
+        builder.Entity<PaymentProviderConfig>().HasIndex(p => p.Code).IsUnique();
+        builder.Entity<PaymentAttempt>(a =>
+        {
+            a.HasIndex(x => x.Reference).IsUnique();
+            a.HasIndex(x => new { x.Status, x.CreatedAt });
+            a.HasIndex(x => x.InvoiceId);
+            a.HasOne(x => x.Invoice).WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<PaymentWebhookEvent>().HasIndex(e => new { e.Provider, e.EventKey }).IsUnique();
+        builder.Entity<SaasRefund>(r =>
+        {
+            r.HasIndex(x => x.PaymentId);
+            r.HasIndex(x => x.RefundTransId).IsUnique().HasFilter("[RefundTransId] IS NOT NULL");
+        });
+        builder.Entity<SaasAuditLog>().HasIndex(a => new { a.TenantId, a.At });
+        builder.Entity<DataExportRequest>(r =>
+        {
+            r.HasIndex(x => new { x.TenantId, x.RequestedAt });
+            r.HasIndex(x => x.Status);
+            r.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<DataAgreementAcceptance>(a =>
+        {
+            a.HasIndex(x => new { x.TenantId, x.Version });
+            a.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<SaasNotification>(n =>
+        {
+            n.HasIndex(x => new { x.TenantId, x.DedupeKey, x.Channel }).IsUnique();
+            n.HasIndex(x => new { x.Status, x.Channel });
+        });
+
+        // Users belong to one tenant; platform staff have none. Not query-filtered on purpose:
+        // cookie validation and sign-in look users up before any tenant is known. User lists are
+        // scoped explicitly (UsersController etc.).
+        builder.Entity<ApplicationUser>(u =>
+        {
+            u.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+            u.HasIndex(x => x.TenantId);
+        });
+
+        var configure = typeof(ApplicationDbContext).GetMethod(nameof(ConfigureTenantEntity), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        foreach (var type in TenantEntityTypes)
+        {
+            configure.MakeGenericMethod(type).Invoke(this, [builder]);
+        }
+    }
+
+    private void ConfigureTenantEntity<T>(ModelBuilder builder) where T : class
+    {
+        var entity = builder.Entity<T>();
+        entity.Property<int>(TenantIdProperty);
+        entity.HasIndex(TenantIdProperty);
+        entity.HasOne<Tenant>().WithMany().HasForeignKey(TenantIdProperty).OnDelete(DeleteBehavior.Restrict);
+        entity.HasQueryFilter(e => FiltersBypassed || EF.Property<int>(e, TenantIdProperty) == CurrentTenantId);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnforceTenantOnSave();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        EnforceTenantOnSave();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    // New rows are stamped with the current tenant; any write that would touch another tenant's
+    // row (or one with no tenant) is rejected before it reaches the database.
+    private void EnforceTenantOnSave()
+    {
+        if (tenant is null)
+        {
+            return;
+        }
+
+        var current = tenant.TenantId;
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                || !TenantEntityTypeSet.Contains(entry.Metadata.ClrType))
+            {
+                continue;
+            }
+
+            var property = entry.Property(TenantIdProperty);
+            var value = (int)(property.CurrentValue ?? 0);
+
+            if (entry.State == EntityState.Added)
+            {
+                if (value == 0)
+                {
+                    if (current == 0)
+                    {
+                        throw new InvalidOperationException($"Cannot save {entry.Metadata.ClrType.Name}: no tenant in context.");
+                    }
+                    property.CurrentValue = current;
+                }
+                else if (!tenant.IsFilterBypassed && value != current)
+                {
+                    throw new InvalidOperationException($"Cannot save {entry.Metadata.ClrType.Name} for tenant {value} from tenant {current}.");
+                }
+            }
+            else if (!tenant.IsFilterBypassed && value != current)
+            {
+                throw new InvalidOperationException($"Cross-tenant write blocked on {entry.Metadata.ClrType.Name}.");
+            }
+            else if (entry.State == EntityState.Modified && property.IsModified && property.OriginalValue is int original && original != value)
+            {
+                throw new InvalidOperationException("TenantId cannot be changed.");
+            }
+        }
     }
 }

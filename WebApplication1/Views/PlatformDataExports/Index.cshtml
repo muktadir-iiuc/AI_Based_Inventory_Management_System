@@ -1,0 +1,86 @@
+@using WebApplication1.Models.Saas
+@model WebApplication1.Controllers.DataExportListViewModel
+@{ ViewData["Title"] = "Data exports"; }
+
+<div class="alert alert-info small">
+    Businesses ask for a copy of their data when they end a plan or move to another system. Generate the export in the format they chose
+    (CSV or JSON files in a ZIP, or one Excel workbook): every table that holds data for that business is included, tables without data are left out,
+    and passwords and tokens are never exported. The tenant downloads it from <em>Billing &rarr; Data &amp; agreement</em>; it stays available for 14 days.
+    @if (Model.PendingCount > 0) { <strong class="ms-1">@Model.PendingCount request(s) waiting.</strong> }
+</div>
+
+<div class="card mb-3"><div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-6 col-md-3"><label class="form-label small mb-0">Status</label>
+            <select name="status" class="form-select form-select-sm"><option value="">All</option>
+                @foreach (var s in new[] { ExportStatus.Requested, ExportStatus.Ready, ExportStatus.Rejected, ExportStatus.Failed }) { <option value="@s" selected="@(Model.Status == s.ToString())">@s</option> }
+            </select></div>
+        <div class="col-6 col-md-4"><label class="form-label small mb-0">Business</label>
+            <select name="tenantId" class="form-select form-select-sm"><option value="">All</option>
+                @foreach (var t in Model.Tenants) { <option value="@t.Id" selected="@(Model.TenantId == t.Id)">@t.Name (@t.Code)</option> }
+            </select></div>
+        <div class="col-12 col-md-2 d-flex gap-2"><button class="btn btn-primary btn-sm flex-grow-1">Filter</button><a href="/Platform/DataExports" class="btn btn-outline-secondary btn-sm">Reset</a></div>
+    </form>
+</div></div>
+
+@if (Model.IsAdmin)
+{
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title mb-0">Record a request taken by phone or email</h3></div>
+        <div class="card-body">
+            <form asp-action="Create" method="post" class="row g-2 align-items-end">
+                <div class="col-12 col-md-3"><label class="form-label small mb-0">Business</label>
+                    <select name="tenantId" class="form-select form-select-sm" required>@foreach (var t in Model.Tenants) { <option value="@t.Id">@t.Name (@t.Code)</option> }</select></div>
+                <div class="col-6 col-md-2"><label class="form-label small mb-0">Format</label>
+                    <select name="format" class="form-select form-select-sm">@foreach (var f in Enum.GetValues<ExportFormat>()) { <option value="@f">@f</option> }</select></div>
+                <div class="col-6 col-md-3"><label class="form-label small mb-0">Reason</label>
+                    <select name="reason" class="form-select form-select-sm">@foreach (var r in Enum.GetValues<ExportReason>()) { <option value="@r">@r</option> }</select></div>
+                <div class="col-12 col-md-3"><label class="form-label small mb-0">Notes</label><input name="notes" maxlength="1000" class="form-control form-control-sm" /></div>
+                <div class="col-12 col-md-1"><button class="btn btn-outline-primary btn-sm w-100">Add</button></div>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-striped table-hover mb-0 align-middle">
+            <thead><tr><th>Requested</th><th>Business</th><th>Plan status</th><th>Reason</th><th>Format</th><th>Status</th><th>Result</th><th style="min-width:230px">Action</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.Page.Items)
+            {
+                var r = row.Request;
+                var badge = r.Status switch { ExportStatus.Ready => "success", ExportStatus.Requested => "warning", ExportStatus.Failed => "danger", _ => "secondary" };
+                <tr>
+                    <td>@r.RequestedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")<div class="small text-muted">@r.RequestedBy</div></td>
+                    <td><a href="/Platform/Tenants/@r.TenantId" class="fw-semibold">@row.TenantName</a><div class="small text-muted">@row.TenantCode &middot; agreement @(row.AgreementVersion ?? "not accepted")</div></td>
+                    <td>@row.SubscriptionStatus</td>
+                    <td>@r.Reason@if (!string.IsNullOrEmpty(r.Notes)) { <div class="small text-muted">@r.Notes</div> }</td>
+                    <td>@r.Format</td>
+                    <td><span class="badge text-bg-@badge">@r.Status</span>@if (!string.IsNullOrEmpty(r.RejectReason)) { <div class="small text-muted">@r.RejectReason</div> }@if (!string.IsNullOrEmpty(r.Error)) { <div class="small text-danger">@r.Error</div> }</td>
+                    <td class="small">@if (r.Status is ExportStatus.Ready or ExportStatus.Expired) { <text>@r.TableCount tables, @r.RowCount.ToString("N0") rows, @((r.FileSize / 1024.0).ToString("N0")) KB<br />@(r.Status == ExportStatus.Expired ? "expired" : "until " + r.ExpiresAt?.ToLocalTime().ToString("dd MMM"))@(r.DownloadedAt is not null ? " · downloaded" : "")</text> }</td>
+                    <td>
+                    @if (Model.IsAdmin && r.Status != ExportStatus.Rejected)
+                    {
+                        <form asp-action="Generate" asp-route-id="@r.Id" method="post" class="d-flex gap-1 mb-1">
+                            <select name="format" class="form-select form-select-sm" style="width:auto">@foreach (var f in Enum.GetValues<ExportFormat>()) { <option value="@f" selected="@(f == r.Format)">@f</option> }</select>
+                            <button class="btn btn-primary btn-sm">@(r.Status == ExportStatus.Requested ? "Generate" : "Regenerate")</button>
+                        </form>
+                        @if (r.Status == ExportStatus.Ready) { <a asp-action="Download" asp-route-id="@r.Id" class="btn btn-outline-secondary btn-sm mb-1"><i class="fas fa-download"></i> Download</a> }
+                        @if (r.Status == ExportStatus.Requested)
+                        {
+                            <form asp-action="Reject" asp-route-id="@r.Id" method="post" class="d-flex gap-1">
+                                <input name="reason" class="form-control form-control-sm" placeholder="Reason" maxlength="500" />
+                                <button class="btn btn-outline-danger btn-sm">Reject</button>
+                            </form>
+                        }
+                    }
+                    </td>
+                </tr>
+            }
+            @if (Model.Page.Items.Count == 0) { <tr><td colspan="8" class="text-center text-muted p-4">No data requests.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Page.Pager" />
+</div>

@@ -26,6 +26,9 @@ public class UserCreateViewModel
     public List<string> Roles { get; set; } = [];
 
     public List<int> WarehouseIds { get; set; } = [];
+
+    /// <summary>Menus assigned to this user individually (see Permissions.All).</summary>
+    public List<string> PermissionKeys { get; set; } = [];
 }
 
 public class UserEditViewModel
@@ -43,6 +46,28 @@ public class UserEditViewModel
     public List<string> Roles { get; set; } = [];
 
     public List<int> WarehouseIds { get; set; } = [];
+
+    /// <summary>Menus assigned to this user individually (see Permissions.All).</summary>
+    public List<string> PermissionKeys { get; set; } = [];
+}
+
+/// <summary>The Permissions page: which user sees which page.</summary>
+public class PagePermissionsViewModel
+{
+    public List<PagePermissionUserRow> Users { get; set; } = [];
+    public (string Key, string Label, string Description)[] Permissions { get; set; } = [];
+
+    /// <summary>"userId|permissionKey" for every current grant.</summary>
+    public HashSet<string> Granted { get; set; } = [];
+}
+
+public class PagePermissionUserRow
+{
+    public string Id { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public List<string> Roles { get; set; } = [];
+    public List<string> Warehouses { get; set; } = [];
 }
 
 /// <summary>One user on the Active Users page.</summary>

@@ -8,9 +8,14 @@ using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+// Only for users assigned the Sales Invoices page (Page Permissions); Admin/Manager always.
+[Authorize(Policy = Permissions.SalesInvoice)]
+[RequireFeature(Features.Sales)]
 public class SalesReturnsController(
     ApplicationDbContext db,
     IStockService stockService,
@@ -214,7 +219,6 @@ public class SalesReturnsController(
                 BatchNumber = i.Batch?.BatchNumber,
                 MaxReturnable = i.Quantity - alreadyReturned.GetValueOrDefault(i.Id, 0),
                 UnitPrice = i.UnitPrice,
-                UnitCost = i.UnitCost,
                 // What one returned unit would credit, after its share of the invoice discount
                 // (display only; the real share is recomputed on posting).
                 CreditPerUnit = i.Quantity > 0

@@ -1,0 +1,6 @@
+@inject WebApplication1.Services.Saas.IPlatformBranding PlatformBranding
+<div class="text-center mb-4">
+    <img src="/Platform/Logo" alt="" style="height: 56px; width: auto; max-width: 160px;" class="mb-3" />
+    <h1 class="h4 mb-1">@await PlatformBranding.GetNameAsync()</h1>
+    <span class="platform-badge">@(ViewData["Badge"] as string)</span>
+</div>

@@ -1,6 +1,8 @@
 @model Customer
 @{
     ViewData["Title"] = $"Customer: {Model.Name}";
+    // Purchase Officers can't see the Customer Ledger, so no dues or invoice history here either.
+    var showLedger = User.CanSeeCustomerLedger();
 }
 
 <div class="row">
@@ -14,18 +16,24 @@
                     <dt class="col-4">Phone</dt><dd class="col-8">@Model.Phone</dd>
                     <dt class="col-4">Email</dt><dd class="col-8">@Model.Email</dd>
                     <dt class="col-4">Address</dt><dd class="col-8">@Model.Address</dd>
-                    @if (Model.OpeningBalance != 0)
+                    @if (showLedger && Model.OpeningBalance != 0)
                     {
                         <dt class="col-4">Opening Balance</dt>
                         <dd class="col-8">@Math.Abs(Model.OpeningBalance).ToString("C") <span class="text-muted small">(@(Model.OpeningBalance > 0 ? "due" : "advance") as of @Model.OpeningBalanceDate?.ToString("MMM dd, yyyy"))</span></dd>
                     }
-                    <dt class="col-4">Outstanding Due</dt>
-                    <dd class="col-8 fw-bold @(Model.OutstandingDue > 0 ? "text-danger" : "text-success")">@Model.OutstandingDue.ToString("C")</dd>
+                    @if (showLedger)
+                    {
+                        <dt class="col-4">Outstanding Due</dt>
+                        <dd class="col-8 fw-bold @(Model.OutstandingDue > 0 ? "text-danger" : "text-success")">@Model.OutstandingDue.ToString("C")</dd>
+                    }
                 </dl>
             </div>
             <div class="card-footer">
                 <a asp-action="Index" class="btn btn-secondary btn-sm">Back to list</a>
-                <a asp-action="Ledger" asp-route-partyId="@Model.Id" class="btn btn-outline-primary btn-sm"><i class="fas fa-book"></i> Ledger</a>
+                @if (showLedger)
+                {
+                    <a asp-action="Ledger" asp-route-partyId="@Model.Id" class="btn btn-outline-primary btn-sm"><i class="fas fa-book"></i> Ledger</a>
+                }
                 @if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.SalesOfficer))
                 {
                     <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
@@ -33,6 +41,8 @@
             </div>
         </div>
     </div>
+    @if (showLedger)
+    {
     <div class="col-md-7">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Sales Invoices</h3></div>
@@ -62,4 +72,5 @@
             </div>
         </div>
     </div>
+    }
 </div>

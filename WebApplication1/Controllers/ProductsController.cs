@@ -10,6 +10,7 @@ using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
@@ -105,6 +106,7 @@ public class ProductsController(
     [HttpPost]
     [Authorize(Roles = Roles.PurchaseManagers)]
     [ValidateAntiForgeryToken]
+    [EnforceLimit(LimitKind.Products)]
     public async Task<IActionResult> Create(Product model)
     {
         ModelState.Remove(nameof(Product.Sku)); // auto-generated below, not user input
@@ -131,6 +133,7 @@ public class ProductsController(
     [HttpPost]
     [Authorize(Roles = Roles.PurchaseManagers)]
     [ValidateAntiForgeryToken]
+    [EnforceLimit(LimitKind.Products)]
     public async Task<IActionResult> QuickCreate([FromBody] ProductQuickCreateRequest? request)
     {
         if (request is null || !ModelState.IsValid)

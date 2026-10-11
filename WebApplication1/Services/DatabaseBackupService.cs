@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.SqlServer.Dac;
 using WebApplication1.Data;
 using WebApplication1.Models.Common;
 
@@ -8,8 +10,17 @@ namespace WebApplication1.Services;
 // by the SQL Server service to a folder on the SQL Server machine. When that machine is also the
 // web server the file can be downloaded/deleted from the app; when it is remote the app only
 // records and reports it.
-public class DatabaseBackupService(ApplicationDbContext db, ILogger<DatabaseBackupService> logger) : IDatabaseBackupService
+//
+// Fallback: hosted SQL Servers often refuse BACKUP DATABASE to the app's login (error 262), and
+// grant no way to change that. Then the app exports the database itself as a .bacpac (DacFx) to a
+// folder on the web server — no SQL Server backup rights needed. Restore it in SSMS with
+// "Import Data-tier Application". Unlike a .bak it isn't a point-in-time snapshot: rows written
+// while the export runs may or may not be included.
+public class DatabaseBackupService(ApplicationDbContext db, ILogger<DatabaseBackupService> logger, IWebHostEnvironment env) : IDatabaseBackupService
 {
+    // SQL Server error 262: "<permission> permission denied in database '<name>'".
+    private const int PermissionDeniedError = 262;
+
     // One backup at a time across the whole app (manual and scheduled share this).
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
@@ -91,7 +102,8 @@ public class DatabaseBackupService(ApplicationDbContext db, ILogger<DatabaseBack
             var configured = string.IsNullOrWhiteSpace(setting.BackupDirectory) ? null : setting.BackupDirectory.Trim();
             var directory = configured ?? await GetInstanceDefaultDirectoryAsync();
 
-            var fileName = $"{SafeFileName(databaseName)}_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
+            var baseName = $"{SafeFileName(databaseName)}_{DateTime.Now:yyyyMMdd_HHmmss}";
+            var fileName = baseName + ".bak";
             var backup = new DatabaseBackup
             {
                 FileName = fileName,
@@ -105,66 +117,57 @@ public class DatabaseBackupService(ApplicationDbContext db, ILogger<DatabaseBack
 
             try
             {
-                if (string.IsNullOrWhiteSpace(directory))
-                {
-                    throw new InvalidOperationException("No backup folder is configured and SQL Server has no default backup folder. Set one in the backup settings.");
-                }
-
-                // A large database can take a long while; the default 30 s command timeout would cut it off.
-                db.Database.SetCommandTimeout(TimeSpan.FromHours(2));
-
-                var quotedName = "[" + databaseName.Replace("]", "]]") + "]";
-                string? copyTarget = null;
-                string? note = null;
-
-                try
-                {
-                    await WriteBackupAsync(quotedName, databaseName, backup.FilePath);
-                }
-                catch (Exception ex) when (configured is not null && ex.Message.Contains("Cannot open backup device", StringComparison.OrdinalIgnoreCase))
-                {
-                    // The chosen folder is written by the SQL Server *service account*, which often has no
-                    // rights on folders like a user's Desktop. Rather than fail, take the backup into SQL
-                    // Server's own (always writable) backup folder and let the app copy it over afterwards.
-                    var fallbackDirectory = await GetInstanceDefaultDirectoryAsync();
-                    if (string.IsNullOrWhiteSpace(fallbackDirectory))
-                    {
-                        throw;
-                    }
-
-                    logger.LogWarning(ex, "SQL Server could not write to {Folder}; using {Fallback} and copying.", configured, fallbackDirectory);
-                    backup.FilePath = Path.Combine(fallbackDirectory, fileName);
-                    copyTarget = Path.Combine(configured, fileName);
-                    note = $"SQL Server's service account can't write to {configured}, so the backup was saved to {fallbackDirectory}.";
-                    await WriteBackupAsync(quotedName, databaseName, backup.FilePath);
-                }
-
-                backup.SizeBytes = await GetSizeAsync(backup.FilePath);
-
-                if (copyTarget is not null)
+                // Native BACKUP DATABASE first; when SQL Server has nowhere to write one or refuses
+                // this login the permission, a .bacpac export; failing that, a .sql restore script.
+                string? nativeFailure = string.IsNullOrWhiteSpace(directory)
+                    ? "SQL Server has no backup folder available"
+                    : null;
+                if (nativeFailure is null)
                 {
                     try
                     {
-                        Directory.CreateDirectory(configured!);
-                        File.Copy(backup.FilePath, copyTarget, overwrite: true);
-                        backup.CopyPath = copyTarget;
-                        note += $" A copy was placed in {configured}.";
+                        await TakeNativeBackupAsync(backup, databaseName, configured, fileName);
                     }
-                    catch (Exception ex)
+                    catch (SqlException ex) when (ex.Number == PermissionDeniedError)
                     {
-                        logger.LogWarning(ex, "Could not copy backup to {Folder}.", configured);
-                        note += $" Copying it to {configured} also failed ({ex.Message}); the file is in the SQL Server folder.";
+                        logger.LogWarning(ex, "SQL Server refused BACKUP DATABASE; exporting a .bacpac instead.");
+                        nativeFailure = "This SQL Server login isn't allowed to run BACKUP DATABASE";
                     }
                 }
 
-                backup.ErrorMessage = note is null ? null : Truncate(note, 1000);
+                if (nativeFailure is not null)
+                {
+                    try
+                    {
+                        await ExportBacpacAsync(backup, databaseName, baseName, configured,
+                            $"{nativeFailure}, so the app exported a .bacpac instead.");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Typically the login also lacks VIEW DEFINITION, which DacFx needs. A plain
+                        // script of schema + data needs only SELECT.
+                        logger.LogWarning(ex, "The .bacpac export failed; writing a .sql restore script instead.");
+                        var bacpacFailure = Truncate(ex.Message, 300);
+                        try
+                        {
+                            await WriteSqlScriptAsync(backup, baseName, configured,
+                                $"{nativeFailure}, and a .bacpac export failed too ({bacpacFailure}), so the app saved a .sql restore script instead.");
+                        }
+                        catch (Exception scriptEx)
+                        {
+                            throw new InvalidOperationException(
+                                $"{nativeFailure}. The .bacpac export failed ({bacpacFailure}). The .sql script failed too ({scriptEx.Message}).", scriptEx);
+                        }
+                    }
+                }
+
                 backup.Status = BackupStatus.Succeeded;
                 backup.CompletedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Database backup {File} failed.", fileName);
+                logger.LogError(ex, "Database backup {File} failed.", backup.FileName);
                 backup.Status = BackupStatus.Failed;
                 backup.ErrorMessage = Truncate(ex.Message, 1000);
                 backup.CompletedAt = DateTime.UtcNow;
@@ -181,6 +184,213 @@ public class DatabaseBackupService(ApplicationDbContext db, ILogger<DatabaseBack
         finally
         {
             Gate.Release();
+        }
+    }
+
+    // BACKUP DATABASE to the configured / SQL Server default folder (the caller has checked there is
+    // one). Sets the size and any note on the row; the caller marks it succeeded.
+    private async Task TakeNativeBackupAsync(DatabaseBackup backup, string databaseName, string? configured, string fileName)
+    {
+        // A large database can take a long while; the default 30 s command timeout would cut it off.
+        db.Database.SetCommandTimeout(TimeSpan.FromHours(2));
+
+        var quotedName = "[" + databaseName.Replace("]", "]]") + "]";
+        string? copyTarget = null;
+        string? note = null;
+
+        try
+        {
+            await WriteBackupAsync(quotedName, databaseName, backup.FilePath);
+        }
+        catch (Exception ex) when (configured is not null && ex.Message.Contains("Cannot open backup device", StringComparison.OrdinalIgnoreCase))
+        {
+            // The chosen folder is written by the SQL Server *service account*, which often has no
+            // rights on folders like a user's Desktop. Rather than fail, take the backup into SQL
+            // Server's own (always writable) backup folder and let the app copy it over afterwards.
+            var fallbackDirectory = await GetInstanceDefaultDirectoryAsync();
+            if (string.IsNullOrWhiteSpace(fallbackDirectory))
+            {
+                throw;
+            }
+
+            logger.LogWarning(ex, "SQL Server could not write to {Folder}; using {Fallback} and copying.", configured, fallbackDirectory);
+            backup.FilePath = Path.Combine(fallbackDirectory, fileName);
+            copyTarget = Path.Combine(configured, fileName);
+            note = $"SQL Server's service account can't write to {configured}, so the backup was saved to {fallbackDirectory}.";
+            await WriteBackupAsync(quotedName, databaseName, backup.FilePath);
+        }
+
+        backup.SizeBytes = await GetSizeAsync(backup.FilePath);
+
+        if (copyTarget is not null)
+        {
+            try
+            {
+                Directory.CreateDirectory(configured!);
+                File.Copy(backup.FilePath, copyTarget, overwrite: true);
+                backup.CopyPath = copyTarget;
+                note += $" A copy was placed in {configured}.";
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not copy backup to {Folder}.", configured);
+                note += $" Copying it to {configured} also failed ({ex.Message}); the file is in the SQL Server folder.";
+            }
+        }
+
+        backup.ErrorMessage = note is null ? null : Truncate(note, 1000);
+    }
+
+    // .bacpac and .sql backups are written by this app (not SQL Server), so they go to a folder the
+    // web server can write: the configured backup folder when the app can use it, else
+    // App_Data/Backups under the app (not web-served — only wwwroot is).
+    private string AppBackupDirectory(string? configured)
+    {
+        var directory = configured is not null && CanWriteTo(configured)
+            ? configured
+            : Path.Combine(env.ContentRootPath, "App_Data", "Backups");
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private async Task WriteSqlScriptAsync(DatabaseBackup backup, string baseName, string? configured, string reason)
+    {
+        var directory = AppBackupDirectory(configured);
+        backup.FileName = baseName + ".sql";
+        backup.FilePath = Path.Combine(directory, backup.FileName);
+        backup.CopyPath = null;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            await SqlScriptBackupWriter.WriteAsync(db, backup.FilePath);
+        }
+        catch
+        {
+            TryDelete(backup.FilePath);
+            throw;
+        }
+
+        backup.SizeBytes = new FileInfo(backup.FilePath).Length;
+        var note = reason + " Restore it by creating an empty database and running the script against it (SSMS, or sqlcmd -i for a large file).";
+        if (configured is not null && directory != configured)
+        {
+            note += $" The app can't write to {configured}, so it was saved in {directory}.";
+        }
+        backup.ErrorMessage = Truncate(note, 1000);
+    }
+
+    private async Task ExportBacpacAsync(DatabaseBackup backup, string databaseName, string baseName, string? configured, string reason)
+    {
+        var directory = AppBackupDirectory(configured);
+
+        backup.FileName = baseName + ".bacpac";
+        backup.FilePath = Path.Combine(directory, backup.FileName);
+        backup.CopyPath = null;
+        await db.SaveChangesAsync();
+
+        var services = new DacServices(db.Database.GetConnectionString());
+        var messages = new List<string>();
+        services.Message += (_, e) =>
+        {
+            if (e.Message.MessageType != DacMessageType.Message)
+            {
+                messages.Add(e.Message.ToString());
+            }
+        };
+
+        // DacFx stages table data in a temp folder — by default the system one, which a hosted app
+        // often can't write. Keep it next to the export, in a folder we know is writable.
+        var workDirectory = Path.Combine(directory, $".export-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDirectory);
+        var skippedValidation = false;
+        try
+        {
+            try
+            {
+                await ExportAsync(verify: true);
+            }
+            catch (DacServicesException ex)
+            {
+                // Schema validation is the usual reason an export is refused on a hosted server (e.g. a
+                // database user tied to a server login the host manages). The data is still exportable:
+                // retry without validating — importing the file validates it again anyway.
+                logger.LogWarning(ex, "Validated .bacpac export failed: {Details}; retrying without validation.", Describe(ex, messages));
+                messages.Clear();
+                TryDelete(backup.FilePath);
+                skippedValidation = true;
+                await ExportAsync(verify: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Don't leave a half-written export behind for someone to restore from.
+            TryDelete(backup.FilePath);
+            var details = Describe(ex, messages);
+            logger.LogError(ex, ".bacpac export failed: {Details}", details);
+            throw new InvalidOperationException(details, ex);
+        }
+        finally
+        {
+            try { Directory.Delete(workDirectory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+
+        backup.SizeBytes = new FileInfo(backup.FilePath).Length;
+        var note = reason + " Restore it in SQL Server Management Studio with Databases → Import Data-tier Application.";
+        if (skippedValidation)
+        {
+            note += " (DacFx schema validation was skipped to allow the export.)";
+        }
+        if (configured is not null && directory != configured)
+        {
+            note += $" The app can't write to {configured}, so it was saved in {directory}.";
+        }
+        backup.ErrorMessage = Truncate(note, 1000);
+
+        // DacFx is synchronous and can run for minutes on a big database.
+        Task ExportAsync(bool verify) => Task.Run(() => services.ExportBacpac(backup.FilePath, databaseName, new DacExportOptions
+        {
+            VerifyExtraction = verify,
+            TempDirectoryForTableData = workDirectory,
+            CommandTimeout = 7200
+        }, null, null));
+    }
+
+    // DacFx's own message ("Could not extract package from specified database.") says nothing; the
+    // reasons are in its error/warning messages and inner exceptions.
+    private static string Describe(Exception ex, IEnumerable<string> messages)
+    {
+        var parts = new List<string>();
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            parts.Add(e.Message);
+            if (e is DacServicesException dac)
+            {
+                parts.AddRange(dac.Messages.Select(m => m.ToString()));
+            }
+        }
+        parts.AddRange(messages);
+        return string.Join(" | ", parts.Select(p => p.Trim()).Where(p => p.Length > 0).Distinct());
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+
+    private static bool CanWriteTo(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var probe = Path.Combine(directory, $".write-test-{Guid.NewGuid():N}");
+            File.WriteAllText(probe, string.Empty);
+            File.Delete(probe);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            return false;
         }
     }
 

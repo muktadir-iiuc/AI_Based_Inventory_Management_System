@@ -8,12 +8,18 @@ using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
 // Stock corrections go through a request/approval flow: a Sales or Purchase officer files a
 // request (nothing changes), then a Manager/Admin approves it — which is the only moment stock,
-// FIFO batches and the ledger move — or rejects it, which changes nothing.
+// FIFO batches and the ledger move — or rejects it, which changes nothing. The menu is only for
+// users assigned the Stock Adjustments permission (Users & Roles -> Edit); Admin/Manager always
+// have it but, being the approvers, don't file requests themselves.
+[Authorize(Policy = Permissions.StockAdjustment)]
+[RequireFeature(Features.StockAdjustments)]
 public class StockAdjustmentsController(
     ApplicationDbContext db,
     IStockService stockService,
@@ -21,10 +27,9 @@ public class StockAdjustmentsController(
     IAccountingService accountingService,
     IActivityNotifier notifier) : Controller
 {
-    private const string RequesterRoles = $"{Roles.SalesOfficer},{Roles.PurchaseOfficer}";
+    private bool IsReviewer => User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
     private const int MaxApprovalAttempts = 3;
 
-    [Authorize(Roles = Roles.InventoryManagers)]
     public async Task<IActionResult> Index(StockAdjustmentStatus? status)
     {
         var query = ScopedQuery().Include(a => a.Warehouse).Include(a => a.Items).AsQueryable();
@@ -34,13 +39,12 @@ public class StockAdjustmentsController(
         }
 
         ViewData["Status"] = status;
-        ViewData["CanReview"] = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
+        ViewData["CanReview"] = IsReviewer;
         ViewData["PendingCount"] = await ScopedQuery().CountAsync(a => a.Status == StockAdjustmentStatus.Pending);
 
         return View(await query.OrderByDescending(a => a.RequestedAt).ThenByDescending(a => a.Id).ToListAsync());
     }
 
-    [Authorize(Roles = Roles.InventoryManagers)]
     public async Task<IActionResult> Details(int id)
     {
         var adjustment = await db.StockAdjustments
@@ -64,9 +68,9 @@ public class StockAdjustmentsController(
         return View(adjustment);
     }
 
-    [Authorize(Roles = RequesterRoles)]
     public async Task<IActionResult> Create()
     {
+        if (IsReviewer) return Forbid();
         await PopulateAsync();
         var warehouseIds = User.GetWarehouseIds();
         return View(new StockAdjustmentCreateViewModel
@@ -77,10 +81,10 @@ public class StockAdjustmentsController(
     }
 
     [HttpPost]
-    [Authorize(Roles = RequesterRoles)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(StockAdjustmentCreateViewModel model)
     {
+        if (IsReviewer) return Forbid();
         model.Items = model.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
         if (model.Items.Count == 0)
         {
@@ -100,6 +104,7 @@ public class StockAdjustmentsController(
 
         var productIds = model.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await db.Products.Where(p => p.IsActive && productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+        var canSeeCost = User.CanSeePurchasePrice();
 
         foreach (var item in model.Items)
         {
@@ -109,7 +114,9 @@ public class StockAdjustmentsController(
                 break;
             }
 
-            if (item.Direction == StockAdjustmentDirection.Increase && (item.UnitCost is null || item.UnitCost <= 0))
+            // Users who can't see purchase prices (Sales Officers, Viewers) don't enter a cost; the
+            // product's last cost is used when the request is approved.
+            if (canSeeCost && item.Direction == StockAdjustmentDirection.Increase && (item.UnitCost is null || item.UnitCost <= 0))
             {
                 ModelState.AddModelError(string.Empty, $"Enter the unit cost for the units being added to {products[item.ProductId].Name}.");
             }
@@ -157,7 +164,7 @@ public class StockAdjustmentsController(
                 ProductId = item.ProductId,
                 Direction = item.Direction,
                 Quantity = item.Quantity,
-                UnitCost = increase ? item.UnitCost : null,
+                UnitCost = increase && canSeeCost ? item.UnitCost : null,
                 SalePrice = increase ? item.SalePrice : null
             });
         }
@@ -220,7 +227,8 @@ public class StockAdjustmentsController(
                     }
                     else
                     {
-                        var unitCost = item.UnitCost ?? 0;
+                        // No cost on the request (filed by someone who can't see costs) = the product's last cost.
+                        var unitCost = item.UnitCost ?? item.Product?.CostPrice ?? 0;
                         var batch = new ProductBatch
                         {
                             ProductId = item.ProductId,
@@ -340,7 +348,6 @@ public class StockAdjustmentsController(
 
     // The requester can withdraw their own request while it is still pending.
     [HttpPost]
-    [Authorize(Roles = RequesterRoles)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Cancel(int id)
     {
@@ -393,8 +400,9 @@ public class StockAdjustmentsController(
 
         // FIFO-available stock per warehouse (sum of active batches) — the number a decrease is
         // actually checked against — plus default prices to pre-fill an increase.
+        // A restricted user only ever receives their own warehouse(s)' quantities.
         var batchTotals = await db.ProductBatches
-            .Where(b => b.IsActive)
+            .Where(b => b.IsActive && (warehouseIds == null || warehouseIds.Contains(b.WarehouseId)))
             .GroupBy(b => new { b.ProductId, b.WarehouseId })
             .Select(g => new { g.Key.ProductId, g.Key.WarehouseId, Quantity = g.Sum(b => b.RemainingQuantity) })
             .ToListAsync();
@@ -403,6 +411,7 @@ public class StockAdjustmentsController(
         var products = await db.Products.Where(p => p.IsActive).OrderBy(p => p.Name)
             .Select(p => new { p.Id, p.Sku, p.Name, p.Brand, p.Size, Category = p.Category!.Name, Symbol = p.UnitOfMeasure!.Symbol, p.CostPrice, p.SalePrice })
             .ToListAsync();
+        var canSeeCost = User.CanSeePurchasePrice();
         ViewData["Products"] = products.Select(p => new
         {
             p.Id,
@@ -412,7 +421,7 @@ public class StockAdjustmentsController(
             p.Size,
             p.Category,
             p.Symbol,
-            p.CostPrice,
+            CostPrice = canSeeCost ? p.CostPrice : (decimal?)null,
             p.SalePrice,
             Stocks = byProduct[p.Id].Select(s => new { s.WarehouseId, s.Quantity })
         }).ToList();
@@ -429,13 +438,8 @@ public class StockAdjustmentsController(
             .Where(s => productIdList.Contains(s.ProductId) && s.WarehouseId == warehouseId)
             .ToListAsync();
 
-        var payloadProducts = products.Select(p => new
-        {
-            productId = p.Id,
-            currentStock = p.CurrentStock,
-            warehouseStocks = stocks.Where(s => s.ProductId == p.Id).ToDictionary(s => s.WarehouseId.ToString(), s => s.Quantity)
-        });
-
-        await notifier.NotifyDataChangeAsync("StockChange", new { products = payloadProducts }, [warehouseId]);
+        // Split per warehouse by the notifier, so no warehouse sees another's quantities.
+        await notifier.NotifyStockChangeAsync(products.Select(p => new StockChangeProduct(
+            p.Id, p.CurrentStock, stocks.Where(s => s.ProductId == p.Id).ToDictionary(s => s.WarehouseId, s => s.Quantity))));
     }
 }

@@ -1,0 +1,18 @@
+@using WebApplication1.Services.Saas
+@model AccessDecision
+@{ ViewData["Title"] = "Access restricted"; }
+
+<div class="card border-danger" style="max-width: 760px;">
+    <div class="card-body">
+        <h4 class="text-danger"><i class="fas fa-lock me-2"></i>Access to the system is restricted</h4>
+        <p class="mb-3">@Model.Message</p>
+        @if (User.IsInRole(Roles.Admin))
+        {
+            <a asp-action="Index" class="btn btn-primary">Go to billing</a>
+        }
+        else
+        {
+            <p class="text-muted mb-0">Please ask your account administrator to resolve this. Your data is safe.</p>
+        }
+    </div>
+</div>

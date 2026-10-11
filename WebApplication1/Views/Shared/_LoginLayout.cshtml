@@ -1,15 +1,17 @@
-@inject ICompanySettingsService CompanySettings
-@{ var company = await CompanySettings.GetAsync(); }
+@inject WebApplication1.Services.Saas.IPlatformBranding PlatformBranding
+@{
+    // A tenant's page passes its own name/logo; every other page (registration, shared sign-in) carries the platform's neutral brand.
+    var brandName = ViewData["BrandName"] as string;
+    if (string.IsNullOrWhiteSpace(brandName)) { brandName = await PlatformBranding.GetNameAsync(); }
+    var brandLogo = ViewData["BrandLogoUrl"] as string ?? "/Platform/Logo";
+}
 <!DOCTYPE html>
-<html lang="en" dir="ltr" data-bs-theme="dark">
+<html lang="@WebApplication1.Services.UiLanguage.Current(Context)" dir="ltr" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] - @company.CompanyName</title>
-    @if (company.LogoImage is not null)
-    {
-        <link rel="icon" href="@Url.Action("Logo", "CompanySettings")" />
-    }
+    <title>@ViewData["Title"] - @brandName</title>
+    <link rel="icon" href="@brandLogo" />
     <link rel="stylesheet" href="~/lib/sneat/css/core.css" />
     <link rel="stylesheet" href="~/lib/sneat/css/demo.css" />
     <link rel="stylesheet" href="~/lib/sneat/css/page-auth.css" />
@@ -17,6 +19,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
+    <div class="text-end p-2"><partial name="_LanguageSwitcher" view-data='new ViewDataDictionary(ViewData) { { "SwitcherStyle", "plain" } }' /></div>
     <div class="container-xxl">
         <div class="authentication-wrapper authentication-basic container-p-y">
             <div class="authentication-inner">
@@ -26,7 +29,12 @@
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (WebApplication1.Services.UiLanguage.IsBangla(Context))
+    {
+        <script src="~/i18n/bn.js" asp-append-version="true"></script>
+        <script src="~/js/i18n.js" asp-append-version="true"></script>
+    }
+<script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

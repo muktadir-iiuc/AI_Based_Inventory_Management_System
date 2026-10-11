@@ -16,18 +16,12 @@ public class PermissionAuthorizationHandler(ApplicationDbContext db) : Authoriza
             return;
         }
 
-        var userRoles = context.User.Claims
-            .Where(c => c.Type == ClaimTypes.Role)
-            .Select(c => c.Value)
-            .ToList();
-
-        if (userRoles.Count == 0)
-        {
-            return;
-        }
-
-        var granted = await db.RolePermissions
-            .AnyAsync(p => p.PermissionKey == requirement.PermissionKey && userRoles.Contains(p.RoleName));
+        // Everyone else: only pages ticked for them individually (Administration -> Page Permissions,
+        // or "Menu Access" on the user's Edit page). The old role-level RolePermissions table is no
+        // longer consulted — the AddUserPermissions migration turned its rows into per-user grants.
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var granted = userId is not null && await db.UserPermissions
+            .AnyAsync(p => p.PermissionKey == requirement.PermissionKey && p.UserId == userId);
 
         if (granted)
         {

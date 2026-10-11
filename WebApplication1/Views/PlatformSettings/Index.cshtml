@@ -1,0 +1,74 @@
+@using WebApplication1.Models.Saas
+@model SettingsViewModel
+@{
+    ViewData["Title"] = "Platform settings";
+    var groups = new (string Title, (string Key, string Label, string Help)[] Items)[]
+    {
+        ("Branding and invoice issuer", [
+            (PlatformSettingKeys.PlatformName, "Platform name", "Shown on emails, the sign-up page and as the issuer on subscription invoice PDFs."),
+            (PlatformSettingKeys.PlatformAddress, "Business address", "Printed under the name on invoice PDFs."),
+            (PlatformSettingKeys.PlatformPhone, "Phone", "Printed on invoice PDFs."),
+            (PlatformSettingKeys.PlatformPublicUrl, "Public URL", "Root address tenants use, e.g. https://app.example.com. Used for the tenant sign-in links shown in the Platform panel.")]),
+        ("Trials and grace", [
+            (PlatformSettingKeys.DefaultTrialDays, "Default trial (days)", "Used when a plan does not set its own."),
+            (PlatformSettingKeys.DefaultGraceDays, "Default grace period (days)", "Days after an invoice's due date before suspension, unless the plan sets its own.")]),
+        ("Invoicing", [
+            (PlatformSettingKeys.DefaultCurrency, "Default currency", "3-letter code, e.g. BDT. Dashboard totals use it."),
+            (PlatformSettingKeys.InvoicePrefix, "Invoice number prefix", "Numbers look like PREFIX-202601-000123."),
+            (PlatformSettingKeys.InvoiceDueDays, "Invoice due after (days)", "For first and plan-change invoices. Renewal invoices are due when the paid term ends."),
+            (PlatformSettingKeys.DefaultTaxPercent, "Default tax %", "Reference value; each plan carries its own tax %.")]),
+        ("Renewals and reminders", [
+            (PlatformSettingKeys.RenewalLeadDays, "Create renewal invoice (days before term end)", ""),
+            (PlatformSettingKeys.ReminderDays, "Payment reminders (days before due)", "Comma separated, e.g. 7,3,1."),
+            (PlatformSettingKeys.AttemptExpiryMinutes, "Online payment attempt expiry (minutes)", "")]),
+        ("Policies", [
+            (PlatformSettingKeys.RetentionDays, "Data retention after termination (days)", "Terminated tenants' data cannot be erased before this."),
+            (PlatformSettingKeys.CancellationPolicy, "Cancellation policy", "end-of-term or immediate (shown to tenants)."),
+            (PlatformSettingKeys.SuspensionPolicy, "Suspension policy", "billing-only: suspended tenants can still reach billing."),
+            (PlatformSettingKeys.TermsUrl, "Terms of service URL", ""),
+            (PlatformSettingKeys.PrivacyUrl, "Privacy policy URL", "")]),
+        ("Sign-up", [
+            (PlatformSettingKeys.RegistrationEnabled, "Self-service sign-up enabled", "true or false."),
+            (PlatformSettingKeys.RegistrationPlanCode, "Sign-up plan code", "New businesses start on this plan (a plan with a trial gives a free trial).")])
+    };
+}
+
+<div class="card mb-3" style="max-width: 760px;">
+    <div class="card-header"><h3 class="card-title mb-0">Platform logo</h3></div>
+    <div class="card-body">
+        <p class="small text-muted">Shown on the platform sign-in page, the platform screens and subscription invoice PDFs. PNG or JPEG, up to 512 KB. This is separate from each business's own company logo.</p>
+        <div class="d-flex flex-wrap gap-3 align-items-center">
+            <img src="/Platform/Logo?v=@DateTime.UtcNow.Ticks" alt="Current platform logo" style="height: 56px; width: auto; max-width: 160px;" class="border rounded p-1 bg-body-tertiary" />
+            <form asp-action="Logo" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="file" name="logo" accept="image/png,image/jpeg" class="form-control form-control-sm" style="max-width: 20rem;" required />
+                <button class="btn btn-primary btn-sm">Upload</button>
+            </form>
+            @if ((bool)(ViewData["HasLogo"] ?? false))
+            {
+                <form asp-action="Logo" method="post"><input type="hidden" name="remove" value="true" /><button class="btn btn-outline-danger btn-sm">Remove</button></form>
+            }
+        </div>
+    </div>
+</div>
+
+<form asp-action="Save" method="post">
+    <div class="row g-3">
+    @foreach (var g in groups)
+    {
+        <div class="col-12 col-xl-6"><div class="card h-100">
+            <div class="card-header"><h3 class="card-title mb-0">@g.Title</h3></div>
+            <div class="card-body">
+                @foreach (var (key, label, help) in g.Items)
+                {
+                    <div class="mb-3">
+                        <label class="form-label" for="s_@key">@label</label>
+                        <input id="s_@key" name="@key" value="@Model.Values.GetValueOrDefault(key)" maxlength="1000" class="form-control" />
+                        @if (!string.IsNullOrEmpty(help)) { <div class="form-text">@help</div> }
+                    </div>
+                }
+            </div>
+        </div></div>
+    }
+    </div>
+    <div class="mt-3"><button class="btn btn-primary">Save settings</button> <span class="text-muted small ms-2">Every change is written to the audit log.</span></div>
+</form>

@@ -1,0 +1,43 @@
+@model PlatformLoginViewModel
+@{
+    ViewData["Title"] = "Platform sign-in";
+    Layout = "_PlatformLoginLayout";
+}
+
+<div class="platform-card p-4 p-sm-5">
+    <div class="text-center mb-4">
+        <img src="/Platform/Logo" alt="" style="height: 56px; width: auto; max-width: 160px;" class="mb-3" />
+        <h1 class="h4 mb-1">@Model.PlatformName</h1>
+        <span class="platform-badge">Platform administration</span>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger py-2" role="alert">@Model.ErrorMessage</div>
+    }
+
+    <form asp-action="Login" method="post" novalidate>
+        <input type="hidden" asp-for="ReturnUrl" />
+        <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+        <div class="mb-3">
+            <label asp-for="Email" class="form-label small text-uppercase text-secondary">Operator email</label>
+            <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
+            <span asp-validation-for="Email" class="text-danger small"></span>
+        </div>
+        <div class="mb-3">
+            <label asp-for="Password" class="form-label small text-uppercase text-secondary">Password</label>
+            <input asp-for="Password" class="form-control" autocomplete="current-password" />
+            <span asp-validation-for="Password" class="text-danger small"></span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="form-check mb-0">
+                <input asp-for="RememberMe" class="form-check-input" />
+                <label asp-for="RememberMe" class="form-check-label small">Keep me signed in on this device</label>
+            </div>
+            <a class="link-warning small" href="/Platform/ForgotPassword">Forgot password?</a>
+        </div>
+        <button class="btn btn-platform w-100 py-2"><i class="fas fa-lock me-2"></i>Sign in to the console</button>
+    </form>
+
+    <p class="text-center text-secondary small mt-4 mb-0">Authorised platform staff only. Business users sign in through their own company link.</p>
+</div>

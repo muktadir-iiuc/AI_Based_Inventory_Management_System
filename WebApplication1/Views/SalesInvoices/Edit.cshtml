@@ -191,6 +191,8 @@
 
 @section Scripts {
     <script>
+        // Sales Officers/Viewers don't see batch purchase prices in the FIFO preview.
+        const showPurchasePrice = @(User.CanSeePurchasePrice() ? "true" : "false");
         const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
         const previewUrl = '@Url.Action("PreviewAllocation")';
         const existingLines = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Items));
@@ -262,7 +264,7 @@
                 <td colspan="7" class="bg-body-tertiary p-2">
                     <div class="small text-muted mb-1">FIFO batch allocation</div>
                     <table class="table table-sm mb-0 allocation-table">
-                        <thead><tr><th>Batch</th><th class="text-end">Available</th><th class="text-end">Allocated</th><th class="text-end">Purchase Price</th><th class="text-end">Sale Price</th></tr></thead>
+                        <thead><tr><th>Batch</th><th class="text-end">Available</th><th class="text-end">Allocated</th>${showPurchasePrice ? '<th class="text-end">Purchase Price</th>' : ''}<th class="text-end">Sale Price</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </td>
@@ -323,6 +325,7 @@
             }
 
             function clearAllocation(message, isError) {
+                priceInput.classList.remove('shimmer');
                 priceInput.value = '';
                 priceInput.disabled = !!isError;
                 priceInput.classList.toggle('is-invalid', !!isError);
@@ -337,6 +340,7 @@
                 priceInput.classList.remove('is-invalid');
                 priceInput.disabled = true;
                 priceInput.placeholder = '…';
+                priceInput.classList.add('shimmer');
             }
 
             async function refreshAllocation() {
@@ -366,6 +370,7 @@
                     return;
                 }
 
+                priceInput.classList.remove('shimmer');
                 priceInput.disabled = false;
                 priceInput.placeholder = '0.00';
                 if (!priceManuallyEdited) {
@@ -378,7 +383,7 @@
                         <td>${l.BatchNumber}</td>
                         <td class="text-end">${Number(l.Available).toFixed(2)}</td>
                         <td class="text-end">${Number(l.Allocated).toFixed(2)}</td>
-                        <td class="text-end">${Number(l.PurchasePrice).toFixed(2)}</td>
+                        ${showPurchasePrice ? `<td class="text-end">${Number(l.PurchasePrice).toFixed(2)}</td>` : ''}
                         <td class="text-end">${Number(l.SalePrice).toFixed(2)}</td>
                     </tr>
                 `).join('');

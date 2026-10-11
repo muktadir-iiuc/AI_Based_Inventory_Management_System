@@ -74,8 +74,12 @@ public class Payment
     [StringLength(100)]
     public string? BankName { get; set; }
 
+    // A discount allowed to a customer when settling their account (Receive Payment): no money
+    // moves, but it settles dues exactly like a payment, so every dues figure nets it automatically.
+    public bool IsDiscount { get; set; }
+
     [NotMapped]
-    public string MethodText => PaymentMethods.Describe(Method, BankName);
+    public string MethodText => IsDiscount ? "Discount" : PaymentMethods.Describe(Method, BankName);
 
     public int? PurchaseInvoiceId { get; set; }
     public PurchaseInvoice? PurchaseInvoice { get; set; }

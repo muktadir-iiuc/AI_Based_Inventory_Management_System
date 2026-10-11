@@ -1,22 +1,41 @@
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ICompanySettingsService CompanySettings
+@inject WebApplication1.Services.Saas.IPlatformBranding PlatformBranding
 @inject IProductPriceService ProductPriceService
 @inject WebApplication1.Data.ApplicationDbContext LayoutDb
+@inject Microsoft.AspNetCore.Authorization.IAuthorizationService LayoutAuth
 @{
     var company = await CompanySettings.GetAsync();
+    // SaaS: platform staff get their own menu; tenant users get a billing banner and, when the
+    // subscription restricts them, only the billing pages (TenantAccessMiddleware enforces it).
+    var isPlatform = User.IsPlatformStaff();
+    var saasAccess = Context.Items[WebApplication1.Middleware.TenantAccessMiddleware.AccessItemKey] as WebApplication1.Services.Saas.AccessDecision;
+    var tenantRestricted = saasAccess is not null && !saasAccess.IsFull;
+    var layoutTenantId = User.GetTenantId();
+    // Branding: a tenant's users see their own company's name and logo; platform staff see the platform's - never a tenant's.
+    var brandName = isPlatform ? await PlatformBranding.GetNameAsync() : company.CompanyName;
+    var brandShort = isPlatform ? brandName : company.ShortName;
+    var brandLogo = isPlatform ? "/Platform/Logo" : (company.LogoImage is not null ? Url.Action("Logo", "CompanySettings") : null);
     var canReviewPrices = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager) || User.IsInRole(Roles.PurchaseOfficer);
     var pendingPriceReviewCount = canReviewPrices ? await ProductPriceService.GetPendingMonthlyReviewCountAsync() : 0;
     // Stock Adjustments: requested by Sales/Purchase, approved by Admin/Manager. Only approvers
     // get the "waiting for you" badge; requesters just see the menu entry.
     var canReviewAdjustments = User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
-    var canSeeAdjustments = canReviewAdjustments || User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.PurchaseOfficer);
+    // Purchase/Sales Invoices, Stock Transfers and Stock Adjustments are assigned per user by an
+    // Admin/Manager (Administration -> Page Permissions); Admin/Manager always see them all.
+    var canSeeAdjustments = (await LayoutAuth.AuthorizeAsync(User, Permissions.StockAdjustment)).Succeeded;
+    var canSeeTransfers = (await LayoutAuth.AuthorizeAsync(User, Permissions.StockTransfer)).Succeeded;
+    // Sales Officers and Viewers never see purchase/cost prices (purchase documents, profitability).
+    var canSeePurchasePrice = User.CanSeePurchasePrice();
+    var canSeePurchaseInvoices = canSeePurchasePrice && (await LayoutAuth.AuthorizeAsync(User, Permissions.PurchaseInvoice)).Succeeded;
+    var canSeeSalesInvoices = (await LayoutAuth.AuthorizeAsync(User, Permissions.SalesInvoice)).Succeeded;
     // Admin/Manager: how many people were active in the last few minutes (Users > Active Users).
     var onlineUserCount = 0;
     if (canReviewAdjustments)
     {
         var onlineSince = DateTime.UtcNow.AddMinutes(-WebApplication1.Models.ViewModels.OnlineUserRow.OnlineMinutes);
-        onlineUserCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.Users, u => u.IsActive && u.LastActivityAt >= onlineSince);
+        onlineUserCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.Users, u => u.IsActive && u.TenantId == layoutTenantId && u.LastActivityAt >= onlineSince);
     }
     var pendingTransferCount = canReviewAdjustments
         ? await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(LayoutDb.StockTransfers, t => t.ApprovalStatus == WebApplication1.Models.Inventory.StockTransferApprovalStatus.Pending)
@@ -26,7 +45,7 @@
         : 0;
 }
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="@WebApplication1.Services.UiLanguage.Current(Context)" data-bs-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -52,10 +71,15 @@
             }
         })();
     </script>
-    <title>@ViewData["Title"] - @company.CompanyName</title>
-    @if (company.LogoImage is not null)
+    <script>
+        // Shows the shimmer skeleton (#pageSkeleton) from the very first paint until the page's
+        // scripts (DataTables, Select2, ...) have initialized it - see the end of <body>.
+        document.documentElement.classList.add('page-loading');
+    </script>
+    <title>@ViewData["Title"] - @brandName</title>
+    @if (brandLogo is not null)
     {
-        <link rel="icon" href="@Url.Action("Logo", "CompanySettings")" />
+        <link rel="icon" href="@brandLogo" />
     }
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/fontawesome-free/css/all.min.css" />
@@ -67,6 +91,20 @@
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+<script>
+    // Restores the sidebar's saved hidden/shown state before first paint. AdminLTE's PushMenu
+    // (data-enable-persistence on .app-sidebar) saves the state on every toggle under the
+    // "lte.sidebar.state" key and re-applies it on DOMContentLoaded - but only then, so without
+    // this a hidden sidebar would flash open and slide shut on every page. Desktop only (lg+),
+    // matching PushMenu, which ignores the saved state on mobile where the sidebar is an overlay.
+    (function () {
+        try {
+            if (window.innerWidth > 991.98 && localStorage.getItem('lte.sidebar.state') === 'sidebar-collapse') {
+                document.body.classList.add('sidebar-collapse');
+            }
+        } catch (e) { }
+    })();
+</script>
 <div class="app-wrapper">
 
     <nav class="app-header navbar navbar-expand bg-body">
@@ -90,6 +128,7 @@
             </ul>
 
             <ul class="navbar-nav ms-auto">
+                <partial name="_LanguageSwitcher" />
                 <li class="nav-item dropdown">
                     <a class="nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Theme">
                         <i class="fas fa-sun d-none" data-lte-theme-icon="light"></i>
@@ -149,18 +188,18 @@
         </div>
     </nav>
 
-    <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+    <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark" data-enable-persistence="true">
         <div class="sidebar-brand">
             <a asp-controller="Home" asp-action="Index" class="brand-link">
-                @if (company.LogoImage is not null)
+                @if (brandLogo is not null)
                 {
-                    <img src="@Url.Action("Logo", "CompanySettings")" alt="@company.CompanyName" class="brand-image opacity-75" style="margin-inline-start:0.3rem; max-height:33px;" />
+                    <img src="@brandLogo" alt="@brandName" class="brand-image opacity-75" style="margin-inline-start:0.3rem; max-height:33px;" />
                 }
                 else
                 {
                     <i class="fas fa-boxes-stacked brand-image opacity-75" style="margin-inline-start:0.3rem;"></i>
                 }
-                <span class="brand-text fw-light">@company.ShortName</span>
+                <span class="brand-text fw-light">@brandShort</span>
             </a>
         </div>
 
@@ -184,6 +223,21 @@
             }
             <nav class="mt-2">
                 <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+                @if (isPlatform)
+                {
+                    <partial name="_PlatformMenu" />
+                }
+                else if (tenantRestricted)
+                {
+                    <li class="nav-item">
+                        <a asp-controller="Billing" asp-action="Index" class="nav-link active">
+                            <i class="nav-icon fas fa-credit-card"></i>
+                            <p>Billing</p>
+                        </a>
+                    </li>
+                }
+                else
+                {
 
                     <li class="nav-item">
                         <a asp-controller="Home" asp-action="Index" class="nav-link @(InController("Home") ? "active" : "")">
@@ -202,7 +256,10 @@
                             <li class="nav-item"><a asp-controller="Categories" asp-action="Index" class="nav-link @(InController("Categories") ? "active" : "")"><i class="nav-icon fas fa-tags"></i><p>Categories</p></a></li>
                             <li class="nav-item"><a asp-controller="Units" asp-action="Index" class="nav-link @(InController("Units") ? "active" : "")"><i class="nav-icon fas fa-ruler"></i><p>Units of Measure</p></a></li>
                             <li class="nav-item"><a asp-controller="Warehouses" asp-action="Index" class="nav-link @(InController("Warehouses") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Warehouses</p></a></li>
-                            <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link @(InController("StockTransfers") ? "active" : "")"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers @if (pendingTransferCount > 0) { <span class="badge text-bg-warning ms-1">@pendingTransferCount</span> }</p></a></li>
+                            @if (canSeeTransfers)
+                            {
+                                <li class="nav-item"><a asp-controller="StockTransfers" asp-action="Index" class="nav-link @(InController("StockTransfers") ? "active" : "")"><i class="nav-icon fas fa-truck-ramp-box"></i><p>Stock Transfers @if (pendingTransferCount > 0) { <span class="badge text-bg-warning ms-1">@pendingTransferCount</span> }</p></a></li>
+                            }
                             @if (canSeeAdjustments)
                             {
                                 <li class="nav-item"><a asp-controller="StockAdjustments" asp-action="Index" class="nav-link @(InController("StockAdjustments") ? "active" : "")"><i class="nav-icon fas fa-scale-balanced"></i><p>Stock Adjustments @if (pendingAdjustmentCount > 0) { <span class="badge text-bg-warning ms-1">@pendingAdjustmentCount</span> }</p></a></li>
@@ -216,10 +273,16 @@
                             <p>Purchase<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link @(InController("PurchaseInvoices") ? "active" : "")"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
-                            <li class="nav-item"><a asp-controller="PurchaseReturns" asp-action="Index" class="nav-link @(InController("PurchaseReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Purchase Returns</p></a></li>
+                            @if (canSeePurchaseInvoices)
+                            {
+                                <li class="nav-item"><a asp-controller="PurchaseInvoices" asp-action="Index" class="nav-link @(InController("PurchaseInvoices") ? "active" : "")"><i class="nav-icon fas fa-file-invoice"></i><p>Purchase Invoices</p></a></li>
+                                <li class="nav-item"><a asp-controller="PurchaseReturns" asp-action="Index" class="nav-link @(InController("PurchaseReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Purchase Returns</p></a></li>
+                            }
                             <li class="nav-item"><a asp-controller="Suppliers" asp-action="Index" class="nav-link @(InController("Suppliers") && !InAction("Suppliers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-industry"></i><p>Suppliers</p></a></li>
-                            <li class="nav-item"><a asp-controller="Suppliers" asp-action="Ledger" class="nav-link @(InAction("Suppliers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Supplier Ledger</p></a></li>
+                            @if (User.CanSeeSupplierLedger())
+                            {
+                                <li class="nav-item"><a asp-controller="Suppliers" asp-action="Ledger" class="nav-link @(InAction("Suppliers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Supplier Ledger</p></a></li>
+                            }
                         </ul>
                     </li>
 
@@ -229,10 +292,16 @@
                             <p>Sales<i class="nav-arrow fas fa-angle-left"></i></p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link @(InController("SalesInvoices") ? "active" : "")"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
-                            <li class="nav-item"><a asp-controller="SalesReturns" asp-action="Index" class="nav-link @(InController("SalesReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Sales Returns</p></a></li>
+                            @if (canSeeSalesInvoices)
+                            {
+                                <li class="nav-item"><a asp-controller="SalesInvoices" asp-action="Index" class="nav-link @(InController("SalesInvoices") ? "active" : "")"><i class="nav-icon fas fa-receipt"></i><p>Sales Invoices</p></a></li>
+                                <li class="nav-item"><a asp-controller="SalesReturns" asp-action="Index" class="nav-link @(InController("SalesReturns") ? "active" : "")"><i class="nav-icon fas fa-rotate-left"></i><p>Sales Returns</p></a></li>
+                            }
                             <li class="nav-item"><a asp-controller="Customers" asp-action="Index" class="nav-link @(InController("Customers") && !InAction("Customers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-users"></i><p>Customers</p></a></li>
-                            <li class="nav-item"><a asp-controller="Customers" asp-action="Ledger" class="nav-link @(InAction("Customers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Customer Ledger</p></a></li>
+                            @if (User.CanSeeCustomerLedger())
+                            {
+                                <li class="nav-item"><a asp-controller="Customers" asp-action="Ledger" class="nav-link @(InAction("Customers", "Ledger") ? "active" : "")"><i class="nav-icon fas fa-book"></i><p>Customer Ledger</p></a></li>
+                            }
                         </ul>
                     </li>
 
@@ -258,7 +327,11 @@
                             <li class="nav-item"><a asp-controller="Reports" asp-action="StockValuation" class="nav-link @(InAction("Reports", "StockValuation") ? "active" : "")"><i class="nav-icon fas fa-warehouse"></i><p>Stock Valuation</p></a></li>
                             <li class="nav-item"><a asp-controller="Reports" asp-action="ReorderSuggestions" class="nav-link @(InAction("Reports", "ReorderSuggestions") ? "active" : "")"><i class="nav-icon fas fa-robot"></i><p>AI Reorder Suggestions</p></a></li>
                             <li class="nav-item"><a asp-controller="Reports" asp-action="SalesHistory" class="nav-link @(InAction("Reports", "SalesHistory") ? "active" : "")"><i class="nav-icon fas fa-clock-rotate-left"></i><p>Sales History</p></a></li>
-                            <li class="nav-item"><a asp-controller="Reports" asp-action="SalesProfitability" class="nav-link @(InAction("Reports", "SalesProfitability") ? "active" : "")"><i class="nav-icon fas fa-chart-pie"></i><p>Sales Profitability</p></a></li>
+                            @if (canSeePurchasePrice)
+                            {
+                                <li class="nav-item"><a asp-controller="Reports" asp-action="PurchaseHistory" class="nav-link @(InAction("Reports", "PurchaseHistory") ? "active" : "")"><i class="nav-icon fas fa-clock-rotate-left"></i><p>Purchase History</p></a></li>
+                                <li class="nav-item"><a asp-controller="Reports" asp-action="SalesProfitability" class="nav-link @(InAction("Reports", "SalesProfitability") ? "active" : "")"><i class="nav-icon fas fa-chart-pie"></i><p>Sales Profitability</p></a></li>
+                            }
                         </ul>
                     </li>
 
@@ -289,11 +362,17 @@
                         <li class="nav-item">
                             <a asp-controller="Permissions" asp-action="Index" class="nav-link @(InController("Permissions") ? "active" : "")">
                                 <i class="nav-icon fas fa-shield-halved"></i>
-                                <p>Role Permissions</p>
+                                <p>Page Permissions</p>
                             </a>
                         </li>
                         @if (User.IsInRole(Roles.Admin))
                         {
+                            <li class="nav-item">
+                                <a asp-controller="Billing" asp-action="Index" class="nav-link @(InController("Billing") ? "active" : "")">
+                                    <i class="nav-icon fas fa-credit-card"></i>
+                                    <p>Billing &amp; Subscription</p>
+                                </a>
+                            </li>
                             <li class="nav-item">
                                 <a asp-controller="CompanySettings" asp-action="Index" class="nav-link @(InController("CompanySettings") ? "active" : "")">
                                     <i class="nav-icon fas fa-building"></i>
@@ -301,13 +380,8 @@
                                 </a>
                             </li>
                         }
-                        <li class="nav-item">
-                            <a asp-controller="DatabaseBackup" asp-action="Index" class="nav-link @(InController("DatabaseBackup") ? "active" : "")">
-                                <i class="nav-icon fas fa-database"></i>
-                                <p>Database Backup</p>
-                            </a>
-                        </li>
                     }
+                }
                 </ul>
             </nav>
         </div>
@@ -330,6 +404,35 @@
             </div>
         </div>
         <div class="app-content">
+            <div id="pageSkeleton" class="page-skeleton container-fluid" aria-hidden="true">
+                <div class="row g-3 mb-3">
+                    @for (var i = 0; i < 4; i++)
+                    {
+                        <div class="col-6 col-lg-3"><span class="skeleton skeleton-stat"></span></div>
+                    }
+                </div>
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span class="skeleton skeleton-title"></span>
+                        <span class="skeleton skeleton-button"></span>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0">
+                            <tbody>
+                                @for (var r = 0; r < 8; r++)
+                                {
+                                    <tr class="skeleton-row">
+                                        @for (var c = 0; c < 5; c++)
+                                        {
+                                            <td><span class="skeleton"></span></td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
             <div class="container-fluid">
                 @if (TempData["Success"] is not null)
                 {
@@ -345,18 +448,22 @@
                         @TempData["Error"]
                     </div>
                 }
+                @if (!isPlatform)
+                {
+                    <partial name="_BillingBanner" />
+                }
                 @RenderBody()
             </div>
         </div>
     </main>
 
     <footer class="app-footer">
-        <div class="float-end d-none d-sm-inline">@company.CompanyName</div>
+        <div class="float-end d-none d-sm-inline">@brandName</div>
         <strong>&copy; @DateTime.Now.Year</strong> All rights reserved.
     </footer>
 </div>
 
-@if (SignInManager.IsSignedIn(User))
+@if (SignInManager.IsSignedIn(User) && !isPlatform && !tenantRestricted)
 {
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;" id="toastContainer"></div>
 
@@ -389,6 +496,11 @@
 <script src="~/lib/datatables/js/dataTables.min.js"></script>
 <script src="~/lib/datatables/js/dataTables.bootstrap5.min.js"></script>
 <script src="~/lib/chart.js/dist/chart.umd.min.js"></script>
+@if (WebApplication1.Services.UiLanguage.IsBangla(Context))
+    {
+        <script src="~/i18n/bn.js" asp-append-version="true"></script>
+        <script src="~/js/i18n.js" asp-append-version="true"></script>
+    }
 <script src="~/js/site.js" asp-append-version="true"></script>
 @if (SignInManager.IsSignedIn(User))
 {
@@ -505,6 +617,12 @@
                 addBubble(question, null, true);
                 input.value = '';
 
+                const pending = document.createElement('div');
+                pending.className = 'd-flex mb-2 justify-content-start';
+                pending.innerHTML = '<div class="skeleton-bubble bg-body-secondary"><span class="skeleton"></span><span class="skeleton" style="width: 65%"></span></div>';
+                chatWindow.appendChild(pending);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+
                 try {
                     const res = await fetch('@Url.Action("Ask", "Chatbot")', {
                         method: 'POST',
@@ -524,6 +642,8 @@
                     addBubble(data.text, data.lines, false);
                 } catch (e) {
                     addBubble('Sorry, something went wrong answering that.', null, false);
+                } finally {
+                    pending.remove();
                 }
             }
 
@@ -553,5 +673,21 @@
     </script>
 }
 @await RenderSectionAsync("Scripts", required: false)
+<script>
+    // Registered after every other script on the page, so this DOMContentLoaded handler runs
+    // last - once DataTables/Select2 have built their widgets - and the content is revealed
+    // already initialized instead of flashing raw tables/selects. 'load' is a fallback in case
+    // an earlier handler threw.
+    (function () {
+        function reveal() {
+            var root = document.documentElement;
+            if (!root.classList.contains('page-loading')) return;
+            root.classList.remove('page-loading');
+            root.classList.add('page-ready');
+        }
+        document.addEventListener('DOMContentLoaded', reveal);
+        window.addEventListener('load', reveal);
+    })();
+</script>
 </body>
 </html>

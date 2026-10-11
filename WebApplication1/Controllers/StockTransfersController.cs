@@ -9,6 +9,8 @@ using WebApplication1.Models.Inventory;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
@@ -16,23 +18,19 @@ namespace WebApplication1.Controllers;
 // officer files a request (nothing moves), then a Manager/Admin approves it — the only moment
 // stock and FIFO batches move — or rejects it. Admin/Manager are the approvers, so a transfer
 // they create themselves is approved on the spot. Editing or cancelling a transfer that has
-// already moved stock is likewise reserved for them.
+// already moved stock is likewise reserved for them. The whole menu is only for users who have
+// been assigned the Stock Transfers permission (Users & Roles -> Edit); Admin/Manager always have it.
+[Authorize(Policy = Permissions.StockTransfer)]
+[RequireFeature(Features.StockTransfers)]
 public class StockTransfersController(
     ApplicationDbContext db,
     IStockService stockService,
     IFifoAllocationService fifoService,
-    IAuthorizationService authorizationService,
     IActivityNotifier notifier) : Controller
 {
     private const int MaxApprovalAttempts = 3;
 
     private bool IsApprover => User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Manager);
-
-    // Sales/Purchase officers (and Admin/Manager) can always file transfers; the older
-    // "Manage Stock Transfers" permission still lets an admin extend that to another role.
-    private async Task<bool> CanRequestAsync() =>
-        Roles.InventoryManagers.Split(',').Any(User.IsInRole)
-        || (await authorizationService.AuthorizeAsync(User, Permissions.StockTransfer)).Succeeded;
 
     public async Task<IActionResult> Index(StockTransferApprovalStatus? status)
     {
@@ -47,7 +45,7 @@ public class StockTransfersController(
         var pendingQuery = query.Where(t => t.ApprovalStatus == StockTransferApprovalStatus.Pending);
         ViewData["PendingCount"] = await pendingQuery.CountAsync();
         ViewData["Status"] = status;
-        ViewData["CanRequest"] = await CanRequestAsync();
+        ViewData["CanRequest"] = true;
         ViewData["IsApprover"] = IsApprover;
 
         if (status.HasValue)
@@ -55,7 +53,9 @@ public class StockTransfersController(
             query = query.Where(t => t.ApprovalStatus == status);
         }
 
-        return View(await query.Include(t => t.Items.Where(i => i.IsCurrent)).OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
+        return View(await query.Include(t => t.Items.Where(i => i.IsCurrent))
+            .Include(t => t.PurchaseInvoiceLinks).ThenInclude(l => l.PurchaseInvoice).ThenInclude(p => p!.Supplier)
+            .OrderByDescending(t => t.Date).ThenByDescending(t => t.Id).ToListAsync());
     }
 
     public async Task<IActionResult> Details(int id)
@@ -64,14 +64,18 @@ public class StockTransfersController(
             .Include(t => t.FromWarehouse)
             .Include(t => t.ToWarehouse)
             .Include(t => t.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(t => t.PurchaseInvoiceLinks).ThenInclude(l => l.PurchaseInvoice)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (transfer is null) return NotFound();
         if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
 
         // What a reviewer needs to judge a pending request: FIFO-available stock at the source now.
+        // Only shown to users assigned to the source warehouse (and Admin/Manager) — a destination-side
+        // user must not see another warehouse's quantity.
         var productIds = transfer.Items.Select(i => i.ProductId).Distinct().ToList();
-        ViewData["Available"] = await db.ProductBatches
+        ViewData["ShowSourceStock"] = User.IsWarehouseAllowed(transfer.FromWarehouseId);
+        ViewData["Available"] = !User.IsWarehouseAllowed(transfer.FromWarehouseId) ? new Dictionary<int, decimal>() : await db.ProductBatches
             .Where(b => b.IsActive && b.WarehouseId == transfer.FromWarehouseId && productIds.Contains(b.ProductId))
             .GroupBy(b => b.ProductId)
             .Select(g => new { ProductId = g.Key, Qty = g.Sum(b => b.RemainingQuantity) })
@@ -83,8 +87,6 @@ public class StockTransfersController(
 
     public async Task<IActionResult> Create()
     {
-        if (!await CanRequestAsync()) return Forbid();
-
         await PopulateDropdownsAsync();
         var warehouseIds = User.GetWarehouseIds();
         return View(new StockTransferCreateViewModel
@@ -98,8 +100,6 @@ public class StockTransfersController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(StockTransferCreateViewModel model)
     {
-        if (!await CanRequestAsync()) return Forbid();
-
         model.Items = model.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
         if (model.Items.Count == 0)
         {
@@ -126,9 +126,11 @@ public class StockTransfersController(
             await ValidateStockAsync(model);
         }
 
+        model.PurchaseInvoiceIds = await AllowedPurchaseInvoiceIdsAsync(model.PurchaseInvoiceIds, []);
+
         if (!ModelState.IsValid)
         {
-            await PopulateDropdownsAsync();
+            await PopulateDropdownsAsync(model.PurchaseInvoiceIds, model.SupplierId);
             return View(model);
         }
 
@@ -149,6 +151,11 @@ public class StockTransfersController(
         foreach (var item in model.Items)
         {
             transfer.Items.Add(new StockTransferItem { ProductId = item.ProductId, Quantity = item.Quantity });
+        }
+
+        foreach (var invoiceId in model.PurchaseInvoiceIds)
+        {
+            transfer.PurchaseInvoiceLinks.Add(new StockTransferPurchaseInvoice { PurchaseInvoiceId = invoiceId });
         }
 
         db.StockTransfers.Add(transfer);
@@ -172,7 +179,7 @@ public class StockTransfersController(
                     await db.SaveChangesAsync();
                 }
                 ModelState.AddModelError(string.Empty, result.Error ?? "The transfer could not be posted.");
-                await PopulateDropdownsAsync();
+                await PopulateDropdownsAsync(model.PurchaseInvoiceIds, model.SupplierId);
                 return View(model);
             }
 
@@ -339,6 +346,7 @@ public class StockTransfersController(
     {
         var transfer = await db.StockTransfers
             .Include(t => t.Items.Where(i => i.IsCurrent))
+            .Include(t => t.PurchaseInvoiceLinks)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (transfer is null) return NotFound();
         if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
@@ -350,13 +358,15 @@ public class StockTransfersController(
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        await PopulateDropdownsAsync();
+        var linkedInvoiceIds = transfer.PurchaseInvoiceLinks.Select(l => l.PurchaseInvoiceId).ToList();
+        await PopulateDropdownsAsync(linkedInvoiceIds);
         var model = new StockTransferCreateViewModel
         {
             FromWarehouseId = transfer.FromWarehouseId,
             ToWarehouseId = transfer.ToWarehouseId,
             Date = transfer.Date,
             Notes = transfer.Notes,
+            PurchaseInvoiceIds = linkedInvoiceIds,
             Items = transfer.Items.Select(i => new TransferLineInput { ProductId = i.ProductId, Quantity = i.Quantity }).ToList()
         };
         ViewData["TransferNumber"] = transfer.TransferNumber;
@@ -375,6 +385,7 @@ public class StockTransfersController(
     {
         var transfer = await db.StockTransfers
             .Include(t => t.Items.Where(i => i.IsCurrent))
+            .Include(t => t.PurchaseInvoiceLinks)
             .FirstOrDefaultAsync(t => t.Id == id);
         if (transfer is null) return NotFound();
         if (!User.IsWarehouseAllowed(transfer.FromWarehouseId) && !User.IsWarehouseAllowed(transfer.ToWarehouseId)) return Forbid();
@@ -407,9 +418,13 @@ public class StockTransfersController(
             ModelState.AddModelError(nameof(model.ToWarehouseId), "Please select a destination warehouse.");
         }
 
+        model.PurchaseInvoiceIds = await AllowedPurchaseInvoiceIdsAsync(
+            model.PurchaseInvoiceIds,
+            transfer.PurchaseInvoiceLinks.Select(l => l.PurchaseInvoiceId).ToList());
+
         if (!ModelState.IsValid)
         {
-            await PopulateDropdownsAsync();
+            await PopulateDropdownsAsync(model.PurchaseInvoiceIds, model.SupplierId);
             ViewData["TransferNumber"] = transfer.TransferNumber;
             return View(model);
         }
@@ -435,6 +450,7 @@ public class StockTransfersController(
                 transfer.ToWarehouseId = model.ToWarehouseId;
                 transfer.Date = model.Date;
                 transfer.Notes = model.Notes;
+                SyncPurchaseInvoiceLinks(transfer, model.PurchaseInvoiceIds);
                 foreach (var item in model.Items)
                 {
                     transfer.Items.Add(new StockTransferItem { ProductId = item.ProductId, Quantity = item.Quantity });
@@ -463,7 +479,7 @@ public class StockTransfersController(
         {
             db.ChangeTracker.Clear();
             ModelState.AddModelError(string.Empty, failure);
-            await PopulateDropdownsAsync();
+            await PopulateDropdownsAsync(model.PurchaseInvoiceIds, model.SupplierId);
             ViewData["TransferNumber"] = transfer.TransferNumber;
             return View(model);
         }
@@ -663,8 +679,10 @@ public class StockTransfersController(
             }
             catch (InsufficientStockException ex)
             {
-                ModelState.AddModelError(string.Empty,
-                    $"Insufficient stock for {product.Name} in the source warehouse: available {ex.Available:0.##}, requested {ex.Requested:0.##}.");
+                // Don't reveal another warehouse's quantity to a user who isn't assigned to it.
+                ModelState.AddModelError(string.Empty, User.IsWarehouseAllowed(model.FromWarehouseId)
+                    ? $"Insufficient stock for {product.Name} in the source warehouse: available {ex.Available:0.##}, requested {ex.Requested:0.##}."
+                    : $"The source warehouse doesn't have enough {product.Name} for the requested {ex.Requested:0.##}.");
             }
         }
     }
@@ -687,22 +705,22 @@ public class StockTransfersController(
             .Where(s => productIdList.Contains(s.ProductId) && warehouseIdList.Contains(s.WarehouseId))
             .ToListAsync();
 
-        var payloadProducts = products.Select(p => new
-        {
-            productId = p.Id,
-            currentStock = p.CurrentStock,
-            warehouseStocks = stocks.Where(s => s.ProductId == p.Id).ToDictionary(s => s.WarehouseId.ToString(), s => s.Quantity)
-        });
-
-        await notifier.NotifyDataChangeAsync("StockChange", new { products = payloadProducts }, warehouseIdList);
+        // Split per warehouse by the notifier: the source's users never receive the destination's
+        // quantity (or vice versa); only Admin/Manager get every warehouse and the total.
+        await notifier.NotifyStockChangeAsync(products.Select(p => new StockChangeProduct(
+            p.Id, p.CurrentStock, stocks.Where(s => s.ProductId == p.Id).ToDictionary(s => s.WarehouseId, s => s.Quantity))));
     }
 
     // fromName/toName are only needed by the client when it has to insert a brand-new row (a
     // freshly requested/posted transfer it doesn't have yet) — later status changes only touch a
     // row already on the page, so they can omit them.
-    private Task NotifyTransferDocAsync(StockTransfer transfer, string? fromName = null, string? toName = null)
+    private async Task NotifyTransferDocAsync(StockTransfer transfer, string? fromName = null, string? toName = null)
     {
-        return notifier.NotifyDataChangeAsync("StockTransferDoc", new
+        var supplierNames = await db.StockTransferPurchaseInvoices
+            .Where(l => l.StockTransferId == transfer.Id)
+            .Select(l => l.PurchaseInvoice!.Supplier!.Name)
+            .Distinct().ToListAsync();
+        await notifier.NotifyDataChangeAsync("StockTransferDoc", new
         {
             id = transfer.Id,
             transferNumber = transfer.TransferNumber,
@@ -713,8 +731,38 @@ public class StockTransfersController(
             date = transfer.Date.ToString("yyyy-MM-dd"),
             dateText = transfer.Date.ToDateTimeText(transfer.CreatedAt),
             status = transfer.DisplayStatus,
-            lineCount = transfer.Items.Count(i => i.IsCurrent)
+            supplierName = string.Join(", ", supplierNames),
+            notes = transfer.Notes
         }, [transfer.FromWarehouseId, transfer.ToWarehouseId]);
+    }
+
+    // Keeps only purchase invoice ids that exist and that this user could have picked (posted and
+    // within their warehouses), plus ones already tagged on the transfer being edited.
+    private async Task<List<int>> AllowedPurchaseInvoiceIdsAsync(List<int>? requested, List<int> alreadyLinked)
+    {
+        var ids = (requested ?? []).Where(id => id > 0).Distinct().ToList();
+        if (ids.Count == 0) return ids;
+
+        var warehouseIds = User.GetWarehouseIds();
+        return await db.PurchaseInvoices
+            .Where(p => ids.Contains(p.Id)
+                && (alreadyLinked.Contains(p.Id)
+                    || (p.Status == DocumentStatus.Posted
+                        && (warehouseIds == null || warehouseIds.Contains(p.WarehouseId)))))
+            .Select(p => p.Id)
+            .ToListAsync();
+    }
+
+    private static void SyncPurchaseInvoiceLinks(StockTransfer transfer, List<int> invoiceIds)
+    {
+        foreach (var link in transfer.PurchaseInvoiceLinks.Where(l => !invoiceIds.Contains(l.PurchaseInvoiceId)).ToList())
+        {
+            transfer.PurchaseInvoiceLinks.Remove(link);
+        }
+        foreach (var invoiceId in invoiceIds.Where(id => transfer.PurchaseInvoiceLinks.All(l => l.PurchaseInvoiceId != id)))
+        {
+            transfer.PurchaseInvoiceLinks.Add(new StockTransferPurchaseInvoice { PurchaseInvoiceId = invoiceId });
+        }
     }
 
     // Both From and To Warehouse dropdowns always list every warehouse — including inactive ones,
@@ -722,13 +770,61 @@ public class StockTransfersController(
     // been deactivated — and regardless of the user's own assignment. This is deliberately unscoped
     // and unfiltered here, unlike every other warehouse-facing dropdown in the app. Stock shown in
     // the picker is FIFO-available (active batch) quantity, the figure a request is checked against.
-    private async Task PopulateDropdownsAsync()
+    // Posted purchase invoices this user may see (same warehouse scoping as the Purchase Invoices
+    // list), plus any already tagged on the transfer.
+    private IQueryable<PurchaseInvoice> VisibleInvoices(List<int> selectedIds)
+    {
+        var warehouseIds = User.GetWarehouseIds();
+        return db.PurchaseInvoices.Where(p => selectedIds.Contains(p.Id)
+            || (p.Status == DocumentStatus.Posted
+                && (warehouseIds == null || warehouseIds.Contains(p.WarehouseId))));
+    }
+
+    private async Task<List<InvoiceOption>> InvoiceOptionsAsync(int supplierId, List<int> selectedIds)
+    {
+        var rows = await VisibleInvoices(selectedIds)
+            .Where(p => p.SupplierId == supplierId)
+            .OrderByDescending(p => p.Date).ThenByDescending(p => p.Id)
+            .Select(p => new { p.Id, p.InvoiceNumber, p.Date, Warehouse = p.Warehouse!.Name })
+            .ToListAsync();
+        return rows.Select(p => new InvoiceOption(p.Id, $"{p.InvoiceNumber} — {p.Date:dd MMM yyyy} ({p.Warehouse})")).ToList();
+    }
+
+    private sealed record InvoiceOption(int Id, string Text);
+
+    // Feeds the cascading Purchase Invoices dropdown on Create/Edit.
+    [HttpGet]
+    public async Task<IActionResult> InvoicesBySupplier(int supplierId) =>
+        Json(await InvoiceOptionsAsync(supplierId, []));
+
+    private async Task PopulateDropdownsAsync(IReadOnlyCollection<int>? selectedInvoiceIds = null, int? supplierId = null)
     {
         var warehouses = await db.Warehouses.OrderBy(w => w.Name).ToListAsync();
         ViewData["Warehouses"] = new SelectList(warehouses, "Id", "Name");
 
+        // Purchase invoices offered as reference tags: posted ones the user may see (same warehouse
+        // scoping as the Purchase Invoices list), plus any already tagged on this transfer even if
+        // since cancelled, so an Edit never silently drops an existing tag. No amounts are shown.
+        var selectedIds = selectedInvoiceIds?.ToList() ?? [];
+        var visible = VisibleInvoices(selectedIds);
+
+        // Supplier dropdown drives the invoice dropdown (cascading). Fall back to the supplier of an
+        // already-tagged invoice so Edit and failed postbacks reopen with both filled in.
+        supplierId ??= selectedIds.Count == 0 ? null
+            : await db.PurchaseInvoices.Where(p => selectedIds.Contains(p.Id)).OrderBy(p => p.Id).Select(p => (int?)p.SupplierId).FirstOrDefaultAsync();
+        ViewData["SupplierId"] = supplierId;
+        var suppliers = await visible.Select(p => new { p.SupplierId, p.Supplier!.Name }).Distinct().OrderBy(s => s.Name).ToListAsync();
+        ViewData["Suppliers"] = new SelectList(suppliers, "SupplierId", "Name", supplierId);
+
+        var invoices = supplierId is null ? new List<InvoiceOption>() : await InvoiceOptionsAsync(supplierId.Value, selectedIds);
+        ViewData["PurchaseInvoices"] = new MultiSelectList(invoices, "Id", "Text", selectedIds);
+
+        // Any warehouse can be picked, but a restricted user only receives stock figures for their
+        // own warehouse(s); the page shows "—" (not a number) for any other source warehouse.
+        var userWarehouseIds = User.GetWarehouseIds();
+        ViewData["StockVisibleWarehouseIds"] = userWarehouseIds;
         var batchTotals = await db.ProductBatches
-            .Where(b => b.IsActive)
+            .Where(b => b.IsActive && (userWarehouseIds == null || userWarehouseIds.Contains(b.WarehouseId)))
             .GroupBy(b => new { b.ProductId, b.WarehouseId })
             .Select(g => new { g.Key.ProductId, g.Key.WarehouseId, Quantity = g.Sum(b => b.RemainingQuantity) })
             .ToListAsync();

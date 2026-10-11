@@ -3,6 +3,7 @@
     ViewData["Title"] = "Stock Valuation";
     var totalCostValue = Model.TotalCostValue;
     var totalSaleValue = Model.TotalSaleValue;
+    var showCost = User.CanSeePurchasePrice();
 }
 
 @if (Model.WarehouseScoped)
@@ -34,6 +35,8 @@
 </div>
 
 <div class="row mb-3">
+    @if (showCost)
+    {
     <div class="col-md-6">
         <div class="card">
             <div class="card-body">
@@ -42,6 +45,7 @@
             </div>
         </div>
     </div>
+    }
     <div class="col-md-6">
         <div class="card">
             <div class="card-body">
@@ -58,8 +62,12 @@
             <thead>
                 <tr>
                     <th>SKU</th><th>Product</th><th data-filter="select">Category</th>
-                    <th class="text-end">Stock</th><th class="text-end">Cost</th>
-                    <th class="text-end">Value at Cost</th><th class="text-end">Value at Sale Price</th>
+                    <th class="text-end">Stock</th>
+                    @if (showCost)
+                    {
+                        <th class="text-end">Cost</th><th class="text-end">Value at Cost</th>
+                    }
+                    <th class="text-end">Value at Sale Price</th>
                 </tr>
             </thead>
             <tbody>
@@ -70,8 +78,11 @@
                     <td>@r.ProductName</td>
                     <td>@r.CategoryName</td>
                     <td class="text-end">@r.Stock.ToString("0.##")</td>
-                    <td class="text-end">@r.CostPrice.ToString("C")</td>
-                    <td class="text-end">@r.ValueAtCost.ToString("C")</td>
+                    @if (showCost)
+                    {
+                        <td class="text-end">@r.CostPrice.ToString("C")</td>
+                        <td class="text-end">@r.ValueAtCost.ToString("C")</td>
+                    }
                     <td class="text-end">@r.ValueAtSalePrice.ToString("C")</td>
                 </tr>
             }

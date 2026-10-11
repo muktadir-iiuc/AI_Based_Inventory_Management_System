@@ -2,14 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using WebApplication1.Data;
 using WebApplication1.Models.Common;
+using WebApplication1.Services.Tenancy;
 
 namespace WebApplication1.Services;
 
 // The layout renders the company name on every single request, so the single settings row is
 // cached and only re-read after an admin saves a change.
-public class CompanySettingsService(ApplicationDbContext db, IMemoryCache cache) : ICompanySettingsService
+public class CompanySettingsService(ApplicationDbContext db, IMemoryCache cache, ITenantContext tenant) : ICompanySettingsService
 {
-    private const string CacheKey = "company-settings";
+    // One cached row per tenant.
+    private string CacheKey => $"company-settings:{tenant.TenantId}";
 
     public const string DefaultCompanyName = "Bangladesh Tyre";
     public const string DefaultShortName = "Bangladesh Tyre";

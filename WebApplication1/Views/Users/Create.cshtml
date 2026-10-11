@@ -37,6 +37,7 @@
                 <span asp-validation-for="WarehouseIds" class="text-danger small"></span>
                 <div class="form-text">Hold Ctrl (Cmd on Mac) to select multiple. This user's activity (invoices, stock) will be limited to the selected warehouse(s).</div>
             </div>
+            <partial name="_MenuAccess" model="Model.PermissionKeys" />
             <button type="submit" class="btn btn-primary">Save</button>
             <a asp-action="Index" class="btn btn-secondary">Cancel</a>
         </form>
@@ -48,13 +49,34 @@
         const unrestrictedRoles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(unrestrictedRoles));
         const roleSelect = document.getElementById('roleSelect');
         const warehouseGroup = document.getElementById('warehouseGroup');
+        const permissionGroup = document.getElementById('permissionGroup');
 
         function toggleWarehouse() {
             const selected = Array.from(roleSelect.selectedOptions).map(o => o.value);
-            warehouseGroup.classList.toggle('d-none', selected.some(r => unrestrictedRoles.includes(r)));
+            const unrestricted = selected.some(r => unrestrictedRoles.includes(r));
+            warehouseGroup.classList.toggle('d-none', unrestricted);
+            permissionGroup.classList.toggle('d-none', unrestricted);
         }
         roleSelect.addEventListener('change', toggleWarehouse);
         toggleWarehouse();
+
+        // Picking a role ticks that role's default pages (Purchase Officer -> Purchase Invoices,
+        // Sales Officer -> Sales Invoices). Only newly picked roles tick anything, and nothing is
+        // ever unticked, so a choice the admin already made is kept.
+        const roleDefaults = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Roles.All.ToDictionary(r => r, Permissions.DefaultsFor)));
+        let previousRoles = Array.from(roleSelect.selectedOptions).map(o => o.value);
+        function applyRoleDefaults() {
+            const selected = Array.from(roleSelect.selectedOptions).map(o => o.value);
+            selected.filter(r => !previousRoles.includes(r)).forEach(r => {
+                (roleDefaults[r] || []).forEach(key => {
+                    const box = permissionGroup.querySelector(`input[name="PermissionKeys"][value="${key}"]`);
+                    if (box) box.checked = true;
+                });
+            });
+            previousRoles = selected;
+        }
+        roleSelect.addEventListener('change', applyRoleDefaults);
+        if (typeof jQuery !== 'undefined') jQuery(roleSelect).on('select2:select select2:unselect', applyRoleDefaults);
     </script>
     <partial name="_ValidationScriptsPartial" />
 }

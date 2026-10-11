@@ -1,13 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Extensions;
+using WebApplication1.Models.Identity;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+[RequireFeature(Features.Reports)]
 public class ReportsController(ApplicationDbContext db, IForecastService forecastService) : Controller
 {
     public async Task<IActionResult> StockValuation(int? warehouseId)
@@ -40,6 +45,12 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         };
 
         var rows = await BuildStockValuationRowsAsync(effectiveIds);
+
+        // Sales Officers/Viewers get the sale-price valuation only; cost is zeroed before the view.
+        if (!User.CanSeePurchasePrice())
+        {
+            rows.ForEach(r => r.CostPrice = 0);
+        }
 
         vm.TotalCostValue = rows.Sum(r => r.ValueAtCost);
         vm.TotalSaleValue = rows.Sum(r => r.ValueAtSalePrice);
@@ -94,18 +105,41 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         }).ToList();
     }
 
-    public async Task<IActionResult> ReorderSuggestions()
+    // Filters: warehouse (a warehouse-restricted user can only pick their own; any other id yields
+    // nothing) and the forecast horizon in days, capped at the AI-suggested maximum — the longest
+    // horizon the model forecast accurately when backtested on that warehouse scope's own sales.
+    public async Task<IActionResult> ReorderSuggestions(int? warehouseId, int? days)
     {
         var warehouseIds = User.GetWarehouseIds();
-        var suggestions = await forecastService.GetReorderSuggestionsAsync(warehouseIds);
-        ViewData["ReorderCount"] = suggestions.Count(r => r.ShouldReorder);
-        return View(suggestions);
+
+        var warehouseQuery = db.Warehouses.Where(w => w.IsActive);
+        if (warehouseIds is not null)
+        {
+            warehouseQuery = warehouseQuery.Where(w => warehouseIds.Contains(w.Id));
+        }
+        var warehouses = await warehouseQuery.OrderBy(w => w.Name).ToListAsync();
+
+        var scope = warehouseIds;
+        if (warehouseId.HasValue)
+        {
+            scope = warehouseIds is null || warehouseIds.Contains(warehouseId.Value) ? [warehouseId.Value] : [];
+        }
+
+        var forecast = await forecastService.GetReorderSuggestionsAsync(scope, days);
+
+        return View(new ReorderSuggestionsViewModel
+        {
+            Forecast = forecast,
+            Warehouses = new SelectList(warehouses, "Id", "Name", warehouseId),
+            WarehouseId = warehouseId,
+            WarehouseScoped = warehouseIds is not null
+        });
     }
 
     // Invoice-wise sales history: one master row per posted invoice, with its batch-wise lines
     // (Qty / Unit Price / Total Price) as the expandable detail. Filters: customer and an inclusive
     // From/To date range. A warehouse-restricted user only ever sees invoices of their own warehouse(s).
-    public async Task<IActionResult> SalesHistory(int? customerId, DateTime? fromDate, DateTime? toDate)
+    public async Task<IActionResult> SalesHistory(int? customerId, int? productId, DateTime? fromDate, DateTime? toDate)
     {
         var warehouseIds = User.GetWarehouseIds();
 
@@ -125,6 +159,11 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         {
             query = query.Where(s => s.CustomerId == customerId);
         }
+        if (productId.HasValue)
+        {
+            // Only invoices that sold this product, and of those only this product's lines.
+            query = query.Where(s => s.Items.Any(i => i.IsCurrent && i.ProductId == productId));
+        }
         if (fromDate.HasValue)
         {
             var from = fromDate.Value.Date;
@@ -139,11 +178,14 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         var invoices = await query.OrderByDescending(s => s.Date).ThenByDescending(s => s.Id).ToListAsync();
 
         var customers = await db.Customers.OrderBy(c => c.Name).ToListAsync();
+        var products = await ProductOptionsAsync();
 
         var vm = new SalesHistoryViewModel
         {
             Customers = new SelectList(customers, "Id", "Name", customerId),
             CustomerId = customerId,
+            Products = new SelectList(products, "Id", "Label", productId),
+            ProductId = productId,
             FromDate = fromDate,
             ToDate = toDate,
             WarehouseScoped = warehouseIds is not null,
@@ -154,8 +196,13 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
                 Date = s.Date.WithTime(s.CreatedAt),
                 CustomerName = s.Customer?.Name ?? string.Empty,
                 WarehouseName = s.Warehouse?.Name ?? string.Empty,
-                Discount = s.DiscountAmount,
-                Lines = s.Items.OrderBy(i => i.Id).Select(i => new SalesHistoryLine
+                // With a product filter the row covers only that product's lines, so it carries only
+                // their share of the invoice discount (DiscountShare) — Total Price is then that
+                // product's net sales on the invoice.
+                Discount = productId.HasValue
+                    ? s.Items.Where(i => i.ProductId == productId).Sum(i => i.DiscountShare)
+                    : s.DiscountAmount,
+                Lines = s.Items.Where(i => productId == null || i.ProductId == productId).OrderBy(i => i.Id).Select(i => new SalesHistoryLine
                 {
                     Product = i.Product is null
                         ? string.Empty
@@ -171,13 +218,90 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         return View(vm);
     }
 
+    // Invoice-wise purchase history, the mirror of SalesHistory: one master row per posted purchase
+    // invoice with its batch lines (Qty / Unit Price / Total Price) as the expandable detail.
+    // Filters: supplier, product and an inclusive From/To date range. Purchase prices are cost data,
+    // so it is limited to the purchase-price viewers; warehouse-restricted users see only their own.
+    [Authorize(Roles = Roles.PurchasePriceViewers)]
+    public async Task<IActionResult> PurchaseHistory(int? supplierId, int? productId, DateTime? fromDate, DateTime? toDate)
+    {
+        var warehouseIds = User.GetWarehouseIds();
+
+        var query = db.PurchaseInvoices
+            .Include(p => p.Supplier)
+            .Include(p => p.Warehouse)
+            // IsCurrent: an edited invoice keeps its superseded lines, which must not be listed.
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Product)
+            .Include(p => p.Items.Where(i => i.IsCurrent)).ThenInclude(i => i.Batch)
+            .Where(p => p.Status == Models.Purchase.DocumentStatus.Posted);
+
+        if (warehouseIds is not null)
+        {
+            query = query.Where(p => warehouseIds.Contains(p.WarehouseId));
+        }
+        if (supplierId.HasValue)
+        {
+            query = query.Where(p => p.SupplierId == supplierId);
+        }
+        if (productId.HasValue)
+        {
+            query = query.Where(p => p.Items.Any(i => i.IsCurrent && i.ProductId == productId));
+        }
+        if (fromDate.HasValue)
+        {
+            var from = fromDate.Value.Date;
+            query = query.Where(p => p.Date >= from);
+        }
+        if (toDate.HasValue)
+        {
+            var toExclusive = toDate.Value.Date.AddDays(1);
+            query = query.Where(p => p.Date < toExclusive);
+        }
+
+        var invoices = await query.OrderByDescending(p => p.Date).ThenByDescending(p => p.Id).ToListAsync();
+
+        var suppliers = await db.Suppliers.OrderBy(s => s.Name).ToListAsync();
+        var products = await ProductOptionsAsync();
+
+        return View(new PurchaseHistoryViewModel
+        {
+            Suppliers = new SelectList(suppliers, "Id", "Name", supplierId),
+            SupplierId = supplierId,
+            Products = new SelectList(products, "Id", "Label", productId),
+            ProductId = productId,
+            FromDate = fromDate,
+            ToDate = toDate,
+            WarehouseScoped = warehouseIds is not null,
+            Invoices = invoices.Select(p => new PurchaseHistoryInvoice
+            {
+                Id = p.Id,
+                InvoiceNumber = p.InvoiceNumber,
+                Date = p.Date.WithTime(p.CreatedAt),
+                SupplierName = p.Supplier?.Name ?? string.Empty,
+                WarehouseName = p.Warehouse?.Name ?? string.Empty,
+                Lines = p.Items.Where(i => productId == null || i.ProductId == productId).OrderBy(i => i.Id).Select(i => new PurchaseHistoryLine
+                {
+                    Product = i.Product is null
+                        ? string.Empty
+                        : string.Join(" - ", new[] { i.Product.Sku, i.Product.Name, i.Product.Brand, i.Product.Size }
+                            .Where(v => !string.IsNullOrWhiteSpace(v))),
+                    BatchNumber = i.Batch?.BatchNumber,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            }).ToList()
+        });
+    }
+
     // One row per batch allocation actually sold — Unit Cost/Unit Sale Price are the exact
     // prices frozen on that SalesInvoiceItem at the time of sale (see §7: historical prices
     // never change because a batch's price changed later), so Profit here is always real.
     //
     // Filters: warehouse (a warehouse-restricted user can only ever see their own, so the picker
     // lists just those and any other id yields no rows) and an inclusive From/To date range.
-    public async Task<IActionResult> SalesProfitability(int? warehouseId, DateTime? fromDate, DateTime? toDate)
+    // Built entirely on unit costs, so hidden from Sales Officers and Viewers.
+    [Authorize(Roles = Roles.PurchasePriceViewers)]
+    public async Task<IActionResult> SalesProfitability(int? warehouseId, int? productId, DateTime? fromDate, DateTime? toDate)
     {
         var warehouseIds = User.GetWarehouseIds();
 
@@ -195,6 +319,10 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
         if (warehouseId.HasValue)
         {
             query = query.Where(i => i.SalesInvoice!.WarehouseId == warehouseId);
+        }
+        if (productId.HasValue)
+        {
+            query = query.Where(i => i.ProductId == productId);
         }
         if (fromDate.HasValue)
         {
@@ -235,6 +363,8 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
             WarehouseScoped = warehouseIds is not null,
             Warehouses = new SelectList(warehouses, "Id", "Name", warehouseId),
             WarehouseId = warehouseId,
+            Products = new SelectList(await ProductOptionsAsync(), "Id", "Label", productId),
+            ProductId = productId,
             FromDate = fromDate,
             ToDate = toDate,
             TotalSales = rows.Sum(r => r.SalesAmount),
@@ -245,4 +375,13 @@ public class ReportsController(ApplicationDbContext db, IForecastService forecas
 
         return View(vm);
     }
+
+    // Product picker for the report filters: "SKU - Name - Brand - Size", like the Sales History lines.
+    private async Task<List<ProductOption>> ProductOptionsAsync() =>
+        (await db.Products.OrderBy(p => p.Name).Select(p => new { p.Id, p.Sku, p.Name, p.Brand, p.Size }).ToListAsync())
+        .Select(p => new ProductOption(p.Id, string.Join(" - ", new[] { p.Sku, p.Name, p.Brand, p.Size }
+            .Where(v => !string.IsNullOrWhiteSpace(v)))))
+        .ToList();
+
+    private sealed record ProductOption(int Id, string Label);
 }

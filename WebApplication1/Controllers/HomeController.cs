@@ -49,11 +49,18 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
 
         if (warehouseIds is not null)
         {
-            var lowStock = await db.ProductWarehouseStocks
-                .Include(s => s.Product)
+            // Per assigned warehouse — never Product.CurrentStock, whose total includes other warehouses.
+            vm.LowStockProducts = await db.ProductWarehouseStocks
                 .Where(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= s.Product!.ReorderLevel)
                 .OrderBy(s => s.Quantity)
                 .Take(6)
+                .Select(s => new LowStockItem
+                {
+                    Name = s.Product!.Name,
+                    Sku = s.Product!.Sku,
+                    WarehouseName = warehouseIds.Count > 1 ? s.Warehouse!.Name : null,
+                    Quantity = s.Quantity
+                })
                 .ToListAsync();
 
             vm.LowStockCount = await db.ProductWarehouseStocks
@@ -62,7 +69,6 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
             vm.OutOfStockCount = await db.ProductWarehouseStocks
                 .Include(s => s.Product)
                 .CountAsync(s => warehouseIds.Contains(s.WarehouseId) && s.Product!.IsActive && s.Quantity <= 0);
-            vm.LowStockProducts = lowStock.Select(s => s.Product!).ToList();
             vm.StockValue = await db.ProductBatches
                 .Where(b => warehouseIds.Contains(b.WarehouseId) && b.IsActive && b.Product!.IsActive)
                 .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
@@ -74,7 +80,9 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
             vm.LowStockProducts = await db.Products
                 .Where(p => p.IsActive && p.CurrentStock <= p.ReorderLevel)
                 .OrderBy(p => p.CurrentStock)
-                .Take(6).ToListAsync();
+                .Take(6)
+                .Select(p => new LowStockItem { Name = p.Name, Sku = p.Sku, Quantity = p.CurrentStock })
+                .ToListAsync();
             vm.StockValue = await db.ProductBatches
                 .Where(b => b.IsActive && b.Product!.IsActive)
                 .SumAsync(b => (decimal?)(b.RemainingQuantity * b.PurchasePrice)) ?? 0;
@@ -86,8 +94,10 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
         {
             vm.CashBalance += await GetBalanceAsync(PaymentMethods.AccountCode(method), debitPositive: true);
         }
-        vm.AccountsReceivableBalance = await GetBalanceAsync(SystemAccountCodes.AccountsReceivable, debitPositive: true);
-        vm.AccountsPayableBalance = await GetBalanceAsync(SystemAccountCodes.AccountsPayable, debitPositive: false);
+        // Receivables are Customer Ledger data (not for Purchase Officers); payables are Supplier
+        // Ledger data (not for Sales Officers/Viewers).
+        vm.AccountsReceivableBalance = User.CanSeeCustomerLedger() ? await GetBalanceAsync(SystemAccountCodes.AccountsReceivable, debitPositive: true) : 0;
+        vm.AccountsPayableBalance = User.CanSeeSupplierLedger() ? await GetBalanceAsync(SystemAccountCodes.AccountsPayable, debitPositive: false) : 0;
 
         vm.ThisMonthSalesTotal = await db.SalesInvoiceItems
             .Where(i => i.SalesInvoice!.Date >= thisMonthStart && (warehouseIds == null || warehouseIds.Contains(i.SalesInvoice!.WarehouseId)))
@@ -159,6 +169,19 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
             vm.PurchaseTrend.Add(purchasesByDay.GetValueOrDefault(day, 0));
         }
 
+        // Sales Officers and Viewers never see purchase/cost figures: purchase totals, recent
+        // purchase invoices, and stock valued at batch cost are blanked before reaching the page.
+        if (!User.CanSeePurchasePrice())
+        {
+            vm.TodayPurchasesTotal = 0;
+            vm.ThisMonthPurchasesTotal = 0;
+            vm.LastMonthPurchasesTotal = 0;
+            vm.PurchaseTrend = vm.PurchaseTrend.Select(_ => 0m).ToList();
+            vm.RecentPurchaseInvoices = [];
+            vm.StockValue = 0;
+            vm.CategoryBreakdown = [];
+        }
+
         return View(vm);
     }
 
@@ -202,7 +225,7 @@ public class HomeController(ApplicationDbContext db, IProductPriceService priceS
             pendingPriceReviewCount = await priceService.GetPendingMonthlyReviewCountAsync();
         }
 
-        return Json(new { lowStockCount, outOfStockCount, stockValue, pendingPriceReviewCount });
+        return Json(new { lowStockCount, outOfStockCount, stockValue = User.CanSeePurchasePrice() ? stockValue : (decimal?)null, pendingPriceReviewCount });
     }
 
     private async Task<decimal> GetBalanceAsync(string accountCode, bool debitPositive)

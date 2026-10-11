@@ -25,9 +25,13 @@ public class Product : BaseEntity
     [Display(Name = "Product Size")]
     public string? Size { get; set; }
 
+    [Display(Name = "Product Category")]
+
     public int CategoryId { get; set; }
+    
     public Category? Category { get; set; }
 
+    [Display(Name = "Unit of Measure")]
     public int UnitOfMeasureId { get; set; }
     public UnitOfMeasure? UnitOfMeasure { get; set; }
 
@@ -40,7 +44,7 @@ public class Product : BaseEntity
     [Column(TypeName = "decimal(18,2)")]
     public decimal CurrentStock { get; set; }
 
-    [Column(TypeName = "decimal(18,2)")]
+    [Display(Name = "Reorder Level"), Column(TypeName = "decimal(18,2)")]
     public decimal ReorderLevel { get; set; } = 10;
 
     public ICollection<StockTransaction> StockTransactions { get; set; } = [];

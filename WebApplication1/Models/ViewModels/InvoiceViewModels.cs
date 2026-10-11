@@ -4,10 +4,10 @@ namespace WebApplication1.Models.ViewModels;
 
 public class PurchaseInvoiceCreateViewModel
 {
-    [Required(ErrorMessage = "Please select a supplier.")]
+    [Display(Name = "Supplier"), Required(ErrorMessage = "Please select a supplier.")]
     public int SupplierId { get; set; }
 
-    [Required(ErrorMessage = "Please select a warehouse.")]
+    [Display(Name = "Warehouse"), Required(ErrorMessage = "Please select a warehouse.")]
     public int WarehouseId { get; set; }
 
     [DataType(DataType.Date)]
@@ -102,6 +102,12 @@ public class StockTransferCreateViewModel
     public DateTime Date { get; set; } = DateTime.UtcNow.Date;
 
     public string? Notes { get; set; }
+
+    // Not stored: only narrows the Purchase Invoices dropdown (the supplier is derived from the tagged invoices).
+    public int? SupplierId { get; set; }
+
+    // Reference-only purchase invoice tags, saved alongside Notes.
+    public List<int>? PurchaseInvoiceIds { get; set; } = [];
 
     public List<TransferLineInput> Items { get; set; } = [];
 }

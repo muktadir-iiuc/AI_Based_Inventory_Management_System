@@ -10,6 +10,31 @@
     "Password": "",
     "FromAddress": ""
   },
+  "Database": {
+    "AutoMigrate": true
+  },
+  "Seed": {
+    "DemoData": false
+  },
+  "RateLimits": {
+    "LoginPerFiveMinutes": 15
+  },
+  "Hosting": {
+    "KnownProxies": ""
+  },
+  "Platform": {
+    "AdminEmail": "",
+    "AdminPassword": "",
+    "AdminName": "Platform Administrator"
+  },
+  "Payments": {
+    "PublicBaseUrl": "https://your-public-domain.example",
+    "SslCommerz": {
+      "StoreId": "",
+      "StorePassword": "",
+      "Sandbox": true
+    }
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",

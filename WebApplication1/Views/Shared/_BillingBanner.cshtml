@@ -1,0 +1,16 @@
+@inject WebApplication1.Services.Saas.IBillingNoticeService BillingNotices
+@{
+    var bannerTenantId = User.GetTenantId();
+    var notice = bannerTenantId > 0 ? await BillingNotices.GetAsync(bannerTenantId) : null;
+}
+@if (notice is not null)
+{
+    <div class="alert alert-@notice.Level d-flex flex-wrap align-items-center gap-2" role="alert">
+        <i class="fas fa-circle-info"></i>
+        <span class="flex-grow-1">@notice.Message</span>
+        @if (User.IsInRole(Roles.Admin))
+        {
+            <a asp-controller="Billing" asp-action="Index" class="btn btn-sm btn-outline-@notice.Level">Billing</a>
+        }
+    </div>
+}

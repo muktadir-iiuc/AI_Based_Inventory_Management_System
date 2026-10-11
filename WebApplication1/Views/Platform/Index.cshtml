@@ -1,0 +1,102 @@
+@using WebApplication1.Services.Saas
+@model PlatformDashboard
+@{
+    ViewData["Title"] = "Platform dashboard";
+    string Money(decimal v) => v.ToString("#,0.00") + " " + Model.Currency;
+}
+
+@section Toolbar {
+    <a href="/Platform/Tenants/Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New tenant</a>
+}
+
+<div class="row g-3 mb-3">
+    @{
+        void Stat(string label, string value, string icon, string color, string? href = null)
+        {
+            <div class="col-6 col-md-4 col-xl-3">
+                <a href="@(href ?? "#")" class="text-decoration-none text-reset">
+                    <div class="card h-100"><div class="card-body d-flex align-items-center gap-3">
+                        <span class="fs-3 text-@color"><i class="fas @icon"></i></span>
+                        <div><div class="fs-4 fw-semibold lh-1">@value</div><small class="text-muted">@label</small></div>
+                    </div></div>
+                </a>
+            </div>
+        }
+    }
+    @{ Stat("Registered tenants", Model.TotalTenants.ToString(), "fa-building", "primary", "/Platform/Tenants"); }
+    @{ Stat("Active tenants", Model.ActiveTenants.ToString(), "fa-circle-check", "success", "/Platform/Tenants?status=Active"); }
+    @{ Stat("On trial", Model.TrialTenants.ToString(), "fa-hourglass-half", "info", "/Platform/Subscriptions?status=Trialing"); }
+    @{ Stat("Suspended", Model.SuspendedTenants.ToString(), "fa-pause-circle", "danger", "/Platform/Tenants?status=Suspended"); }
+    @{ Stat("Disabled", Model.DisabledTenants.ToString(), "fa-ban", "secondary", "/Platform/Tenants?status=Disabled"); }
+    @{ Stat("Expired subscriptions", Model.ExpiredSubscriptions.ToString(), "fa-calendar-xmark", "warning", "/Platform/Subscriptions?status=Expired"); }
+    @{ Stat("Tenants with overdue invoices", Model.TenantsWithOverdueInvoices.ToString(), "fa-triangle-exclamation", "danger", "/Platform/Invoices?status=Overdue"); }
+    @{ Stat("Terminated", Model.TerminatedTenants.ToString(), "fa-trash-can", "secondary", "/Platform/Tenants?status=Terminated"); }
+    @{ Stat("MRR", Money(Model.Mrr), "fa-arrow-trend-up", "success"); }
+    @{ Stat("ARR", Money(Model.Arr), "fa-chart-line", "success"); }
+    @{ Stat("Collected this month", Money(Model.CollectedThisMonth), "fa-money-bill-wave", "primary", "/Platform/Payments"); }
+    @{ Stat("Unpaid (" + Model.UnpaidInvoices + " invoices)", Money(Model.UnpaidAmount), "fa-file-invoice-dollar", "warning", "/Platform/Invoices?status=Pending"); }
+    @{ Stat("Paid invoices", Model.PaidInvoices.ToString(), "fa-receipt", "success", "/Platform/Invoices?status=Paid"); }
+    @{ Stat("Failed payments (30 days)", Model.FailedPayments30d.ToString(), "fa-circle-xmark", "danger", "/Platform/Payments?tab=attempts&status=Failed"); }
+    @{ Stat("Pending / in review", Model.PendingPayments.ToString(), "fa-clock", "warning", "/Platform/Payments?tab=awaiting"); }
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title mb-0">Renewals in the next 7 days</h3></div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Tenant</th><th>Plan</th><th>Renews</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.UpcomingRenewals)
+                    {
+                        <tr><td><a href="/Platform/Tenants/@r.TenantId">@r.TenantName</a></td><td>@r.PlanName</td><td>@r.When.ToLocalTime().ToString("dd MMM yyyy")</td><td class="text-end">@r.Amount.ToString("0.00") @r.Currency</td></tr>
+                    }
+                    @if (Model.UpcomingRenewals.Count == 0) { <tr><td colspan="4" class="text-muted text-center p-3">None.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header"><h3 class="card-title mb-0">Trials ending in the next 7 days</h3></div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Tenant</th><th>Plan</th><th>Ends</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.UpcomingTrialExpirations)
+                    {
+                        <tr><td><a href="/Platform/Tenants/@r.TenantId">@r.TenantName</a></td><td>@r.PlanName</td><td>@r.When.ToLocalTime().ToString("dd MMM yyyy hh:mm tt")</td></tr>
+                    }
+                    @if (Model.UpcomingTrialExpirations.Count == 0) { <tr><td colspan="3" class="text-muted text-center p-3">None.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Recent platform activity</h3>
+                <a href="/Platform/AuditLogs" class="btn btn-sm btn-outline-secondary">All logs</a>
+            </div>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead><tr><th>Time</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
+                    <tbody>
+                    @foreach (var a in Model.RecentActivity)
+                    {
+                        <tr class="@(a.Result == "Success" ? "" : "table-warning")">
+                            <td class="text-nowrap">@a.At.ToLocalTime().ToString("dd MMM hh:mm tt")</td>
+                            <td>@a.ActorName</td>
+                            <td>@a.Action</td>
+                            <td class="small">@a.Details</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

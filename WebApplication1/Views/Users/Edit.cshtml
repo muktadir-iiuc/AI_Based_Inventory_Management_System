@@ -32,6 +32,7 @@
                 <span asp-validation-for="WarehouseIds" class="text-danger small"></span>
                 <div class="form-text">Hold Ctrl (Cmd on Mac) to select multiple. This user's activity (invoices, stock) will be limited to the selected warehouse(s).</div>
             </div>
+            <partial name="_MenuAccess" model="Model.PermissionKeys" />
             <div class="form-check mb-3">
                 <input asp-for="IsActive" class="form-check-input" />
                 <label asp-for="IsActive" class="form-check-label"></label>
@@ -47,10 +48,13 @@
         const unrestrictedRoles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(unrestrictedRoles));
         const roleSelect = document.getElementById('roleSelect');
         const warehouseGroup = document.getElementById('warehouseGroup');
+        const permissionGroup = document.getElementById('permissionGroup');
 
         function toggleWarehouse() {
             const selected = Array.from(roleSelect.selectedOptions).map(o => o.value);
-            warehouseGroup.classList.toggle('d-none', selected.some(r => unrestrictedRoles.includes(r)));
+            const unrestricted = selected.some(r => unrestrictedRoles.includes(r));
+            warehouseGroup.classList.toggle('d-none', unrestricted);
+            permissionGroup.classList.toggle('d-none', unrestricted);
         }
         roleSelect.addEventListener('change', toggleWarehouse);
         toggleWarehouse();

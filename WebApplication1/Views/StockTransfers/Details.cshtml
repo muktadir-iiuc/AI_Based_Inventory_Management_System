@@ -6,6 +6,8 @@
     var available = (Dictionary<int, decimal>)ViewData["Available"]!;
     var isPending = Model.ApprovalStatus == StockTransferApprovalStatus.Pending;
     var isPosted = Model.ApprovalStatus == StockTransferApprovalStatus.Approved && Model.Status == DocumentStatus.Posted;
+    // Source stock only for users assigned to the source warehouse (and Admin/Manager).
+    var showStock = isPending && ViewData["ShowSourceStock"] is true;
 }
 
 @section Toolbar {
@@ -53,6 +55,13 @@
                         <dt class="col-5">@(Model.ApprovalStatus == StockTransferApprovalStatus.Rejected ? "Rejection reason" : "Review note")</dt><dd class="col-7">@Model.ReviewNote</dd>
                     }
                     <dt class="col-5">Notes</dt><dd class="col-7">@Model.Notes</dd>
+                    <dt class="col-5">Purchase Invoices</dt>
+                    <dd class="col-7">
+                        @foreach (var link in Model.PurchaseInvoiceLinks.Where(l => l.PurchaseInvoice != null).OrderBy(l => l.PurchaseInvoice!.InvoiceNumber))
+                        {
+                            <a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@link.PurchaseInvoiceId" class="badge text-bg-light border me-1 text-decoration-none">@link.PurchaseInvoice!.InvoiceNumber</a>
+                        }
+                    </dd>
                 </dl>
             </div>
             <div class="card-footer">
@@ -96,22 +105,22 @@
             <div class="card-header"><h3 class="card-title">Line Items</h3></div>
             <div class="card-body p-0 table-responsive-card">
                 <table class="table table-striped mb-0">
-                    <thead><tr><th>Product</th><th class="text-end">Qty</th>@if (isPending) { <th class="text-end">Available at Source Now</th> }</tr></thead>
+                    <thead><tr><th>Product</th><th class="text-end">Qty</th>@if (showStock) { <th class="text-end">Available at Source Now</th> }</tr></thead>
                     <tbody>
                     @foreach (var item in Model.Items)
                     {
                         var stock = available.GetValueOrDefault(item.ProductId);
-                        var short_ = isPending && item.Quantity > stock;
+                        var short_ = showStock && item.Quantity > stock;
                         <tr class="@(short_ ? "table-danger" : "")">
                             <td>@string.Join(" - ", new[] { item.Product?.Name, item.Product?.Brand, item.Product?.Size }.Where(v => !string.IsNullOrWhiteSpace(v))) <small class="text-muted">(@item.Product?.Sku)</small></td>
                             <td class="text-end">@item.Quantity.ToString("0.##")</td>
-                            @if (isPending) { <td class="text-end @(short_ ? "fw-semibold text-danger" : "")">@stock.ToString("0.##")</td> }
+                            @if (showStock) { <td class="text-end @(short_ ? "fw-semibold text-danger" : "")">@stock.ToString("0.##")</td> }
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
-            @if (isPending && Model.Items.Any(i => i.Quantity > available.GetValueOrDefault(i.ProductId)))
+            @if (showStock && Model.Items.Any(i => i.Quantity > available.GetValueOrDefault(i.ProductId)))
             {
                 <div class="card-footer">
                     <div class="text-danger small"><i class="fas fa-triangle-exclamation"></i> Some lines now exceed the source stock, so this request can no longer be approved as filed — reject it.</div>

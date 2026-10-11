@@ -28,7 +28,7 @@ public class DashboardViewModel
 
     public List<Sales.SalesInvoice> RecentSalesInvoices { get; set; } = [];
     public List<Purchase.PurchaseInvoice> RecentPurchaseInvoices { get; set; } = [];
-    public List<Inventory.Product> LowStockProducts { get; set; } = [];
+    public List<LowStockItem> LowStockProducts { get; set; } = [];
     public List<TopProductStat> TopProducts { get; set; } = [];
     public List<NamedValueStat> TopCustomers { get; set; } = [];
     public List<NamedValueStat> CategoryBreakdown { get; set; } = [];
@@ -51,4 +51,14 @@ public class NamedValueStat
 {
     public string Name { get; set; } = string.Empty;
     public decimal Value { get; set; }
+}
+
+/// <summary>A dashboard Low Stock row. Quantity is the user's own warehouse stock when they are
+/// warehouse-restricted (never another warehouse's); otherwise the all-warehouse total.</summary>
+public class LowStockItem
+{
+    public string Name { get; set; } = string.Empty;
+    public string Sku { get; set; } = string.Empty;
+    public string? WarehouseName { get; set; }
+    public decimal Quantity { get; set; }
 }

@@ -1,7 +1,7 @@
 @model SalesProfitabilityViewModel
 @{
     ViewData["Title"] = "Sales Profitability";
-    var hasFilters = Model.WarehouseId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
+    var hasFilters = Model.WarehouseId.HasValue || Model.ProductId.HasValue || Model.FromDate.HasValue || Model.ToDate.HasValue;
 }
 
 @if (Model.WarehouseScoped)
@@ -19,6 +19,12 @@
                 <label class="form-label small text-muted mb-1">Warehouse</label>
                 <select name="warehouseId" asp-items="Model.Warehouses" class="form-select form-select-sm" style="min-width: 220px;">
                     <option value="">@(Model.WarehouseScoped ? "All my warehouses" : "All warehouses")</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Product</label>
+                <select name="productId" asp-items="Model.Products" class="form-select form-select-sm" style="min-width: 260px;">
+                    <option value="">All products</option>
                 </select>
             </div>
             <div class="col-auto">

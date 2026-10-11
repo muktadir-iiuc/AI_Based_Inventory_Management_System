@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models.Identity;
 using WebApplication1.Models.Inventory;
+using WebApplication1.Services.Tenancy;
 
 namespace WebApplication1.Services;
 
@@ -11,7 +12,8 @@ public class ProductPriceService(
     UserManager<ApplicationUser> userManager,
     IEmailService emailService,
     ICompanySettingsService companySettings,
-    ILogger<ProductPriceService> logger) : IProductPriceService
+    ILogger<ProductPriceService> logger,
+    ITenantContext? tenant = null) : IProductPriceService
 {
     public ProductPriceHistory? ApplySalePriceChange(Product product, decimal newPrice, string changedByUserId)
     {
@@ -64,7 +66,10 @@ public class ProductPriceService(
     public async Task NotifyManagersOfPriceChangeAsync(Product product, ProductPriceHistory change, string changedByName)
     {
         var managers = await userManager.GetUsersInRoleAsync(Roles.Manager);
-        var recipients = managers.Where(m => !string.IsNullOrWhiteSpace(m.Email)).ToList();
+        // Roles are global, so GetUsersInRoleAsync returns every tenant's managers: only this tenant's may be told.
+        var recipients = managers
+            .Where(m => !string.IsNullOrWhiteSpace(m.Email) && (tenant is null || m.TenantId == tenant.TenantId))
+            .ToList();
         if (recipients.Count == 0)
         {
             return;

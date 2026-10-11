@@ -1,48 +1,111 @@
-@model HashSet<string>
+@model PagePermissionsViewModel
 @{
-    ViewData["Title"] = "Role Permissions";
-    var roles = (string[])ViewData["Roles"]!;
-    var permissions = ((string Key, string Label, string Description)[])ViewData["Permissions"]!;
+    ViewData["Title"] = "Page Permissions";
 }
 
 <div class="alert alert-info">
     <i class="fas fa-shield-halved me-1"></i>
-    Admin and Manager always have full access. Use this page to grant extra, specific capabilities to the other roles
-    without making them a Manager.
+    Choose which pages each user can see. A page that isn't ticked is hidden from that user's menu and blocked if they open it directly.
+    Admin and Manager always see every page, so they aren't listed. New Purchase Officers start with Purchase Invoices and new Sales Officers
+    with Sales Invoices ticked. Purchase Invoices can't be given to Sales Officers or Viewers (<i class="fas fa-lock"></i>), since purchase
+    prices are never shown to them. Changes apply straight away; the user doesn't need to sign in again.
 </div>
 
 <div class="card">
-    <div class="card-body">
-        <form asp-action="Save" method="post">
-            <div class="table-responsive-card">
-                <table class="table table-bordered align-middle">
-                    <thead>
-                        <tr>
-                            <th>Role</th>
-                            @foreach (var p in permissions)
-                            {
-                                <th class="text-center" title="@p.Description">@p.Label</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var role in roles)
-                    {
-                        <tr>
-                            <td class="fw-bold">@role</td>
-                            @foreach (var p in permissions)
-                            {
-                                var key = $"{role}|{p.Key}";
-                                <td class="text-center">
-                                    <input type="checkbox" class="form-check-input" name="grants" value="@key" checked="@Model.Contains(key)" />
-                                </td>
-                            }
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Permissions</button>
-        </form>
+    <div class="card-header">
+        <input type="search" id="userFilter" class="form-control form-control-sm" style="max-width: 320px" placeholder="Search by name, email, role or warehouse..." />
     </div>
+    <form asp-action="Save" method="post">
+        @* Not a DataTable on purpose: paging would drop the other pages' checkboxes from the post,
+           and Save treats a missing checkbox as "remove access". The search only hides rows. *@
+        <div class="card-body p-0 table-responsive-card">
+            <table class="table table-bordered table-hover align-middle mb-0" id="permissionTable">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role(s)</th>
+                        <th>Warehouse(s)</th>
+                        @foreach (var p in Model.Permissions)
+                        {
+                            <th class="text-center" title="@p.Description">
+                                @p.Label
+                                <div class="form-check d-flex justify-content-center mt-1 mb-0">
+                                    <input type="checkbox" class="form-check-input column-toggle" data-key="@p.Key" title="Tick / untick for every listed user" />
+                                </div>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var u in Model.Users)
+                {
+                    <tr class="user-row">
+                        <td>
+                            <div class="fw-semibold">@u.FullName</div>
+                            <div class="small text-muted">@u.Email</div>
+                        </td>
+                        <td>@string.Join(", ", u.Roles)</td>
+                        <td>@(u.Warehouses.Count == 0 ? "—" : string.Join(", ", u.Warehouses))</td>
+                        @foreach (var p in Model.Permissions)
+                        {
+                            var key = $"{u.Id}|{p.Key}";
+                            <td class="text-center">
+                                @if (Permissions.IsGrantable(p.Key, u.Roles))
+                                {
+                                    <input type="checkbox" class="form-check-input grant" name="grants" value="@key" data-key="@p.Key"
+                                           checked="@Model.Granted.Contains(key)" aria-label="@p.Label for @u.FullName" />
+                                }
+                                else
+                                {
+                                    <i class="fas fa-lock text-muted" title="Not available: this user's role can't see purchase prices"></i>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+                @if (Model.Users.Count == 0)
+                {
+                    <tr><td colspan="@(3 + Model.Permissions.Length)" class="text-center text-muted py-3">No active users other than Admins and Managers.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Permissions</button>
+        </div>
+    </form>
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const table = document.getElementById('permissionTable');
+            const rows = Array.from(table.querySelectorAll('tbody tr.user-row'));
+            const visibleRows = () => rows.filter(r => !r.classList.contains('d-none'));
+
+            // Header checkbox reflects its column (for the rows currently shown) and ticks/unticks it.
+            function syncToggles() {
+                table.querySelectorAll('.column-toggle').forEach(t => {
+                    const boxes = visibleRows().map(r => r.querySelector(`.grant[data-key="${t.dataset.key}"]`)).filter(Boolean);
+                    const checked = boxes.filter(b => b.checked).length;
+                    t.checked = boxes.length > 0 && checked === boxes.length;
+                    t.indeterminate = checked > 0 && checked < boxes.length;
+                });
+            }
+
+            table.querySelectorAll('.column-toggle').forEach(t => t.addEventListener('change', () => {
+                visibleRows().forEach(r => { const b = r.querySelector(`.grant[data-key="${t.dataset.key}"]`); if (b) b.checked = t.checked; });
+                syncToggles();
+            }));
+            table.addEventListener('change', e => { if (e.target.classList.contains('grant')) syncToggles(); });
+
+            document.getElementById('userFilter').addEventListener('input', e => {
+                const term = e.target.value.trim().toLowerCase();
+                rows.forEach(r => r.classList.toggle('d-none', term !== '' && !r.textContent.toLowerCase().includes(term)));
+                syncToggles();
+            });
+
+            syncToggles();
+        })();
+    </script>
+}

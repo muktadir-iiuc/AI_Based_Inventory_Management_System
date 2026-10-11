@@ -158,12 +158,17 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Code")
                         .IsUnique();
 
                     b.ToTable("Accounts");
@@ -203,9 +208,14 @@ namespace WebApplication1.Migrations
                     b.Property<string>("SourceReference")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("EntryNumber")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EntryNumber")
                         .IsUnique();
 
                     b.ToTable("JournalEntries");
@@ -234,11 +244,16 @@ namespace WebApplication1.Migrations
                     b.Property<string>("Memo")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
 
                     b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("JournalEntryLines");
                 });
@@ -273,6 +288,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("Direction")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsDiscount")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
@@ -292,6 +310,9 @@ namespace WebApplication1.Migrations
                     b.Property<int?>("SupplierId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
@@ -301,6 +322,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("SalesInvoiceId");
 
                     b.HasIndex("SupplierId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Payments");
                 });
@@ -388,7 +411,12 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("CompanySettings");
                 });
@@ -514,6 +542,9 @@ namespace WebApplication1.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -531,8 +562,14 @@ namespace WebApplication1.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
@@ -550,6 +587,8 @@ namespace WebApplication1.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex")
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -578,6 +617,35 @@ namespace WebApplication1.Migrations
                     b.ToTable("RolePermissions");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Identity.UserPermission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("PermissionKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId", "PermissionKey")
+                        .IsUnique();
+
+                    b.ToTable("UserPermissions");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Identity.UserWarehouse", b =>
                 {
                     b.Property<string>("UserId")
@@ -586,7 +654,12 @@ namespace WebApplication1.Migrations
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("UserId", "WarehouseId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
 
@@ -619,7 +692,12 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Categories");
                 });
@@ -678,6 +756,9 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("UnitOfMeasureId")
                         .HasColumnType("int");
 
@@ -685,10 +766,12 @@ namespace WebApplication1.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("Sku")
-                        .IsUnique();
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UnitOfMeasureId");
+
+                    b.HasIndex("TenantId", "Sku")
+                        .IsUnique();
 
                     b.ToTable("Products");
                 });
@@ -745,6 +828,9 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("SalePrice")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
@@ -757,6 +843,8 @@ namespace WebApplication1.Migrations
                         .HasFilter("[PurchaseInvoiceItemId] IS NOT NULL");
 
                     b.HasIndex("RemainingQuantity");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId", "ProductId", "PurchaseDate");
 
@@ -787,9 +875,14 @@ namespace WebApplication1.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("ProductId", "ChangedAt");
 
@@ -810,10 +903,15 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
 
@@ -865,15 +963,20 @@ namespace WebApplication1.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdjustmentNumber")
-                        .IsUnique();
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
+
+                    b.HasIndex("TenantId", "AdjustmentNumber")
+                        .IsUnique();
 
                     b.ToTable("StockAdjustments");
                 });
@@ -904,6 +1007,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("StockAdjustmentId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("UnitCost")
                         .HasColumnType("decimal(18,2)");
 
@@ -912,6 +1018,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("StockAdjustmentId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("StockAdjustmentItems");
                 });
@@ -946,6 +1054,9 @@ namespace WebApplication1.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
@@ -963,6 +1074,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("BatchId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
 
@@ -1013,6 +1126,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("ToWarehouseId")
                         .HasColumnType("int");
 
@@ -1024,9 +1140,11 @@ namespace WebApplication1.Migrations
 
                     b.HasIndex("FromWarehouseId");
 
+                    b.HasIndex("TenantId");
+
                     b.HasIndex("ToWarehouseId");
 
-                    b.HasIndex("TransferNumber")
+                    b.HasIndex("TenantId", "TransferNumber")
                         .IsUnique();
 
                     b.ToTable("StockTransfers");
@@ -1052,13 +1170,38 @@ namespace WebApplication1.Migrations
                     b.Property<int>("StockTransferId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
 
                     b.HasIndex("StockTransferId");
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("StockTransferItems");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Inventory.StockTransferPurchaseInvoice", b =>
+                {
+                    b.Property<int>("StockTransferId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PurchaseInvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("StockTransferId", "PurchaseInvoiceId");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("StockTransferPurchaseInvoices");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.UnitOfMeasure", b =>
@@ -1088,7 +1231,12 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("UnitOfMeasures");
                 });
@@ -1124,9 +1272,14 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Code")
                         .IsUnique();
 
                     b.ToTable("Warehouses");
@@ -1158,6 +1311,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("PettyCashNameId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Type")
                         .HasColumnType("int");
 
@@ -1169,6 +1325,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("Date");
 
                     b.HasIndex("PettyCashNameId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
 
@@ -1197,9 +1355,14 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Name")
                         .IsUnique();
 
                     b.ToTable("PettyCashNames");
@@ -1235,17 +1398,22 @@ namespace WebApplication1.Migrations
                     b.Property<int>("SupplierId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InvoiceNumber")
-                        .IsUnique();
-
                     b.HasIndex("SupplierId");
 
+                    b.HasIndex("TenantId");
+
                     b.HasIndex("WarehouseId");
+
+                    b.HasIndex("TenantId", "InvoiceNumber")
+                        .IsUnique();
 
                     b.ToTable("PurchaseInvoices");
                 });
@@ -1273,6 +1441,9 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("SalePrice")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
 
@@ -1281,6 +1452,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("PurchaseInvoiceItems");
                 });
@@ -1312,11 +1485,16 @@ namespace WebApplication1.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PurchaseInvoiceId");
 
-                    b.HasIndex("ReturnNumber")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "ReturnNumber")
                         .IsUnique();
 
                     b.ToTable("PurchaseReturns");
@@ -1339,6 +1517,9 @@ namespace WebApplication1.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("UnitCost")
                         .HasColumnType("decimal(18,2)");
 
@@ -1347,6 +1528,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("PurchaseInvoiceItemId");
 
                     b.HasIndex("PurchaseReturnId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("PurchaseReturnItems");
                 });
@@ -1395,9 +1578,1093 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("Suppliers");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.DataAgreementAcceptance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AcceptedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AcceptedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("AcceptedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Context")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("SubscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Version");
+
+                    b.ToTable("DataAgreementAcceptances");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.DataExportRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AgreementVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("DownloadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProcessedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("RequestedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<long>("RowCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TableCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId", "RequestedAt");
+
+                    b.ToTable("DataExportRequests");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PaymentAttempt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("GatewayUrl")
+                        .HasMaxLength(600)
+                        .HasColumnType("nvarchar(600)");
+
+                    b.Property<string>("InitiatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<DateTime?>("LastCheckedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ProviderValId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("SavedPaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SessionKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("PaymentAttempts");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PaymentProviderConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SupportedMethods")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("PaymentProviders");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PaymentWebhookEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AttemptReference")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Payload")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("ReceiveCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReportedStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<bool?>("SignatureValid")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "EventKey")
+                        .IsUnique();
+
+                    b.ToTable("PaymentWebhookEvents");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PlanFeature", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FeatureKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int>("PlanId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId", "FeatureKey")
+                        .IsUnique();
+
+                    b.ToTable("PlanFeatures");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PlatformSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("PlatformSettings");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasAuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "At");
+
+                    b.ToTable("SaasAuditLogs");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasInvoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("AppliedToSubscription")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("BillToAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("BillToEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("BillToName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("BillToTaxId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<decimal>("DiscountTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PlanId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RemindersSent")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("SubscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TaxTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SubscriptionId", "PeriodStart")
+                        .IsUnique()
+                        .HasFilter("[Status] <> 5 AND [SubscriptionId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("SaasInvoices");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasInvoiceItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ItemType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.ToTable("SaasInvoiceItems");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ToEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "Channel");
+
+                    b.HasIndex("TenantId", "DedupeKey", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("SaasNotifications");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasPayment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsReconciled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ReceiptNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RecordedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("RefundedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("Provider", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+                    b.ToTable("SaasPayments");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasRefund", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderRefundRef")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RefundTransId")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("RefundTransId")
+                        .IsUnique()
+                        .HasFilter("[RefundTransId] IS NOT NULL");
+
+                    b.ToTable("SaasRefunds");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SubscriptionHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Actor")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("PlanId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SubscriptionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ToStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("SubscriptionHistories");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SubscriptionPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AutoRenew")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("AvailableFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("AvailableTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("GraceDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IntervalCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IntervalUnit")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("MaxProducts")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxStorageMb")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxUsers")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxWarehouses")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TaxPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("TrialDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("SubscriptionPlans");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.TenantFeatureOverride", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FeatureKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "FeatureKey")
+                        .IsUnique();
+
+                    b.ToTable("TenantFeatureOverrides");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.TenantSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AutoRenew")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime?>("CurrentPeriodEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CurrentPeriodStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("GraceDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("GraceEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IntervalCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IntervalUnit")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxProductsOverride")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxStorageMbOverride")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxUsersOverride")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxWarehousesOverride")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PendingPlanId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PlanId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("TaxPercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("TrialEndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantSubscriptions");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Sales.Customer", b =>
@@ -1444,7 +2711,12 @@ namespace WebApplication1.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Customers");
                 });
@@ -1479,6 +2751,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<int>("WarehouseId")
                         .HasColumnType("int");
 
@@ -1486,10 +2761,12 @@ namespace WebApplication1.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("InvoiceNumber")
-                        .IsUnique();
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WarehouseId");
+
+                    b.HasIndex("TenantId", "InvoiceNumber")
+                        .IsUnique();
 
                     b.ToTable("SalesInvoices");
                 });
@@ -1520,6 +2797,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("SalesInvoiceId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("UnitCost")
                         .HasColumnType("decimal(18,2)");
 
@@ -1533,6 +2813,8 @@ namespace WebApplication1.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("SalesInvoiceId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("SalesInvoiceItems");
                 });
@@ -1564,12 +2846,17 @@ namespace WebApplication1.Migrations
                     b.Property<int>("SalesInvoiceId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ReturnNumber")
-                        .IsUnique();
-
                     b.HasIndex("SalesInvoiceId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "ReturnNumber")
+                        .IsUnique();
 
                     b.ToTable("SalesReturns");
                 });
@@ -1594,6 +2881,9 @@ namespace WebApplication1.Migrations
                     b.Property<int>("SalesReturnId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("UnitCost")
                         .HasColumnType("decimal(18,2)");
 
@@ -1606,7 +2896,119 @@ namespace WebApplication1.Migrations
 
                     b.HasIndex("SalesReturnId");
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("SalesReturnItems");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Tenancy.Tenant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AdminHoldReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BillingEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAdminHold")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("OwnerUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("PortalHost")
+                        .HasMaxLength(253)
+                        .HasColumnType("nvarchar(253)");
+
+                    b.Property<string>("PortalUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("PurgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("SuspendedForNonPayment")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("TaxId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("PortalHost")
+                        .IsUnique()
+                        .HasFilter("[PortalHost] IS NOT NULL");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("Tenants");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1660,6 +3062,24 @@ namespace WebApplication1.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Accounting.Account", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Accounting.JournalEntry", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Accounting.JournalEntryLine", b =>
                 {
                     b.HasOne("WebApplication1.Models.Accounting.Account", "Account")
@@ -1672,6 +3092,12 @@ namespace WebApplication1.Migrations
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Account");
@@ -1701,6 +3127,12 @@ namespace WebApplication1.Migrations
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("PurchaseInvoice");
@@ -1710,8 +3142,48 @@ namespace WebApplication1.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Common.CompanySetting", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Identity.ApplicationUser", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Identity.UserPermission", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Identity.UserWarehouse", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("WebApplication1.Models.Identity.ApplicationUser", "User")
                         .WithMany("UserWarehouses")
                         .HasForeignKey("UserId")
@@ -1729,11 +3201,26 @@ namespace WebApplication1.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.Inventory.Category", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Inventory.Product", b =>
                 {
                     b.HasOne("WebApplication1.Models.Inventory.Category", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1760,6 +3247,12 @@ namespace WebApplication1.Migrations
                         .WithOne("Batch")
                         .HasForeignKey("WebApplication1.Models.Inventory.ProductBatch", "PurchaseInvoiceItemId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("WebApplication1.Models.Inventory.Warehouse", "Warehouse")
                         .WithMany()
@@ -1788,6 +3281,12 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Product");
@@ -1798,6 +3297,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
                         .WithMany("WarehouseStocks")
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1814,6 +3319,12 @@ namespace WebApplication1.Migrations
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.StockAdjustment", b =>
                 {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("WebApplication1.Models.Inventory.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -1837,6 +3348,12 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Product");
 
                     b.Navigation("StockAdjustment");
@@ -1852,6 +3369,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Inventory.Product", "Product")
                         .WithMany("StockTransactions")
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1873,6 +3396,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Inventory.Warehouse", "FromWarehouse")
                         .WithMany()
                         .HasForeignKey("FromWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1901,9 +3430,58 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Product");
 
                     b.Navigation("StockTransfer");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Inventory.StockTransferPurchaseInvoice", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Purchase.PurchaseInvoice", "PurchaseInvoice")
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Inventory.StockTransfer", "StockTransfer")
+                        .WithMany("PurchaseInvoiceLinks")
+                        .HasForeignKey("StockTransferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseInvoice");
+
+                    b.Navigation("StockTransfer");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Inventory.UnitOfMeasure", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Inventory.Warehouse", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashEntry", b =>
@@ -1911,6 +3489,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.PettyCash.PettyCashName", "PettyCashName")
                         .WithMany("Entries")
                         .HasForeignKey("PettyCashNameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1925,11 +3509,26 @@ namespace WebApplication1.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("WebApplication1.Models.PettyCash.PettyCashName", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("WebApplication1.Models.Purchase.PurchaseInvoice", b =>
                 {
                     b.HasOne("WebApplication1.Models.Purchase.Supplier", "Supplier")
                         .WithMany("PurchaseInvoices")
                         .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1958,6 +3557,12 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Product");
 
                     b.Navigation("PurchaseInvoice");
@@ -1968,6 +3573,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Purchase.PurchaseInvoice", "PurchaseInvoice")
                         .WithMany("Returns")
                         .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1988,9 +3599,125 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("PurchaseInvoiceItem");
 
                     b.Navigation("PurchaseReturn");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Purchase.Supplier", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.DataAgreementAcceptance", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.DataExportRequest", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PaymentAttempt", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Saas.SaasInvoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.PlanFeature", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Saas.SubscriptionPlan", "Plan")
+                        .WithMany("Features")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasInvoice", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasInvoiceItem", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Saas.SaasInvoice", "Invoice")
+                        .WithMany("Items")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasPayment", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Saas.SaasInvoice", "Invoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.TenantSubscription", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Saas.SubscriptionPlan", "Plan")
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Sales.Customer", b =>
+                {
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Sales.SalesInvoice", b =>
@@ -1998,6 +3725,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Sales.Customer", "Customer")
                         .WithMany("SalesInvoices")
                         .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2031,6 +3764,12 @@ namespace WebApplication1.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Batch");
 
                     b.Navigation("Product");
@@ -2043,6 +3782,12 @@ namespace WebApplication1.Migrations
                     b.HasOne("WebApplication1.Models.Sales.SalesInvoice", "SalesInvoice")
                         .WithMany("Returns")
                         .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2061,6 +3806,12 @@ namespace WebApplication1.Migrations
                         .WithMany("Items")
                         .HasForeignKey("SalesReturnId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.Tenancy.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("SalesInvoiceItem");
@@ -2107,6 +3858,8 @@ namespace WebApplication1.Migrations
             modelBuilder.Entity("WebApplication1.Models.Inventory.StockTransfer", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("PurchaseInvoiceLinks");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Inventory.UnitOfMeasure", b =>
@@ -2148,6 +3901,18 @@ namespace WebApplication1.Migrations
                     b.Navigation("OpeningBalancePayments");
 
                     b.Navigation("PurchaseInvoices");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SaasInvoice", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("WebApplication1.Models.Saas.SubscriptionPlan", b =>
+                {
+                    b.Navigation("Features");
                 });
 
             modelBuilder.Entity("WebApplication1.Models.Sales.Customer", b =>

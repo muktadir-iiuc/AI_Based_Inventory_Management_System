@@ -14,8 +14,13 @@ public static class ThermalReceiptFormatter
     // left the detail section visibly short of the header and totals. Keep this <= 49 or lines wrap.
     public const int LineWidth = 49;
 
-    public static List<SalesInvoiceThermalLine> BuildDetailLines(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items)
+    public static List<SalesInvoiceThermalLine> BuildDetailLines(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items, ReceiptLanguage language = ReceiptLanguage.English)
     {
+        if (language == ReceiptLanguage.Bangla)
+        {
+            return BuildBanglaDetailLines(header, items);
+        }
+
         var lines = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(header.CustomerAddress))
@@ -69,6 +74,138 @@ public static class ThermalReceiptFormatter
 
         return lines.Select(text => new SalesInvoiceThermalLine { Text = text }).ToList();
     }
+
+    // ------------------------------------------------------------------ Bangla
+
+    // The English layout pads with spaces so amounts line up in a monospaced font. Bangla has no monospaced font and its letters combine
+    // (vowel signs, conjuncts), so column padding and character counts do not work: this layout never pads. Each item is a short block -
+    // name, optional details/SKU, then "qty x price = total" - and long text is wrapped by user-perceived characters (text elements).
+    // Characters per wrapped line; Bangla glyphs are wider than Latin ones in a 3 inch box.
+    public const int BanglaLineWidth = 32;
+    private const int BanglaSeparatorWidth = 62;
+
+    private static List<SalesInvoiceThermalLine> BuildBanglaDetailLines(SalesInvoiceReportHeader header, IReadOnlyList<SalesInvoiceReportLine> items)
+    {
+        var l = ReceiptText.For(ReceiptLanguage.Bangla);
+        var separator = new string('-', BanglaSeparatorWidth);
+        var lines = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(header.CustomerAddress))
+        {
+            lines.AddRange(Wrap($"{l.Address}: {header.CustomerAddress}", BanglaLineWidth, "  "));
+        }
+        if (!string.IsNullOrWhiteSpace(header.CustomerPhone))
+        {
+            lines.Add($"{l.Phone}: {header.CustomerPhone}");
+        }
+        if (lines.Count > 0)
+        {
+            lines.Add(separator);
+        }
+
+        if (items.Count > 0)
+        {
+            lines.Add($"{l.Item}  /  {l.Amount}");
+            lines.Add(separator);
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            lines.AddRange(Wrap($"{ReceiptText.Digits((i + 1).ToString(), ReceiptLanguage.Bangla)}. {item.ProductName}", BanglaLineWidth, "    "));
+            if (!string.IsNullOrWhiteSpace(item.Details))
+            {
+                lines.AddRange(Wrap(item.Details, BanglaLineWidth - 4, "    ").Select(x => "    " + x.TrimStart()));
+            }
+            if (!string.IsNullOrWhiteSpace(item.Sku))
+            {
+                lines.Add($"    {item.Sku}");
+            }
+            lines.Add($"    {item.Quantity} {l.Qty} {item.UnitPrice} = {item.LineTotal}");
+            if (i < items.Count - 1)
+            {
+                lines.Add(string.Empty);
+            }
+        }
+
+        if (items.Count > 0 && decimal.TryParse(Normalize(header.DiscountAmount), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var discount) && discount > 0)
+        {
+            lines.Add(separator);
+            lines.Add($"{l.Subtotal}: {header.SubtotalAmount}");
+            lines.Add($"{l.Discount}: -{header.DiscountAmount}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(header.Notes))
+        {
+            lines.Add(separator);
+            lines.AddRange(Wrap($"{l.Note}{header.Notes}", BanglaLineWidth, "  "));
+        }
+
+        return lines.Select(text => new SalesInvoiceThermalLine { Text = text }).ToList();
+    }
+
+    // Bangla digits back to 0-9 so the discount can be tested numerically.
+    private static string Normalize(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        var chars = text.Select(c => c is >= '\u09E6' and <= '\u09EF' ? (char)('0' + (c - '\u09E6')) : c).ToArray();
+        return new string(chars).Replace(",", string.Empty);
+    }
+
+    /// <summary>Word-wraps to <paramref name="width"/> user-perceived characters, indenting continuation lines. A word longer than a line is split.</summary>
+    internal static List<string> Wrap(string text, int width, string continuationIndent)
+    {
+        var result = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var currentLength = 0;
+
+        void Flush()
+        {
+            if (currentLength > 0) result.Add(current.ToString());
+            current.Clear();
+            currentLength = 0;
+        }
+
+        foreach (var rawWord in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var word = rawWord;
+            var wordLength = Length(word);
+            var indent = result.Count > 0 && currentLength == 0 ? continuationIndent : string.Empty;
+            var indentLength = Length(indent);
+
+            if (currentLength > 0 && currentLength + 1 + wordLength > width)
+            {
+                Flush();
+                indent = continuationIndent;
+                indentLength = Length(indent);
+            }
+
+            // A single word wider than the line: break it between text elements.
+            while (indentLength + wordLength > width && width > indentLength + 1)
+            {
+                var take = width - indentLength;
+                var enumerator = System.Globalization.StringInfo.GetTextElementEnumerator(word);
+                var cut = 0;
+                var count = 0;
+                while (count < take && enumerator.MoveNext()) { cut = enumerator.ElementIndex + enumerator.GetTextElement().Length; count++; }
+                if (currentLength > 0) Flush();
+                result.Add(indent + word[..cut]);
+                word = word[cut..];
+                wordLength = Length(word);
+                indent = continuationIndent;
+                indentLength = Length(indent);
+            }
+
+            if (currentLength == 0) { current.Append(indent); currentLength = indentLength; }
+            else { current.Append(' '); currentLength++; }
+            current.Append(word);
+            currentLength += wordLength;
+        }
+        Flush();
+        return result;
+    }
+
+    private static int Length(string text) => new System.Globalization.StringInfo(text).LengthInTextElements;
 
     private static string Separator(char c) => new(c, LineWidth);
 

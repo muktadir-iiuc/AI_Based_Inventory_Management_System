@@ -1,0 +1,44 @@
+@using WebApplication1.Services.Saas
+@model TenantCreateViewModel
+@{ ViewData["Title"] = "New tenant"; }
+
+<div class="card" style="max-width: 900px;">
+    <form asp-action="Create" method="post">
+        <div class="card-body">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <h6>Business</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-8"><label asp-for="Name" class="form-label"></label><input asp-for="Name" class="form-control" /></div>
+                <div class="col-12 col-md-4"><label asp-for="Code" class="form-label"></label><input asp-for="Code" class="form-control" placeholder="auto" /></div>
+                <div class="col-12 col-md-6"><label asp-for="Phone" class="form-label"></label><input asp-for="Phone" class="form-control" inputmode="tel" /></div>
+                <div class="col-12 col-md-6"><label asp-for="TaxId" class="form-label"></label><input asp-for="TaxId" class="form-control" /></div>
+                <div class="col-12 col-md-8"><label asp-for="Address" class="form-label"></label><input asp-for="Address" class="form-control" /></div>
+                <div class="col-12 col-md-4"><label asp-for="City" class="form-label"></label><input asp-for="City" class="form-control" /></div>
+            </div>
+            <h6>Owner (becomes the tenant administrator)</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6"><label asp-for="OwnerName" class="form-label"></label><input asp-for="OwnerName" class="form-control" /></div>
+                <div class="col-12 col-md-6"><label asp-for="OwnerEmail" class="form-label"></label><input asp-for="OwnerEmail" type="email" class="form-control" autocomplete="off" /></div>
+                <div class="col-12 col-md-6"><label asp-for="OwnerPassword" class="form-label"></label><input asp-for="OwnerPassword" class="form-control" autocomplete="new-password" /><div class="form-text">At least 8 characters with upper and lower case, a digit and a symbol. Ask the owner to change it after first sign-in.</div></div>
+            </div>
+            <h6>Subscription</h6>
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label asp-for="PlanId" class="form-label"></label>
+                    <select asp-for="PlanId" class="form-select">
+                        @foreach (var p in Model.Plans) { <option value="@p.Id">@p.Name - @p.Price.ToString("#,0.##") @p.Currency / @BillingMath.DescribeInterval(p.IntervalCount, p.IntervalUnit)@(p.TrialDays > 0 ? $" ({p.TrialDays}-day trial)" : "")</option> }
+                    </select>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label asp-for="StartMode" class="form-label"></label>
+                    <select asp-for="StartMode" class="form-select">
+                        <option value="Trial">Free trial first (if the plan has one)</option>
+                        <option value="InvoiceFirst">Invoice first - access after payment</option>
+                        <option value="ActivateNow">Activate now without invoice (comped / contract)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2"><button class="btn btn-primary">Create tenant</button><a href="/Platform/Tenants" class="btn btn-outline-secondary">Cancel</a></div>
+    </form>
+</div>

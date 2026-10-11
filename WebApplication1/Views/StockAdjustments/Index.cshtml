@@ -5,7 +5,8 @@
     var status = ViewData["Status"] as StockAdjustmentStatus?;
     var canReview = ViewData["CanReview"] is true;
     var pendingCount = (int)ViewData["PendingCount"]!;
-    var canRequest = User.IsInRole(Roles.SalesOfficer) || User.IsInRole(Roles.PurchaseOfficer);
+    // Reaching this page means the user holds the Stock Adjustments permission; approvers don't file requests.
+    var canRequest = !canReview;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 

@@ -95,7 +95,12 @@
                     <div class="form-text mb-3">
                         The time is the web server's local time. SQL Server writes the backup, so it needs write permission on the folder. If it
                         doesn't (e.g. a user's Desktop), the backup is saved to SQL Server's own backup folder and this app copies it to your folder
-                        (works when the app runs on the SQL Server machine). Once more than the number above exist, the oldest successful backups are deleted.
+                        (works when the app runs on the SQL Server machine). If SQL Server won't take backups at all (common on hosted servers, where
+                        the login has no BACKUP DATABASE permission), the app exports the database as a <strong>.bacpac</strong> file instead, saved to this
+                        folder if the app can write there, otherwise to the app's App_Data\Backups folder. Restore a .bacpac in SQL Server Management Studio
+                        with Databases → Import Data-tier Application. If the export isn't allowed either (it needs VIEW DEFINITION permission), the app
+                        saves a <strong>.sql</strong> restore script instead: create an empty database and run the script against it. Once more than the
+                        number above exist, the oldest successful backups are deleted.
                     </div>
                     @if (Model.NextRunLocal is { } next)
                     {

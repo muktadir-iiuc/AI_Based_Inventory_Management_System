@@ -12,9 +12,14 @@ using WebApplication1.Models.Purchase;
 using WebApplication1.Models.Sales;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+// Only for users assigned the Sales Invoices page (Page Permissions); Admin/Manager always.
+[Authorize(Policy = Permissions.SalesInvoice)]
+[RequireFeature(Features.Sales)]
 public class SalesInvoicesController(
     ApplicationDbContext db,
     IStockService stockService,
@@ -106,6 +111,7 @@ public class SalesInvoicesController(
         try
         {
             var allocations = await fifoService.PreviewAsync(productId, warehouseId, quantity);
+            var showCost = User.CanSeePurchasePrice();
             return Json(new
             {
                 ok = true,
@@ -114,7 +120,7 @@ public class SalesInvoicesController(
                     a.Batch.BatchNumber,
                     Available = a.Batch.RemainingQuantity,
                     Allocated = a.Quantity,
-                    PurchasePrice = a.Batch.PurchasePrice,
+                    PurchasePrice = showCost ? a.Batch.PurchasePrice : (decimal?)null,
                     SalePrice = a.Batch.SalePrice
                 }),
                 unitPrice = allocations.Count > 0 ? allocations[0].Batch.SalePrice : 0,
@@ -477,34 +483,49 @@ public class SalesInvoicesController(
                 .SumAsync(p => (decimal?)p.Amount) ?? 0);
     }
 
-    public async Task<IActionResult> PrintThermal(int id)
+    // The receipt prints in English or Bangla, chosen by the user. An explicit ?lang=en|bn wins and is remembered (cookie) as that user's
+    // default for next time; with no choice at all the receipt is English, exactly as before.
+    private ReceiptLanguage ReceiptLanguageFor(string? requested) =>
+        ReceiptText.Resolve(requested, Request.Cookies[ReceiptText.CookieName] ?? Request.Cookies[UiLanguage.CookieName]);
+
+    public async Task<IActionResult> PrintThermal(int id, string? lang = null)
     {
         var invoice = await db.SalesInvoices.Where(s => s.Id == id)
             .Select(s => new { s.InvoiceNumber, s.WarehouseId }).FirstOrDefaultAsync();
         if (invoice is null) return NotFound();
         if (!User.IsWarehouseAllowed(invoice.WarehouseId)) return Forbid();
 
+        var language = ReceiptLanguageFor(lang);
+        if (ReceiptText.Parse(lang) is not null)
+        {
+            Response.Cookies.Append(ReceiptText.CookieName, ReceiptText.Code(language), new CookieOptions
+            {
+                HttpOnly = true, IsEssential = true, SameSite = SameSiteMode.Lax, Secure = Request.IsHttps, Expires = DateTimeOffset.UtcNow.AddDays(365)
+            });
+        }
+
         ViewData["Title"] = $"Receipt Preview — {invoice.InvoiceNumber}";
-        return View(new ThermalReceiptPreviewViewModel(id, invoice.InvoiceNumber));
+        return View(new ThermalReceiptPreviewViewModel(id, invoice.InvoiceNumber, ReceiptText.Code(language)));
     }
 
-    public async Task<IActionResult> ThermalReceiptPdf(int id)
+    public async Task<IActionResult> ThermalReceiptPdf(int id, string? lang = null)
     {
-        var pdf = await GenerateThermalReceiptPdfAsync(id);
+        var pdf = await GenerateThermalReceiptPdfAsync(id, ReceiptLanguageFor(lang));
         if (pdf is null) return NotFound();
 
         return File(pdf.Value.Bytes, "application/pdf");
     }
 
-    public async Task<IActionResult> ThermalReceiptDownload(int id)
+    public async Task<IActionResult> ThermalReceiptDownload(int id, string? lang = null)
     {
-        var pdf = await GenerateThermalReceiptPdfAsync(id);
+        var language = ReceiptLanguageFor(lang);
+        var pdf = await GenerateThermalReceiptPdfAsync(id, language);
         if (pdf is null) return NotFound();
 
-        return File(pdf.Value.Bytes, "application/pdf", $"{pdf.Value.InvoiceNumber}-receipt.pdf");
+        return File(pdf.Value.Bytes, "application/pdf", $"{pdf.Value.InvoiceNumber}-receipt{(language == ReceiptLanguage.Bangla ? "-bn" : string.Empty)}.pdf");
     }
 
-    private async Task<(byte[] Bytes, string InvoiceNumber)?> GenerateThermalReceiptPdfAsync(int id)
+    private async Task<(byte[] Bytes, string InvoiceNumber)?> GenerateThermalReceiptPdfAsync(int id, ReceiptLanguage language = ReceiptLanguage.English)
     {
         var invoice = await db.SalesInvoices
             .Include(s => s.Customer)
@@ -541,7 +562,7 @@ public class SalesInvoicesController(
         if (!string.IsNullOrWhiteSpace(servedBy))
         {
             var servedByFullName = await db.Users.AsNoTracking()
-                .Where(u => u.UserName == servedBy || u.Email == servedBy)
+                .Where(u => u.TenantId == User.GetTenantId() && (u.UserName == servedBy || u.Email == servedBy))
                 .Select(u => u.FullName)
                 .FirstOrDefaultAsync();
             if (!string.IsNullOrWhiteSpace(servedByFullName))
@@ -556,12 +577,12 @@ public class SalesInvoicesController(
             CompanyAddress = company.Address ?? string.Empty,
             CompanyPhone = string.IsNullOrWhiteSpace(company.Phone) ? string.Empty : $"Phone: {company.Phone}",
             InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.Date.ToDateTimeText(invoice.CreatedAt),
+            InvoiceDate = ReceiptText.Date(invoice.Date, invoice.CreatedAt, language),
             CustomerName = invoice.Customer?.Name ?? string.Empty,
             CustomerAddress = invoice.Customer?.Address ?? string.Empty,
             CustomerPhone = invoice.Customer?.Phone ?? string.Empty,
             WarehouseName = invoice.Warehouse?.Name ?? string.Empty,
-            ServedBy = string.IsNullOrWhiteSpace(servedBy) ? "N/A" : servedBy,
+            ServedBy = string.IsNullOrWhiteSpace(servedBy) ? (language == ReceiptLanguage.Bangla ? "প্রযোজ্য নয়" : "N/A") : servedBy,
             Notes = invoice.Notes ?? string.Empty,
             SubtotalAmount = invoice.SubTotal.ToString("N2"),
             DiscountAmount = invoice.DiscountAmount.ToString("N2"),
@@ -571,7 +592,9 @@ public class SalesInvoicesController(
             CustomerOutstandingDue = customerOutstandingDue.ToString("N2")
         };
 
-        var detailLines = ThermalReceiptFormatter.BuildDetailLines(header, itemLines);
+        // Labels, digits and dates in the chosen language (English passes through untouched).
+        ReceiptText.Localize(header, itemLines, language);
+        var detailLines = ThermalReceiptFormatter.BuildDetailLines(header, itemLines, language);
 
         // The RDLC's fixed-position sections (company header, invoice meta, totals,
         // footer) have known heights, but the receipt/detail-lines block in between
@@ -632,6 +655,7 @@ public class SalesInvoicesController(
 
         var templatePath = Path.Combine(env.ContentRootPath, "Reports", "SalesInvoiceThermalReceipt.rdlc");
         var rdlc = await System.IO.File.ReadAllTextAsync(templatePath);
+        rdlc = ReceiptText.ApplyToTemplate(rdlc, language, HttpContext.RequestServices.GetRequiredService<IConfiguration>()[ReceiptText.BanglaFontSetting] ?? ReceiptText.DefaultBanglaFont);
         rdlc = rdlc
             .Replace("__DYNAMICHEIGHT__", dynamicHeight.ToString("0.00"))
             .Replace("__DIVIDER3_TOP__", divider3Top.ToString("0.00"))

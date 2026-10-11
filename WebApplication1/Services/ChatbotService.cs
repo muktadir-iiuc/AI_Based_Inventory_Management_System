@@ -14,7 +14,17 @@ namespace WebApplication1.Services;
 /// </summary>
 public class ChatbotService(ApplicationDbContext db) : IChatbotService
 {
-    public async Task<ChatbotAnswer> AskAsync(string question, List<int>? warehouseIds)
+    private static readonly ChatbotAnswer NoPurchaseAccess =
+        new() { Text = "Purchase prices and purchase figures aren't available for your role." };
+
+    private static readonly ChatbotAnswer NoCustomerLedgerAccess =
+        new() { Text = "Customer dues and balances aren't available for your role." };
+
+    private static readonly ChatbotAnswer NoSupplierLedgerAccess =
+        new() { Text = "Supplier dues and balances aren't available for your role." };
+
+    public async Task<ChatbotAnswer> AskAsync(string question, List<int>? warehouseIds, bool canSeePurchasePrices = true,
+        bool canSeeCustomerLedger = true, bool canSeeSupplierLedger = true)
     {
         var q = (question ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -28,7 +38,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (product is not null && Has(q, "price", "cost", "sell for", "sale price", "cost price", "how much is", "how much does"))
         {
-            return await ProductPriceAnswerAsync(product, warehouseIds);
+            return await ProductPriceAnswerAsync(product, warehouseIds, canSeePurchasePrices);
         }
 
         if (product is not null && Has(q, "stock", "quantity", "available", "in hand", "how many", "left", "have"))
@@ -41,12 +51,14 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         var customer = await FindCustomerAsync(q);
         if (customer is not null && Has(q, duesKeywords))
         {
+            if (!canSeeCustomerLedger) return NoCustomerLedgerAccess;
             return await CustomerDuesAnswerAsync(customer, warehouseIds);
         }
 
         var supplier = await FindSupplierAsync(q);
         if (supplier is not null && Has(q, duesKeywords))
         {
+            if (!canSeeSupplierLedger) return NoSupplierLedgerAccess;
             return await SupplierDuesAnswerAsync(supplier, warehouseIds);
         }
 
@@ -68,6 +80,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (ranking && q.Contains("supplier"))
         {
+            if (!canSeePurchasePrices) return NoPurchaseAccess;
             return await TopSuppliersAnswerAsync(q, warehouseIds);
         }
 
@@ -78,11 +91,13 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "receivable", "customers owe", "owed by customer", "customer due", "customer balance", "customer outstanding"))
         {
+            if (!canSeeCustomerLedger) return NoCustomerLedgerAccess;
             return await AccountBalanceAnswerAsync("Accounts Receivable (money customers owe us)", SystemAccountCodes.AccountsReceivable, debitPositive: true);
         }
 
         if (Has(q, "payable", "owe supplier", "supplier due", "supplier balance", "we owe", "supplier outstanding"))
         {
+            if (!canSeeSupplierLedger) return NoSupplierLedgerAccess;
             return await AccountBalanceAnswerAsync("Accounts Payable (money we owe suppliers)", SystemAccountCodes.AccountsPayable, debitPositive: false);
         }
 
@@ -93,7 +108,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "invoice"))
         {
-            var invoiceAnswer = await InvoiceLookupAnswerAsync(q, warehouseIds);
+            var invoiceAnswer = await InvoiceLookupAnswerAsync(q, warehouseIds, canSeePurchasePrices);
             if (invoiceAnswer is not null)
             {
                 return invoiceAnswer;
@@ -107,6 +122,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "recent purchase", "latest purchase", "recent purchase invoice", "last purchase"))
         {
+            if (!canSeePurchasePrices) return NoPurchaseAccess;
             return await RecentInvoicesAnswerAsync(isSales: false, warehouseIds);
         }
 
@@ -117,6 +133,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         if (Has(q, "purchase", "bought", "spent on"))
         {
+            if (!canSeePurchasePrices) return NoPurchaseAccess;
             return await PurchaseTotalAnswerAsync(q, warehouseIds);
         }
 
@@ -337,7 +354,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
     // Selling price now lives on whichever batch is next to be consumed (FIFO), not on the
     // product itself — Product.SalePrice/CostPrice are only ever a default suggested at
     // purchase time, never authoritative for what something actually sells for.
-    private async Task<ChatbotAnswer> ProductPriceAnswerAsync(Product product, List<int>? warehouseIds)
+    private async Task<ChatbotAnswer> ProductPriceAnswerAsync(Product product, List<int>? warehouseIds, bool canSeePurchasePrices)
     {
         var batchesQuery = db.ProductBatches
             .Where(b => b.ProductId == product.Id && b.IsActive && b.RemainingQuantity > 0);
@@ -364,7 +381,9 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
 
         return new ChatbotAnswer
         {
-            Text = $"{product.Name} ({product.Sku}): current selling price {next.SalePrice:C}, cost {next.PurchasePrice:C}{note}."
+            Text = canSeePurchasePrices
+                ? $"{product.Name} ({product.Sku}): current selling price {next.SalePrice:C}, cost {next.PurchasePrice:C}{note}."
+                : $"{product.Name} ({product.Sku}): current selling price {next.SalePrice:C}{note}."
         };
     }
 
@@ -574,7 +593,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
         return new ChatbotAnswer { Text = $"{label}: {balance:C}." };
     }
 
-    private async Task<ChatbotAnswer?> InvoiceLookupAnswerAsync(string q, List<int>? warehouseIds)
+    private async Task<ChatbotAnswer?> InvoiceLookupAnswerAsync(string q, List<int>? warehouseIds, bool canSeePurchasePrices)
     {
         var tokens = q.Split([' ', ',', '?', '.', '!'], StringSplitOptions.RemoveEmptyEntries);
         var candidate = tokens.FirstOrDefault(t => t.Any(char.IsDigit) && t.Any(char.IsLetter));
@@ -600,6 +619,7 @@ public class ChatbotService(ApplicationDbContext db) : IChatbotService
             .FirstOrDefaultAsync();
         if (purchaseInvoice is not null)
         {
+            if (!canSeePurchasePrices) return NoPurchaseAccess;
             return new ChatbotAnswer
             {
                 Text = $"Purchase invoice {purchaseInvoice.InvoiceNumber} - {purchaseInvoice.Supplier?.Name}, {purchaseInvoice.Date:d}, status {purchaseInvoice.Status}, total {purchaseInvoice.TotalAmount:C}.",

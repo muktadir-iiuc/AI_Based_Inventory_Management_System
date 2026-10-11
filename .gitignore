@@ -27,3 +27,8 @@ Thumbs.db
 ## Secrets
 WebApplication1/appsettings.json
 /WebApplication1/Data/DbInitializer.cs
+
+# Database backups exported by the app (.bacpac) - never commit them
+WebApplication1/App_Data/Backups/
+WebApplication1/App_Data/Branding/
+WebApplication1/App_Data/Exports/

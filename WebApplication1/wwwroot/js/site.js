@@ -91,7 +91,7 @@ function initDataTables(root) {
             // it — while keeping DataTables 2's Bootstrap5 layout renderer (and its styling of
             // the length dropdown/pagination) intact, unlike the legacy 'dom' string option.
             layout: { topStart: 'pageLength', topEnd: null, bottomStart: 'info', bottomEnd: 'paging' },
-            language: { emptyTable: 'No records found.' }
+            language: window.IMS_DT_LANG || { emptyTable: 'No records found.' }
         });
 
         selectColumns.forEach(function (index) {
@@ -397,8 +397,8 @@ function initPartyDue(options) {
             hide();
             return;
         }
-        options.dueEl.className = 'small mt-1 text-muted';
-        options.dueEl.textContent = 'Checking due…';
+        options.dueEl.className = 'small mt-1';
+        options.dueEl.innerHTML = '<span class="skeleton" style="width: 12rem"></span>';
         fetch(options.dueUrl + '/' + id + (options.excludeInvoiceId ? '?excludeInvoiceId=' + options.excludeInvoiceId : ''), { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
@@ -459,4 +459,76 @@ function initPartyDue(options) {
         document.querySelectorAll('[data-payment-method]').forEach(syncPaymentMethod);
     });
     window.syncPaymentMethod = syncPaymentMethod;
+})();
+
+// Shimmer skeleton rows for a table body whose data is being fetched: fills tbody with `count`
+// placeholder rows of `cols` shimmering cells. The caller replaces them when the data arrives.
+function skeletonRows(tbody, cols, count) {
+    var cell = '<td><span class="skeleton"></span></td>';
+    var row = '<tr class="skeleton-row" aria-hidden="true">' + new Array(cols + 1).join(cell) + '</tr>';
+    tbody.innerHTML = new Array((count || 6) + 1).join(row);
+}
+
+// Page-level shimmer while navigating: when a same-tab link or form leaves this page, the
+// content area is swapped for the #pageSkeleton placeholder (see _Layout) until the next page
+// renders. Deferred briefly so instant responses don't flicker, and skipped for anything that
+// won't actually replace this page: new-tab/modifier clicks, in-page (#) links, Bootstrap
+// toggles, downloads/PDF/print endpoints (which leave the page in place), handlers that cancel
+// the event (validation, confirm dialogs, AJAX forms), and anything marked data-no-skeleton.
+(function () {
+    var root = document.documentElement;
+    var timer = null;
+    var fileUrl = /\/(Download|[A-Za-z]*Pdf|Print[A-Za-z]*|Export[A-Za-z]*|Logo)(\/|\?|$)/i;
+
+    function show() {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            root.classList.add('page-loading');
+            // Safety net: if nothing replaced the page (e.g. a response that turned out to be
+            // a file download), give the content back instead of shimmering forever.
+            timer = setTimeout(hide, 15000);
+        }, 150);
+    }
+
+    function hide() {
+        clearTimeout(timer);
+        root.classList.remove('page-loading');
+    }
+
+    function leavesPage(url, target) {
+        if (target && target !== '_self') return false;
+        var u;
+        try { u = new URL(url, location.href); } catch (e) { return false; }
+        if (u.origin !== location.origin) return false;
+        if (u.pathname === location.pathname && u.search === location.search && u.hash) return false;
+        return !fileUrl.test(u.pathname);
+    }
+
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.hasAttribute('download') || a.hasAttribute('data-bs-toggle') || a.closest('[data-no-skeleton]')) return;
+        var href = a.getAttribute('href');
+        if (!href || href.charAt(0) === '#' || /^(javascript|mailto|tel):/i.test(href)) return;
+        if (leavesPage(a.href, a.target)) show();
+    });
+
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (form.closest('[data-no-skeleton]')) return;
+        // Other handlers (jQuery validation, confirm prompts, AJAX submitters) may cancel the
+        // submit after this bubbles up; check once they've all had their turn.
+        setTimeout(function () {
+            if (e.defaultPrevented) return;
+            var submitter = e.submitter;
+            var action = (submitter && submitter.getAttribute('formaction')) || form.action || location.href;
+            var target = (submitter && submitter.getAttribute('formtarget')) || form.target;
+            if (leavesPage(action, target)) show();
+        }, 0);
+    });
+
+    // Back/forward restores from the bfcache with the skeleton still showing - clear it.
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) hide();
+    });
 })();

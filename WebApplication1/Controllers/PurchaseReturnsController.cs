@@ -7,9 +7,15 @@ using WebApplication1.Models.Identity;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+// Purchase returns carry unit costs, so Sales Officers and Viewers can't open them.
+[Authorize(Roles = Roles.PurchasePriceViewers)]
+[Authorize(Policy = Permissions.PurchaseInvoice)]
+[RequireFeature(Features.Purchasing)]
 public class PurchaseReturnsController(
     ApplicationDbContext db,
     IStockService stockService,
@@ -161,7 +167,8 @@ public class PurchaseReturnsController(
                 "Purchase Return Posted",
                 $"{purchaseReturn.ReturnNumber} against {invoice.InvoiceNumber} ({purchaseReturn.TotalAmount:C})",
                 "fas fa-rotate-left text-warning",
-                [invoice.WarehouseId]);
+                [invoice.WarehouseId],
+                mentionsPurchasePrices: true);
 
             TempData["Success"] = $"Purchase return {purchaseReturn.ReturnNumber} posted.";
             return RedirectToAction(nameof(Details), new { id = purchaseReturn.Id });

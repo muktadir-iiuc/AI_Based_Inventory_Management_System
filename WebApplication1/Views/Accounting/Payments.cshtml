@@ -3,6 +3,7 @@
     ViewData["Title"] = "Payments & Receipts";
     var totalIn = Model.Where(p => p.Direction == PaymentDirection.In).Sum(p => p.Amount);
     var totalOut = Model.Where(p => p.Direction == PaymentDirection.Out).Sum(p => p.Amount);
+    // Both totals are net of advance refunds (stored as negative amounts).
 }
 
 @section Toolbar {
@@ -50,7 +51,10 @@
                     <td class="fw-semibold">@p.PaymentNumber</td>
                     <td data-date="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToDateTimeText(p.CreatedAt)</td>
                     <td>
-                        @if (p.Direction == PaymentDirection.Out) { <span class="badge text-bg-danger">Paid to supplier</span> }
+                        @* A negative amount is an advance refund, which runs the other way. *@
+                        @if (p.Amount < 0 && p.Direction == PaymentDirection.Out) { <span class="badge text-bg-success">Refund from supplier</span> }
+                        else if (p.Amount < 0) { <span class="badge text-bg-warning">Refunded to customer</span> }
+                        else if (p.Direction == PaymentDirection.Out) { <span class="badge text-bg-danger">Paid to supplier</span> }
                         else { <span class="badge text-bg-success">Received from customer</span> }
                     </td>
                     <td>@p.MethodText</td>
@@ -67,12 +71,12 @@
                         }
                         @if (p.Customer is not null)
                         {
-                            <a asp-controller="Customers" asp-action="Ledger" asp-route-partyId="@p.CustomerId">Opening balance</a>
+                            <a asp-controller="Customers" asp-action="Ledger" asp-route-partyId="@p.CustomerId">@(p.Amount < 0 ? "Advance refund" : "Opening balance / advance")</a>
                             <span class="text-muted">(@p.Customer.Name)</span>
                         }
                         @if (p.Supplier is not null)
                         {
-                            <a asp-controller="Suppliers" asp-action="Ledger" asp-route-partyId="@p.SupplierId">Opening balance</a>
+                            <a asp-controller="Suppliers" asp-action="Ledger" asp-route-partyId="@p.SupplierId">@(p.Amount < 0 ? "Advance refund" : "Opening balance / advance")</a>
                             <span class="text-muted">(@p.Supplier.Name)</span>
                         }
                     </td>

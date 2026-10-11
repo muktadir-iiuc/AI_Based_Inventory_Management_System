@@ -1,0 +1,16 @@
+@using WebApplication1.Models.Saas
+@model SubscriptionStatus
+@{
+    var (cls, text) = Model switch
+    {
+        SubscriptionStatus.Active => ("success", "Active"),
+        SubscriptionStatus.Trialing => ("info", "Trial"),
+        SubscriptionStatus.PastDue => ("warning", "Past due"),
+        SubscriptionStatus.GracePeriod => ("warning", "Grace period"),
+        SubscriptionStatus.Suspended => ("danger", "Suspended"),
+        SubscriptionStatus.Disabled => ("dark", "Disabled"),
+        SubscriptionStatus.Cancelled => ("secondary", "Cancelled"),
+        _ => ("secondary", "Expired")
+    };
+}
+<span class="badge text-bg-@cls">@text</span>

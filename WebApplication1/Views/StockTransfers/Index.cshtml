@@ -8,7 +8,6 @@
     var canReview = isApprover;
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var postedCount = Model.Count(t => t.DisplayStatus == "Posted");
-    var totalLines = Model.Sum(t => t.Items.Count);
 }
 
 @section Toolbar {
@@ -43,14 +42,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card h-100">
-            <div class="card-body py-3">
-                <div class="text-muted small">Total Lines Moved</div>
-                <div class="fs-4 fw-bold">@totalLines</div>
-            </div>
-        </div>
-    </div>
+</div>
 </div>
 
 <div class="card">
@@ -73,7 +65,7 @@
     </div>
     <div class="card-body p-0 table-responsive-card">
         <table class="table table-striped table-hover mb-0 data-table" id="transferTable">
-            <thead><tr><th>Transfer #</th><th data-filter="select">From</th><th data-filter="select">To</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th class="text-end">Lines</th>@if (canReview) { <th class="text-end" data-filter="false">Actions</th> }</tr></thead>
+            <thead><tr><th>Transfer #</th><th data-filter="select">From</th><th data-filter="select">To</th><th data-filter="date">Date</th><th data-filter="select">Status</th><th data-filter="select">Supplier</th><th>Notes</th>@if (canReview) { <th class="text-end" data-filter="false">Actions</th> }</tr></thead>
             <tbody>
             @foreach (var t in Model)
             {
@@ -92,7 +84,8 @@
                             default: <span class="badge text-bg-secondary"><i class="fas fa-ban"></i> Cancelled</span> break;
                         }
                     </td>
-                    <td class="text-end lines-cell">@t.Items.Count</td>
+                    <td class="supplier-cell">@string.Join(", ", t.PurchaseInvoiceLinks.Select(l => l.PurchaseInvoice?.Supplier?.Name).Where(n => n != null).Distinct())</td>
+                    <td class="notes-cell">@t.Notes</td>
                     @if (canReview)
                     {
                         <td class="text-end text-nowrap actions-cell">
@@ -196,6 +189,10 @@
                 }
             }
 
+            function esc(v) {
+                return jQuery('<div>').text(v || '').html();
+            }
+
             function getDt() {
                 return (typeof jQuery !== 'undefined' && jQuery.fn.DataTable && jQuery.fn.DataTable.isDataTable(tableEl))
                     ? jQuery(tableEl).DataTable()
@@ -222,7 +219,6 @@
                     // Once a request is decided its Approve/Reject buttons no longer apply.
                     var actions = existing.querySelector('.actions-cell');
                     if (actions && data.status !== 'Pending') actions.innerHTML = '';
-                    existing.querySelector('.lines-cell').textContent = data.lineCount;
                     if (dt) { dt.row(existing).invalidate(); dt.draw(false); }
                     flash(existing);
                     return;
@@ -235,7 +231,8 @@
                     '<td>' + (data.toWarehouseName || '') + '</td>' +
                     '<td data-date="' + data.date + '">' + data.dateText + '</td>' +
                     '<td class="status-cell">' + statusBadge(data.status) + '</td>' +
-                    '<td class="text-end lines-cell">' + data.lineCount + '</td>' +
+                    '<td class="supplier-cell">' + esc(data.supplierName) + '</td>' +
+                    '<td class="notes-cell">' + esc(data.notes) + '</td>' +
                     (tableEl.querySelector('thead th:last-child').textContent.trim() === 'Actions'
                         ? '<td class="text-end text-nowrap actions-cell">' + (data.status === 'Pending'
                             ? '<a href="/StockTransfers/Details/' + data.id + '" class="btn btn-sm btn-outline-primary">Review</a>' : '') + '</td>'

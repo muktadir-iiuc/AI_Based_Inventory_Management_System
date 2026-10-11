@@ -1,4 +1,5 @@
 @model DashboardViewModel
+@inject IAuthorizationService Auth
 @{
     ViewData["Title"] = "Dashboard";
     var currencySymbol = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
@@ -8,6 +9,11 @@
     var todaySalesChange = DayChange(Model.TodaySalesTotal, yesterdaySales);
     var todayPurchasesChange = DayChange(Model.TodayPurchasesTotal, yesterdayPurchases);
     var maxTopCustomer = Model.TopCustomers.Count > 0 ? Model.TopCustomers.Max(c => c.Value) : 0;
+    // Sales Officers/Viewers: no purchase or cost-based widgets (the controller blanks the data too).
+    var showCost = User.CanSeePurchasePrice();
+    // Links into invoice pages only for users assigned those pages (Page Permissions).
+    var canOpenSales = (await Auth.AuthorizeAsync(User, Permissions.SalesInvoice)).Succeeded;
+    var canOpenPurchases = showCost && (await Auth.AuthorizeAsync(User, Permissions.PurchaseInvoice)).Succeeded;
 }
 
 <div class="dashboard-page">
@@ -60,9 +66,14 @@
                 </p>
             </div>
             <i class="small-box-icon fas fa-cash-register"></i>
-            <a asp-controller="SalesInvoices" asp-action="Index" class="small-box-footer">View sales <i class="fas fa-arrow-circle-right"></i></a>
+            @if (canOpenSales)
+            {
+                <a asp-controller="SalesInvoices" asp-action="Index" class="small-box-footer">View sales <i class="fas fa-arrow-circle-right"></i></a>
+            }
         </div>
     </div>
+    @if (showCost)
+    {
     <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 3">
         <div class="small-box text-bg-info">
             <div class="inner">
@@ -78,12 +89,18 @@
                 </p>
             </div>
             <i class="small-box-icon fas fa-truck-loading"></i>
-            <a asp-controller="PurchaseInvoices" asp-action="Index" class="small-box-footer">View purchases <i class="fas fa-arrow-circle-right"></i></a>
+            @if (canOpenPurchases)
+            {
+                <a asp-controller="PurchaseInvoices" asp-action="Index" class="small-box-footer">View purchases <i class="fas fa-arrow-circle-right"></i></a>
+            }
         </div>
     </div>
+    }
 </div>
 
 <div class="row">
+    @if (showCost)
+    {
     <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 4">
         <div class="info-box shadow-sm">
             <span class="info-box-icon text-bg-secondary"><i class="fas fa-warehouse"></i></span>
@@ -93,6 +110,7 @@
             </div>
         </div>
     </div>
+    }
     <div class="col-lg-3 col-6 dash-in" style="--dash-delay: 5">
         <div class="info-box shadow-sm">
             <span class="info-box-icon text-bg-danger"><i class="fas fa-ban"></i></span>
@@ -148,6 +166,8 @@
             </div>
         </div>
     </div>
+    @if (User.CanSeeCustomerLedger())
+    {
     <div class="col-md-4 dash-in" style="--dash-delay: 9">
         <div class="card dash-hover">
             <div class="card-body">
@@ -159,6 +179,9 @@
             </div>
         </div>
     </div>
+    }
+    @if (User.CanSeeSupplierLedger())
+    {
     <div class="col-md-4 dash-in" style="--dash-delay: 10">
         <div class="card dash-hover">
             <div class="card-body">
@@ -170,13 +193,14 @@
             </div>
         </div>
     </div>
+    }
 </div>
 
 <div class="row">
     <div class="col-md-8 dash-in" style="--dash-delay: 11">
         <div class="card dash-hover">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h3 class="card-title mb-0">Sales vs Purchases</h3>
+                <h3 class="card-title mb-0">@(showCost ? "Sales vs Purchases" : "Sales")</h3>
                 <div class="btn-group btn-group-sm" role="group" aria-label="Trend period">
                     <button type="button" class="btn btn-outline-primary" data-days="7">7D</button>
                     <button type="button" class="btn btn-outline-primary" data-days="14">14D</button>
@@ -235,8 +259,8 @@
                     @foreach (var p in Model.LowStockProducts)
                     {
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span>@p.Name <small class="text-muted">(@p.Sku)</small></span>
-                            <span class="badge text-bg-warning">@p.CurrentStock.ToString("0.##")</span>
+                            <span>@p.Name <small class="text-muted">(@p.Sku@(p.WarehouseName is null ? "" : " · " + p.WarehouseName))</small></span>
+                            <span class="badge text-bg-warning">@p.Quantity.ToString("0.##")</span>
                         </li>
                     }
                 </ul>
@@ -270,6 +294,8 @@
             </div>
         </div>
     </div>
+    @if (showCost)
+    {
     <div class="col-md-4 dash-in" style="--dash-delay: 15">
         <div class="card dash-hover">
             <div class="card-header">
@@ -289,10 +315,11 @@
             </div>
         </div>
     </div>
+    }
 </div>
 
 <div class="row">
-    <div class="col-md-6 dash-in" style="--dash-delay: 16">
+    <div class="@(showCost ? "col-md-6" : "col-12") dash-in" style="--dash-delay: 16">
         <div class="card dash-hover">
             <div class="card-header">
                 <h3 class="card-title">Recent Sales Invoices</h3>
@@ -304,7 +331,7 @@
                     @foreach (var s in Model.RecentSalesInvoices)
                     {
                         <tr>
-                            <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@s.Id">@s.InvoiceNumber</a></td>
+                            <td>@if (canOpenSales) { <a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@s.Id">@s.InvoiceNumber</a> } else { @s.InvoiceNumber }</td>
                             <td>@s.Customer?.Name</td>
                             <td>@s.Date.ToDateTimeText(s.CreatedAt)</td>
                             <td class="text-end">@s.TotalAmount.ToString("C")</td>
@@ -315,6 +342,8 @@
             </div>
         </div>
     </div>
+    @if (showCost)
+    {
     <div class="col-md-6 dash-in" style="--dash-delay: 17">
         <div class="card dash-hover">
             <div class="card-header">
@@ -327,7 +356,7 @@
                     @foreach (var p in Model.RecentPurchaseInvoices)
                     {
                         <tr>
-                            <td><a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@p.Id">@p.InvoiceNumber</a></td>
+                            <td>@if (canOpenPurchases) { <a asp-controller="PurchaseInvoices" asp-action="Details" asp-route-id="@p.Id">@p.InvoiceNumber</a> } else { @p.InvoiceNumber }</td>
                             <td>@p.Supplier?.Name</td>
                             <td>@p.Date.ToDateTimeText(p.CreatedAt)</td>
                             <td class="text-end">@p.TotalAmount.ToString("C")</td>
@@ -338,6 +367,7 @@
             </div>
         </div>
     </div>
+    }
 </div>
 
 </div>
@@ -409,7 +439,7 @@
             }
 
             function setMoney(el, value) {
-                if (!el) return;
+                if (!el || value === null || value === undefined) return;
                 var prefix = el.dataset.prefix || '';
                 el.textContent = prefix + (Number(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 el.classList.add('text-warning');
@@ -475,6 +505,7 @@
         const allLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
         const allSales = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SalesTrend));
         const allPurchases = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PurchaseTrend));
+        const showPurchases = @(showCost ? "true" : "false");
 
         const initialColors = chartThemeColors();
         const trendCtx = document.getElementById('trendChart');
@@ -492,18 +523,17 @@
                         fill: true,
                         pointRadius: 2,
                         pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Purchases',
-                        data: allPurchases.slice(-30),
-                        borderColor: '#17a2b8',
-                        backgroundColor: 'rgba(23, 162, 184, 0.12)',
-                        tension: 0.35,
-                        fill: true,
-                        pointRadius: 2,
-                        pointHoverRadius: 6
                     }
-                ]
+                ].concat(showPurchases ? [{
+                    label: 'Purchases',
+                    data: allPurchases.slice(-30),
+                    borderColor: '#17a2b8',
+                    backgroundColor: 'rgba(23, 162, 184, 0.12)',
+                    tension: 0.35,
+                    fill: true,
+                    pointRadius: 2,
+                    pointHoverRadius: 6
+                }] : [])
             },
             options: {
                 responsive: true,
@@ -526,7 +556,7 @@
                 const n = parseInt(btn.dataset.days, 10);
                 trendChart.data.labels = allLabels.slice(-n);
                 trendChart.data.datasets[0].data = allSales.slice(-n);
-                trendChart.data.datasets[1].data = allPurchases.slice(-n);
+                if (showPurchases) trendChart.data.datasets[1].data = allPurchases.slice(-n);
                 trendChart.update();
             });
         });

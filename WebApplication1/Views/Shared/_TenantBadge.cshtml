@@ -1,0 +1,13 @@
+@using WebApplication1.Models.Tenancy
+@model Tenant
+@{
+    var (cls, text) = Model.Status switch
+    {
+        TenantStatus.Active => ("success", "Active"),
+        TenantStatus.Suspended => ("danger", Model.IsAdminHold ? "Suspended (admin)" : "Suspended (payment)"),
+        TenantStatus.Disabled => ("dark", "Disabled"),
+        TenantStatus.Terminated => ("secondary", Model.PurgedAt is null ? "Terminated" : "Terminated (erased)"),
+        _ => ("warning", "Pending")
+    };
+}
+<span class="badge text-bg-@cls">@text</span>

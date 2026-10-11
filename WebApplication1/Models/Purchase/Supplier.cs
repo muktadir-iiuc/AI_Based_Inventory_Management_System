@@ -10,7 +10,7 @@ public class Supplier : BaseEntity
     [Required, StringLength(150)]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(100)]
+    [Display(Name = "Contact Person"), StringLength(100)]
     public string? ContactPerson { get; set; }
 
     [StringLength(30)]

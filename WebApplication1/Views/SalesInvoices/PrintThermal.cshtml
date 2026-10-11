@@ -1,14 +1,19 @@
 @model ThermalReceiptPreviewViewModel
 @{
     ViewData["Title"] = $"Receipt Preview — {Model.InvoiceNumber}";
-    var pdfUrl = Url.Action("ThermalReceiptPdf", new { id = Model.SalesInvoiceId });
-    var downloadUrl = Url.Action("ThermalReceiptDownload", new { id = Model.SalesInvoiceId });
+    var pdfUrl = Url.Action("ThermalReceiptPdf", new { id = Model.SalesInvoiceId, lang = Model.Language });
+    var downloadUrl = Url.Action("ThermalReceiptDownload", new { id = Model.SalesInvoiceId, lang = Model.Language });
+    var isBangla = Model.Language == "bn";
 }
 
 @section Toolbar {
     <a asp-action="Details" asp-route-id="@Model.SalesInvoiceId" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-arrow-left"></i> Back to Invoice
     </a>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Receipt language">
+        <a asp-action="PrintThermal" asp-route-id="@Model.SalesInvoiceId" asp-route-lang="en" class="btn @(isBangla ? "btn-outline-secondary" : "btn-secondary")" aria-pressed="@(!isBangla)">English</a>
+        <a asp-action="PrintThermal" asp-route-id="@Model.SalesInvoiceId" asp-route-lang="bn" class="btn @(isBangla ? "btn-secondary" : "btn-outline-secondary")" aria-pressed="@isBangla">বাংলা</a>
+    </div>
     <button type="button" id="printReceiptBtn" class="btn btn-outline-primary btn-sm">
         <i class="fas fa-print"></i> Print
     </button>

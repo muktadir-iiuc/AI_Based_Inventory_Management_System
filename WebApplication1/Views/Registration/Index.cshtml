@@ -1,0 +1,36 @@
+@model RegisterViewModel
+@inject WebApplication1.Services.Saas.IPlatformSettings PlatformSettings
+@{
+    ViewData["Title"] = "Start your free trial";
+    Layout = "_LoginLayout";
+    var platformName = await PlatformSettings.GetAsync(WebApplication1.Models.Saas.PlatformSettingKeys.PlatformName);
+    var terms = await PlatformSettings.GetAsync(WebApplication1.Models.Saas.PlatformSettingKeys.TermsUrl);
+    var privacy = await PlatformSettings.GetAsync(WebApplication1.Models.Saas.PlatformSettingKeys.PrivacyUrl);
+}
+
+<div class="card px-sm-6 px-0">
+    <div class="card-body">
+        <h4 class="mb-1">Start your free trial</h4>
+        <p class="mb-4">Create your @platformName account for purchase, sales, stock and accounting. No card needed.</p>
+
+        <form asp-action="Index" method="post">
+            <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+            <div class="mb-3"><label asp-for="BusinessName" class="form-label"></label><input asp-for="BusinessName" class="form-control" autocomplete="organization" autofocus /></div>
+            <div class="mb-3"><label asp-for="OwnerName" class="form-label"></label><input asp-for="OwnerName" class="form-control" autocomplete="name" /></div>
+            <div class="mb-3"><label asp-for="Email" class="form-label"></label><input asp-for="Email" type="email" class="form-control" autocomplete="email" /></div>
+            <div class="mb-3"><label asp-for="Phone" class="form-label"></label><input asp-for="Phone" class="form-control" inputmode="tel" autocomplete="tel" /></div>
+            <div class="mb-3"><label asp-for="Password" class="form-label"></label><input asp-for="Password" class="form-control" autocomplete="new-password" /><div class="form-text">8+ characters with upper and lower case, a digit and a symbol.</div></div>
+            <div class="mb-3"><label asp-for="ConfirmPassword" class="form-label"></label><input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" /></div>
+            @* Honeypot: hidden from people, tempting to bots. *@
+            <div style="position:absolute; left:-10000px;" aria-hidden="true"><label>Website <input asp-for="Website" tabindex="-1" autocomplete="off" /></label></div>
+            <div class="form-check mb-3">
+                <input asp-for="AcceptTerms" class="form-check-input" />
+                <label asp-for="AcceptTerms" class="form-check-label">
+                    I accept the @if (!string.IsNullOrEmpty(terms)) { <a href="@terms" target="_blank" rel="noopener">terms of service</a> } else { <text>terms of service</text> } and @if (!string.IsNullOrEmpty(privacy)) { <a href="@privacy" target="_blank" rel="noopener">privacy policy</a> } else { <text>privacy policy</text> }, and the <a href="/DataAgreement" target="_blank" rel="noopener">data agreement</a> (your data stays yours; you can export it any time)
+                </label>
+            </div>
+            <button class="btn btn-primary d-grid w-100">Create my account</button>
+        </form>
+        <p class="text-center mt-3 mb-0">Already registered? <a href="/Account/Login">Sign in</a></p>
+    </div>
+</div>

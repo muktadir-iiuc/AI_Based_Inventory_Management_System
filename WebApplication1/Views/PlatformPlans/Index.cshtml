@@ -1,0 +1,52 @@
+@using WebApplication1.Models.Saas
+@using WebApplication1.Services.Saas
+@model List<SubscriptionPlan>
+@{
+    ViewData["Title"] = "Subscription plans";
+    var subscribers = (Dictionary<int, int>)ViewData["Subscribers"]!;
+}
+
+@section Toolbar { <a href="/Platform/Plans/Create" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New plan</a> }
+
+<div class="alert alert-info small">Changing a plan never rewrites what existing subscribers pay or what issued invoices say; it applies to new subscriptions, plan changes and the plan's visibility.</div>
+
+<div class="card">
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-striped table-hover mb-0 align-middle">
+            <thead><tr><th>Plan</th><th>Price</th><th>Trial</th><th>Grace</th><th>Limits (users / products / warehouses)</th><th>Modules</th><th>Visible</th><th>Status</th><th class="text-end">Subscribers</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td><a asp-action="Edit" asp-route-id="@p.Id" class="fw-semibold">@p.Name</a><div class="small text-muted">@p.Code</div></td>
+                    <td class="text-nowrap">@p.Price.ToString("#,0.##") @p.Currency<div class="small text-muted">@BillingMath.DescribeInterval(p.IntervalCount, p.IntervalUnit)</div></td>
+                    <td>@(p.TrialDays > 0 ? $"{p.TrialDays} days" : "-")</td>
+                    <td>@p.GraceDays d</td>
+                    <td class="small">@(p.MaxUsers?.ToString() ?? "∞") / @(p.MaxProducts?.ToString() ?? "∞") / @(p.MaxWarehouses?.ToString() ?? "∞")</td>
+                    <td class="small">@p.Features.Count / @Features.All.Length</td>
+                    <td>@(p.IsPublic ? "Yes" : "No")</td>
+                    <td><span class="badge text-bg-@(p.Status switch { PlanStatus.Active => "success", PlanStatus.Draft => "secondary", PlanStatus.Disabled => "warning", _ => "dark" })">@p.Status</span></td>
+                    <td class="text-end">@subscribers.GetValueOrDefault(p.Id)</td>
+                    <td class="text-end text-nowrap">
+                        <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                        <form asp-action="SetStatus" asp-route-id="@p.Id" method="post" class="d-inline">
+                            @if (p.Status == PlanStatus.Active)
+                            {
+                                <button name="status" value="Disabled" class="btn btn-sm btn-outline-warning">Disable</button>
+                            }
+                            else if (p.Status is PlanStatus.Disabled or PlanStatus.Draft)
+                            {
+                                <button name="status" value="Active" class="btn btn-sm btn-outline-success">Enable</button>
+                            }
+                            @if (p.Status != PlanStatus.Archived)
+                            {
+                                <button name="status" value="Archived" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Archive this plan? It is hidden everywhere; existing subscribers keep it.');">Archive</button>
+                            }
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

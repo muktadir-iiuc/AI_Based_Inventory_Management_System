@@ -1,0 +1,55 @@
+@using WebApplication1.Models.Saas
+@using WebApplication1.Services.Saas
+@model BillingPlansViewModel
+@{ ViewData["Title"] = "Available plans"; }
+
+<div class="row g-3">
+@foreach (var plan in Model.Plans)
+{
+    var current = Model.Subscription?.PlanId == plan.Id && Model.Subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue or SubscriptionStatus.GracePeriod;
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="card h-100 @(current ? "border-primary" : "")">
+            <div class="card-header"><h3 class="card-title mb-0">@plan.Name @if (current) { <span class="badge text-bg-primary ms-1">Current</span> }</h3></div>
+            <div class="card-body">
+                <div class="fs-3 fw-semibold">@plan.Price.ToString("#,0.##") <small class="fs-6 text-muted">@plan.Currency / @BillingMath.DescribeInterval(plan.IntervalCount, plan.IntervalUnit)</small></div>
+                @if (plan.TaxPercent > 0) { <div class="text-muted small">+ @plan.TaxPercent.ToString("0.##")% tax</div> }
+                <p class="mt-2">@plan.Description</p>
+                <ul class="list-unstyled mb-3">
+                    <li>Users: @(plan.MaxUsers?.ToString() ?? "unlimited")</li>
+                    <li>Products: @(plan.MaxProducts?.ToString() ?? "unlimited")</li>
+                    <li>Warehouses: @(plan.MaxWarehouses?.ToString() ?? "unlimited")</li>
+                </ul>
+                <ul class="list-unstyled mb-0 small">
+                    @foreach (var (key, label) in Features.All)
+                    {
+                        var has = plan.Features.Any(f => f.FeatureKey == key);
+                        <li class="@(has ? "" : "text-muted")"><i class="fas @(has ? "fa-check text-success" : "fa-xmark") me-1"></i>@label</li>
+                    }
+                </ul>
+            </div>
+            <div class="card-footer">
+                @if (current)
+                {
+                    <button class="btn btn-secondary w-100" disabled>Your current plan</button>
+                }
+                else
+                {
+                    <form asp-action="ChoosePlan" method="post">
+                        <input type="hidden" name="planId" value="@plan.Id" />
+                        @if (ViewData["NeedsAgreement"] is true)
+                        {
+                            <div class="form-check mb-2 small">
+                                <input type="checkbox" class="form-check-input" id="agree-@plan.Id" name="acceptDataAgreement" value="true" required />
+                                <label class="form-check-label" for="agree-@plan.Id">I accept the <a href="/DataAgreement" target="_blank">data agreement</a>.</label>
+                            </div>
+                        }
+                        <button class="btn btn-primary w-100">Choose this plan</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+}
+@if (Model.Plans.Count == 0) { <div class="col-12"><div class="alert alert-info">No plans are available right now. Contact support.</div></div> }
+</div>
+<p class="text-muted small mt-3">Upgrades start when the invoice is paid (no credit for the unused part of the current term). Downgrades start at your next renewal. Enterprise and custom contracts are arranged with our team.</p>

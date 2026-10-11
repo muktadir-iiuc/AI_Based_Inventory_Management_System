@@ -10,9 +10,12 @@ using WebApplication1.Models.Identity;
 using WebApplication1.Models.Purchase;
 using WebApplication1.Models.ViewModels;
 using WebApplication1.Services;
+using WebApplication1.Models.Saas;
+using WebApplication1.Services.Saas;
 
 namespace WebApplication1.Controllers;
 
+[RequireFeature(Features.Purchasing)]
 public class SuppliersController(ApplicationDbContext db, IAccountingService accountingService, IWebHostEnvironment env, ICompanySettingsService companySettings, IPartyPaymentService partyPayments) : Controller
 {
     public async Task<IActionResult> Index(string? search)
@@ -148,18 +151,23 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
         rows.AddRange(payments.Select(p => new PartyLedgerRow
         {
             Date = p.Date.WithTime(p.CreatedAt),
-            DocumentType = "Payment Made",
+            // A negative party-level payment is an advance refund — it moves the balance the other way.
+            DocumentType = p.Amount < 0 ? "Refund Received" : "Payment Made",
             DocumentNumber = p.PaymentNumber,
-            Description = p.InvoiceNumber is null ? "Opening balance / advance" : $"Against {p.InvoiceNumber}",
+            Description = p.Amount < 0 ? "Advance refund" : p.InvoiceNumber is null ? "Opening balance / advance" : $"Against {p.InvoiceNumber}",
             PaymentMethod = PaymentMethods.Describe(p.Method, p.BankName),
-            Debit = p.Amount,
+            Debit = p.Amount > 0 ? p.Amount : 0,
+            Credit = p.Amount < 0 ? -p.Amount : 0,
             TypeRank = 2
         }));
 
         vm.Build(rows);
+        vm.RefundableAdvance = await partyPayments.RefundableAdvanceAsync(PartyLedgerType.Supplier, supplier.Id, warehouseIds);
         return vm;
     }
 
+    // Not for Sales Officers and Viewers (Roles.SupplierLedgerViewers).
+    [Authorize(Roles = Roles.SupplierLedgerViewers)]
     public async Task<IActionResult> Ledger(int? partyId, DateTime? from, DateTime? to)
     {
         var vm = await BuildLedgerAsync(partyId, from, to);
@@ -191,8 +199,33 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
             : RedirectToAction(nameof(Ledger), new { partyId });
     }
 
+    // Pay back (part of) the party's advance — what they paid beyond what they owed. Never more
+    // than the advance itself; the service enforces the cap (see IPartyPaymentService).
+    [HttpPost]
+    [Authorize(Roles = Roles.AccountingManagers)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RefundAdvance(int partyId, decimal amount, DateTime? date, PaymentMethod method, string? bankName, string? notes, string? returnUrl)
+    {
+        var result = await partyPayments.RefundAdvanceAsync(PartyLedgerType.Supplier, partyId, amount, date ?? DateTime.UtcNow.Date,
+            method, bankName, notes, User.GetWarehouseIds(), User.Identity?.Name);
+
+        if (result.Ok)
+        {
+            TempData["Success"] = $"Advance refund {result.PaymentNumbers[0]} of {Math.Round(amount, 2):N2} recorded.";
+        }
+        else
+        {
+            TempData["Error"] = result.Error;
+        }
+
+        return !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+            ? LocalRedirect(returnUrl)
+            : RedirectToAction(nameof(Ledger), new { partyId });
+    }
+
     // The same ledger (same rows, same running balance, same warehouse scoping) as an A4 PDF in
     // the Sales Invoice report's style, opened inline so it can be printed or saved from the viewer.
+    [Authorize(Roles = Roles.SupplierLedgerViewers)]
     public async Task<IActionResult> LedgerPdf(int partyId, DateTime? from, DateTime? to)
     {
         var vm = await BuildLedgerAsync(partyId, from, to);
@@ -210,6 +243,7 @@ public class SuppliersController(ApplicationDbContext db, IAccountingService acc
     // From the invoice Edit page, excludeInvoiceId leaves that invoice (lines, payments, returns)
     // out of the balance so it reads as "due before this invoice"; settled is what the invoice
     // itself has already paid/returned, which the page nets off its edited total.
+    [Authorize(Roles = Roles.SupplierLedgerViewers)]
     public async Task<IActionResult> Due(int id, int? excludeInvoiceId = null)
     {
         var warehouseIds = User.GetWarehouseIds();

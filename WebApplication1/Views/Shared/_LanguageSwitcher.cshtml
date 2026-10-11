@@ -1,0 +1,29 @@
+@using WebApplication1.Services
+@{
+    var isBn = UiLanguage.IsBangla(Context);
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var style = ViewData["SwitcherStyle"] as string ?? "nav";   // "nav" = AdminLTE navbar item, "plain" = standalone (sign-in pages)
+}
+@if (style == "plain")
+{
+    <form method="post" action="/Language/Set" class="d-inline-flex gap-1 ims-lang-switch" data-i18n-skip>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <button type="submit" name="lang" value="en" class="btn btn-sm @(isBn ? "btn-outline-secondary" : "btn-secondary")">English</button>
+        <button type="submit" name="lang" value="bn" class="btn btn-sm @(isBn ? "btn-secondary" : "btn-outline-secondary")">বাংলা</button>
+    </form>
+}
+else
+{
+    <li class="nav-item dropdown ims-lang-switch" data-i18n-skip>
+        <a class="nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Language / ভাষা">
+            <i class="fas fa-language"></i> <span class="d-none d-md-inline">@(isBn ? "বাংলা" : "EN")</span>
+        </a>
+        <form method="post" action="/Language/Set" class="dropdown-menu dropdown-menu-end p-0">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <button type="submit" name="lang" value="en" class="dropdown-item d-flex align-items-center gap-2">English @if (!isBn) { <i class="fas fa-check ms-auto"></i> }</button>
+            <button type="submit" name="lang" value="bn" class="dropdown-item d-flex align-items-center gap-2">বাংলা @if (isBn) { <i class="fas fa-check ms-auto"></i> }</button>
+        </form>
+    </li>
+}

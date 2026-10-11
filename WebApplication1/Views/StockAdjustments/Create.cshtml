@@ -4,6 +4,8 @@
     ViewData["Title"] = "New Stock Adjustment Request";
     var warehouseList = (SelectList)ViewData["Warehouses"]!;
     var reasons = Html.GetEnumSelectList<StockAdjustmentReason>();
+    // Sales Officers/Viewers don't see or enter costs; an increase then uses the product's last cost on approval.
+    var showCost = User.CanSeePurchasePrice();
 }
 
 <div class="alert alert-info py-2 small">
@@ -53,7 +55,10 @@
                                 <th>Product</th>
                                 <th style="width: 140px">Adjustment</th>
                                 <th style="width: 100px">Quantity</th>
-                                <th style="width: 115px">Unit Cost</th>
+                                @if (showCost)
+                                {
+                                    <th style="width: 115px">Unit Cost</th>
+                                }
                                 <th style="width: 115px">Sale Price</th>
                                 <th style="width: 100px">Available</th>
                                 <th style="width: 52px"></th>
@@ -64,7 +69,14 @@
                 </div>
                 <div class="card-footer small text-muted">
                     <strong>Decrease</strong> removes stock (oldest batches first, at their own cost).
-                    <strong>Increase</strong> adds a new batch — enter what those units cost; sale price is optional and defaults to the product's default price.
+                    @if (showCost)
+                    {
+                        <text><strong>Increase</strong> adds a new batch — enter what those units cost; sale price is optional and defaults to the product's default price.</text>
+                    }
+                    else
+                    {
+                        <text><strong>Increase</strong> adds a new batch at the product's last cost; sale price is optional and defaults to the product's default price.</text>
+                    }
                 </div>
             </div>
         </div>
@@ -96,6 +108,7 @@
 
 @section Scripts {
     <script>
+        const showCost = @(showCost ? "true" : "false");
         const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewData["Products"]));
         const initialItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Items.Select(i => new { productId = i.ProductId, direction = (int)i.Direction, quantity = i.Quantity, unitCost = i.UnitCost, salePrice = i.SalePrice })));
         const warehouseEl = document.getElementById('warehouseId');
@@ -130,7 +143,7 @@
                     </select>
                 </td>
                 <td><input name="Items[${i}].Quantity" type="number" step="1" min="1" class="form-control qty-input" value="1" /></td>
-                <td><input name="Items[${i}].UnitCost" type="number" step="0.01" min="0" class="form-control cost-input" placeholder="Cost" /></td>
+                ${showCost ? `<td><input name="Items[${i}].UnitCost" type="number" step="0.01" min="0" class="form-control cost-input" placeholder="Cost" /></td>` : ''}
                 <td><input name="Items[${i}].SalePrice" type="number" step="0.01" min="0" class="form-control price-input" placeholder="Optional" /></td>
                 <td class="available-cell text-muted">&mdash;</td>
                 <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove line"><i class="fas fa-times"></i></button></td>`;
@@ -155,9 +168,9 @@
                 const product = products.find(p => p.Id == select.value);
                 const stock = product ? stockInWarehouse(product) : null;
                 available.textContent = stock === null ? '—' : stock.toFixed(2).replace(/\.?0+$/, '');
-                cost.disabled = price.disabled = !isIncrease();
-                cost.required = isIncrease();
-                if (!isIncrease()) { cost.value = ''; price.value = ''; }
+                price.disabled = !isIncrease();
+                if (cost) { cost.disabled = !isIncrease(); cost.required = isIncrease(); }
+                if (!isIncrease()) { if (cost) cost.value = ''; price.value = ''; }
                 const short = !isIncrease() && stock !== null && (parseFloat(qty.value) || 0) > stock;
                 tr.classList.toggle('table-danger', short);
                 available.classList.toggle('text-danger', short);
@@ -169,7 +182,7 @@
                 const product = products.find(p => p.Id == select.value);
                 // Pre-fill an increase from the product's default prices, but never overwrite what was typed.
                 if (product && isIncrease()) {
-                    if (!cost.value) cost.value = product.CostPrice;
+                    if (cost && !cost.value) cost.value = product.CostPrice;
                     if (!price.value) price.value = product.SalePrice;
                 }
                 refresh();
@@ -190,7 +203,7 @@
                 if (init.productId) select.value = init.productId;
                 direction.value = String(init.direction || 2);
                 if (init.quantity) qty.value = init.quantity;
-                if (init.unitCost != null) cost.value = init.unitCost;
+                if (cost && init.unitCost != null) cost.value = init.unitCost;
                 if (init.salePrice != null) price.value = init.salePrice;
                 if (typeof jQuery !== 'undefined') { jQuery(select).trigger('change.select2'); jQuery(direction).trigger('change.select2'); }
             }

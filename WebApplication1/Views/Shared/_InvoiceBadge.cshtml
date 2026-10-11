@@ -1,0 +1,15 @@
+@using WebApplication1.Models.Saas
+@model InvoiceStatus
+@{
+    var (cls, text) = Model switch
+    {
+        InvoiceStatus.Paid => ("success", "Paid"),
+        InvoiceStatus.PartiallyPaid => ("info", "Partially paid"),
+        InvoiceStatus.Overdue => ("danger", "Overdue"),
+        InvoiceStatus.Cancelled => ("secondary", "Cancelled"),
+        InvoiceStatus.Refunded => ("dark", "Refunded"),
+        InvoiceStatus.Draft => ("secondary", "Draft"),
+        _ => ("warning", "Pending")
+    };
+}
+<span class="badge text-bg-@cls">@text</span>
